@@ -169,7 +169,9 @@ class J2534BridgeTransport(
                 scopedMemoryReadEnabled = approvedMemoryReadScope != null
                 standardObdPhysicalReadEnabled = response.opt("standardObdPhysicalRead") == true &&
                     J2534StandardObd.supportsChannel(requestCanId, responseCanId, protocolNumber)
-                standardObdClearEnabled = standardObdPhysicalReadEnabled && response.opt("standardObdClear") == true
+                standardObdClearEnabled = standardObdPhysicalReadEnabled &&
+                    J2534StandardObd.supportsPrimaryChannel(requestCanId, responseCanId, protocolNumber) &&
+                    response.opt("standardObdClear") == true
                 opened = true
                 val adapter = response.optString("adapter", "J2534")
                 val voltage = response.optLong("batteryMillivolts", -1L)
@@ -277,6 +279,13 @@ class J2534BridgeTransport(
         return supported
     }
 
+    suspend fun readStandardObdVin(): String? {
+        check(isStandardObdPhysicalReadEnabled)
+        val reply = exchange(byteArrayOf(9, 2), 3500)
+        check(isStandardObdPhysicalReadEnabled)
+        return J2534StandardObd.vinData(reply)
+    }
+
     suspend fun readStandardObdPid(pid: Int): String {
         check(isStandardObdPhysicalReadEnabled)
         require(pid in 1..255)
@@ -306,7 +315,9 @@ class J2534BridgeTransport(
         check(isStandardObdPhysicalReadEnabled) {
             "J2534 disconnected before the physical console response was accepted."
         }
-        return reply.toHex()
+        // exchange() already verified the configured physical response ID;
+        // retain it alongside the assembled payload for console provenance.
+        return checkNotNull(connectedResponseCanId) + " " + reply.toHex()
     }
 
     internal companion object {
@@ -362,8 +373,8 @@ class J2534BridgeTransport(
         check(isStandardObdPhysicalReadEnabled)
         // An absent/refused read is not equivalent to a confirmed empty list.
         suspend fun read(mode: Int): List<ObdDtc>? =
-            J2534StandardObd.optionalDtcs(mode, exchange(byteArrayOf(mode.toByte()), 2500))
-        return PhysicalObdDtcSnapshot(requireNotNull(read(3)), read(7), read(10))
+            J2534StandardObd.evidenceDtcs(mode, exchange(byteArrayOf(mode.toByte()), 2500))
+        return PhysicalObdDtcSnapshot(read(3), read(7), read(10))
     }
 
     /** Physical scan uses only exact read payloads, never AT commands. */
@@ -378,13 +389,14 @@ class J2534BridgeTransport(
                 1 -> payload.size == 2
                 2 -> payload.size == 3 && payload[2] == 0.toByte()
                 3,7,10 -> payload.size == 1
-                6 -> payload.size == 2 && payload[1] == 0.toByte()
-                9 -> payload.size == 2 && (payload[1].toInt() and 0xFF) in setOf(2,4,6,10)
+                6 -> payload.size == 2
+                8 -> payload.size == 2 && (payload[1].toInt() and 0xFF) % 32 == 0
+                9 -> payload.size == 2
                 else -> false
             }) { "Unsupported physical OBD scan command." }
             val reply = exchange(payload, timeout)
             if (J2534StandardObd.isExplicitlyUnsupported(mode, reply) &&
-                mode != 3 && !(mode == 1 && payload[1] == 0.toByte())) {
+                !(mode == 1 && payload[1] == 0.toByte())) {
                 // Keep the actual negative response in the scan log; the
                 // read decoder treats the requested service as unavailable.
                 reply.toHex()
@@ -401,7 +413,7 @@ class J2534BridgeTransport(
             }
         })
         return engine.fullPhysicalCanScan(responder, standardObdAdapterInfo) { mode, raw ->
-            J2534StandardObd.optionalDtcs(mode, raw.hexToBytes())
+            J2534StandardObd.evidenceDtcs(mode, raw.hexToBytes())
         }
     }
 

@@ -2,6 +2,10 @@ package com.camarodiag.gen5.data.obd
 
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
 
 /** A single-command OBD transport. Implement with Bluetooth/USB/Wi-Fi ELM or a documented provider. */
 fun interface ObdCommandChannel {
@@ -13,22 +17,32 @@ data class ObdValue(
     val name: String,
     val value: String,
     val unit: String = "",
-    val raw: List<Int>
-)
+    val raw: List<Int>,
+    val responder: String? = null
+) {
+    /** A value at the encoded temperature limit is not automatically a
+     * sensor failure or valid physical temperature. Retain the evidence. */
+    val temperatureAtEncodingLimit: Boolean get() = when (pid) {
+        0x05, 0x0F, 0x46, 0x5C -> raw.singleOrNull() in setOf(0, 255)
+        else -> false
+    }
+}
 
 data class ObdDtc(val code: String, val status: String)
 
-/** Null means the ECU explicitly refused that read; it never means zero DTCs. */
+/** Null means no verified positive read; it never means zero DTCs. */
 data class PhysicalObdDtcSnapshot(
-    val confirmed: List<ObdDtc>,
+    val confirmed: List<ObdDtc>?,
     val pending: List<ObdDtc>?,
     val permanent: List<ObdDtc>?
 ) {
     val unavailableModes: Set<Int> get() = buildSet {
+        if (confirmed == null) add(3)
         if (pending == null) add(7)
         if (permanent == null) add(10)
     }
-    val records: List<ObdDtc> get() = confirmed + pending.orEmpty() + permanent.orEmpty()
+    val records: List<ObdDtc> get() = confirmed.orEmpty() + pending.orEmpty() + permanent.orEmpty()
+    val modeCounts: Map<Int, Int?> get() = linkedMapOf(3 to confirmed?.size, 7 to pending?.size, 10 to permanent?.size)
 }
 
 data class ObdEcuIdentification(
@@ -38,6 +52,25 @@ data class ObdEcuIdentification(
     val ecuNames: List<String>,
     val respondingEcuAddresses: List<String>
 )
+
+/** Raw observations are evidence, not necessarily a valid or decoded measurement. */
+data class ObdMode01Observation(
+    val responder: String?,
+    val bytes: List<Int>,
+    val eligibleForDecode: Boolean,
+    val decodedValueCount: Int
+)
+
+data class ObdMode01Read(
+    val pid: Int,
+    val rawResponse: String,
+    val observations: List<ObdMode01Observation>
+)
+
+data class ObdFreezeFrameRead(val pid: Int, val rawResponse: String, val verifiedBytes: List<Int>?)
+
+data class ObdVehicleInfoRead(val infoType: Int, val rawResponse: String, val positiveRecords: List<List<Int>>,
+    val extendedRecords: List<ObdJ1979ExtendedVehicleInfo.Result> = emptyList())
 
 data class ObdScanReport(
     val supportedPids: Set<Int>,
@@ -57,8 +90,32 @@ data class ObdScanReport(
     val rawLog: List<String>,
     val freezeFrameDtc: ObdDtc? = null,
     val physicalCanResponder: String? = null,
-    val unavailableDtcModes: Set<Int> = emptySet()
-)
+    val unavailableDtcModes: Set<Int> = emptySet(),
+    val supportedPidsByResponder: Map<String, Set<Int>> = emptyMap(),
+    val firstUnresolvedPid: Int? = null,
+    val pidAttributionIncomplete: Boolean = false,
+    val mode01Reads: List<ObdMode01Read> = emptyList(),
+    val freezeFrameSupportedPids: Set<Int> = emptySet(),
+    val freezeFrameReads: List<ObdFreezeFrameRead> = emptyList(),
+    val freezeFrameSupportComplete: Boolean? = null,
+    val freezeFrameResponder: String? = null,
+    val vehicleInfoSupportedTypes: Set<Int> = emptySet(),
+    val vehicleInfoSupportComplete: Boolean? = null,
+    val vehicleInfoReads: List<ObdVehicleInfoRead> = emptyList(),
+    val mode05: ObdMode05Report? = null,
+    val mode08: ObdMode08Inventory? = null,
+    val negotiatedElmProtocol: Int? = null,
+    val anonymousLegacyVinCandidate: String? = null,
+    // Distinguish verified empty results from absent evidence.
+    val pidInventoryComplete: Boolean? = null,
+    val verifiedDtcModes: Set<Int> = emptySet(),
+    val nativeUsbEvidence: String? = null
+) {
+    /** Missing and explicitly unavailable modes must both remain unknown. */
+    val unverifiedDtcModes: Set<Int> get() = setOf(3, 7, 10).filterTo(linkedSetOf()) {
+        it !in verifiedDtcModes || it in unavailableDtcModes
+    }
+}
 
 /**
  * Read-only SAE J1979 scanner.
@@ -66,9 +123,40 @@ data class ObdScanReport(
  * It only sends standardized OBD-II read services and adapter setup commands.
  * It does not invoke UDS programming, security access, actuator control or ECU writes.
  */
-class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
+class ObdElmFormattingException : IllegalStateException("ELM response formatting could not be restored.")
+
+class Obd2FeatureEngine(
+    private val channel: ObdCommandChannel,
+    private val physicalElmHeaders: Boolean = false
+) {
 
     private val log = mutableListOf<String>()
+    private var freezeFrameSourcePinned = false
+    private var freezeFrameSource: String? = null
+    private var freezeFrameSupportComplete: Boolean? = null
+
+    /** An entire freeze-frame record belongs to one responding ECU.
+     * Do not switch to another responder when a later PID is unavailable. */
+    private fun freezeFrameValue(response: String, pid: Int, nonzeroDtc: Boolean = false): List<Int>? {
+        val observations = CamaroUdsProtocol.parseFreezeFrameObservations(response, pid)
+        val grouped = observations.groupBy { it.responder }
+        val valid = grouped.mapNotNull { (source, rows) ->
+            val unique = rows.map { it.bytes }.distinct().singleOrNull() ?: return@mapNotNull null
+            if (nonzeroDtc && unique.all { it == 0 }) return@mapNotNull null
+            source to unique
+        }.toMap()
+        if (freezeFrameSourcePinned) return valid[freezeFrameSource]
+        val physical = valid.keys.filterNotNull().sorted()
+        val selected = physical.firstOrNull { it == "7E8" || it == "18DAF110" }
+            ?: physical.firstOrNull()
+        if (selected == null && !valid.containsKey(null)) return null
+        freezeFrameSource = selected
+        freezeFrameSourcePinned = true
+        return valid[selected]
+    }
+
+    /** Actual command/response evidence; callers decide whether to export it. */
+    fun rawExchangeLog(): List<String> = log.toList()
 
     private suspend fun ask(command: String, timeoutMs: Long = 1800L): String {
         val response = channel.command(command, timeoutMs).trim()
@@ -76,17 +164,62 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return response
     }
 
+    private suspend fun formattingCommand(command: String) {
+        val lines = ask(command).lineSequence().map { it.trim().removeSuffix(">").trim() }
+            .filter { it.isNotEmpty() }.toList()
+        if (lines.lastOrNull()?.equals("OK", ignoreCase = true) != true ||
+            lines.any { it.uppercase(Locale.ROOT) in setOf("?", "ERROR", "NO DATA", "UNABLE TO CONNECT") }) {
+            throw ObdElmFormattingException()
+        }
+    }
+
+    private suspend fun restorePhysicalHeaders() = withContext(NonCancellable) {
+        var failed = false
+        for (command in listOf("ATH1", "ATS0")) {
+            if (runCatching { formattingCommand(command) }.isFailure) failed = true
+        }
+        if (failed) throw ObdElmFormattingException()
+    }
+
+    /** The ELM itself assembles multi-frame Mode 09/DTC replies in headerless
+     * automatic formatting. Restore the normal header-bearing PID channel
+     * before releasing the transport's exclusive command session. */
+    private suspend fun <T> withHeaderlessRecords(block: suspend () -> T): T {
+        if (!physicalElmHeaders) return block()
+        return try {
+            formattingCommand("ATH0")
+            formattingCommand("ATS0")
+            block()
+        } finally {
+            restorePhysicalHeaders()
+        }
+    }
+
+    /** One operator-selected read. Keep the original response, including
+     * line boundaries. Let ELM assemble Mode 09 and DTC records, then
+     * restore its header-bearing telemetry format before releasing the lock. */
+    suspend fun readConsoleRequest(request: SafeObdRequest): String {
+        require(SafeObdRequestPolicy.parse(request.elmCommand) == request)
+        return if (request.service == 0x01) ask(request.elmCommand, 4_000L)
+        else withHeaderlessRecords { ask(request.elmCommand, 4_000L) }
+    }
+
     suspend fun initialize(): Map<String, String> {
         val result = linkedMapOf<String, String>()
         listOf("ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATSP6").forEach {
             result[it] = ask(it, 2500L)
         }
-        result["IDENTIFICATION"] = ask("ATI")
-        result["DESCRIPTION"] = ask("AT@1")
-        result["PROTOCOL"] = ask("ATDP")
-        result["VOLTAGE"] = ask("ATRV")
+        result.putAll(inspectAdapter())
         return result
     }
+
+    /** Read adapter metadata without resetting its negotiated vehicle protocol. */
+    private suspend fun inspectAdapter(): Map<String, String> = linkedMapOf(
+        "IDENTIFICATION" to ask("ATI"),
+        "DESCRIPTION" to ask("AT@1"),
+        "PROTOCOL" to ask("ATDP"),
+        "VOLTAGE" to ask("ATRV")
+    )
 
     /**
      * Detects 11-bit CAN response identifiers returned to the standard OBD
@@ -95,58 +228,100 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
      */
     suspend fun discoverFunctionalObdResponders(): List<String> {
         return try {
-            ask("ATS1")
-            ask("ATH1")
+            if (physicalElmHeaders) {
+                formattingCommand("ATS1")
+                formattingCommand("ATH1")
+            } else {
+                ask("ATS1")
+                ask("ATH1")
+            }
             val response = ask("0100", 2500L)
-            val ids = Regex("(?i)(?:^|\\s)([0-9A-F]{3})\\s+(?=(?:[0-9A-F]{2}\\s*){4,})")
-                .findAll(response)
-                .mapNotNull { match ->
-                    val id = match.groupValues[1].uppercase(Locale.ROOT)
-                    val numeric = id.toIntOrNull(16) ?: return@mapNotNull null
-                    id.takeIf { numeric in 0x7E8..0x7EF }
+            val ids = response.lineSequence().flatMap { line ->
+                // Some adapters put several header-tagged CAN replies on one line.
+                line.split(Regex("(?i)\\s+(?=(?:7E[0-9A-F]|7DF|18DAF1[0-9A-F]{2})\\s+)" )).asSequence()
+            }.mapNotNull { raw ->
+                val line = raw.trim().removeSuffix(">").trim().uppercase(Locale.ROOT)
+                val spaced = Regex("^(7E[8-F]|18DAF1[0-9A-F]{2})\\s+").find(line)
+                val id = spaced?.groupValues?.get(1) ?: when {
+                    line.length % 2 == 1 && line.startsWith("7E") -> line.take(3)
+                    line.startsWith("18DAF1") -> line.take(8)
+                    else -> return@mapNotNull null
                 }
-                .distinct()
-                .sorted()
-                .toList()
+                if (!id.matches(Regex("7E[8-F]|18DAF1[0-9A-F]{2}"))) return@mapNotNull null
+                val payload = CamaroUdsProtocol.parsePidBytes(line, "00") ?: return@mapNotNull null
+                id.takeIf { payload.size == 4 }
+            }.distinct().sorted().toList()
             ids
         } finally {
             // Restore normal ELM output framing regardless of the scan result.
-            runCatching { ask("ATH0") }
-            runCatching { ask("ATS0") }
+            if (physicalElmHeaders) restorePhysicalHeaders()
+            else {
+                runCatching { ask("ATH0") }
+                runCatching { ask("ATS0") }
+            }
         }
     }
 
     /** Reads Mode 01 supported-PID bitmaps (PID 00, 20, ... E0). */
-    data class PidDiscovery(val supported: Set<Int>, val firstUnresolvedPid: Int?)
+    data class PidDiscovery(val supported: Set<Int>, val firstUnresolvedPid: Int?,
+        val byResponder: Map<String, Set<Int>> = emptyMap(),
+        val attributionIncomplete: Boolean = false)
 
     suspend fun discoverSupportedPids(): Set<Int> = discoverPidAvailability().supported
 
     suspend fun discoverPidAvailability(primaryPowertrainResponderOnly: Boolean = false): PidDiscovery {
         val supported = linkedSetOf<Int>()
+        val byResponder = linkedMapOf<String, MutableSet<Int>>()
+        var attributionIncomplete = false
+        fun result(unresolved: Int?) = PidDiscovery(supported.toSet(), unresolved,
+            byResponder.mapValues { it.value.toSet() }, attributionIncomplete)
+        var expectedResponders: Set<String?>? = null
+        var firstUnresolved: Int? = null
         var basePid = 0x00
         repeat(8) {
             val pidHex = "%02X".format(Locale.US, basePid)
             val response = ask("01$pidHex")
-            val bytes = if (primaryPowertrainResponderOnly) {
-                CamaroUdsProtocol.parsePidBytes(response, pidHex, primaryPowertrainResponderOnly = true)
-                    ?.takeIf { it.size == 4 }?.asList()
-            } else payload(response, 0x41, basePid)
-            if (bytes == null || bytes.size < 4) return PidDiscovery(supported, basePid + 1)
-
-            for (bit in 0 until 32) {
-                val mask = 1 shl (7 - (bit % 8))
-                if ((bytes[bit / 8] and mask) != 0 && bit != 31) {
-                    // Bit 31 is the continuation flag for the next bitmap page,
-                    // not a queryable Mode 01 PID (0x20, 0x40, ...).
-                    supported += basePid + bit + 1
-                }
+            val grouped = CamaroUdsProtocol.parsePidObservations(response, pidHex,
+                primaryPowertrainResponderOnly).filter { it.bytes.size == 4 }
+                .groupBy { it.responder }
+            val candidates = if (grouped.keys.any { it != null }) grouped.filterKeys { it != null } else grouped
+            val valid = candidates.mapNotNull { (address, rows) ->
+                val distinct = rows.map { it.bytes }.distinct()
+                if (address == null && distinct.size > 1 && !primaryPowertrainResponderOnly) {
+                    // Without headers, multiple functional replies cannot be
+                    // tied to ECUs. Their OR is only a union of advertised PIDs,
+                    // never the support bitmap of a single ECU.
+                    attributionIncomplete = true
+                    address to List(4) { index -> distinct.fold(0) { mask, bytes -> mask or bytes[index] } }
+                } else distinct.singleOrNull()?.let { address to it }
+            }.toMap()
+            if (candidates.keys.any { it == null }) attributionIncomplete = true
+            val expected = expectedResponders
+            val accepted = if (expected == null) valid else valid.filterKeys { it in expected }
+            if (accepted.isEmpty() || (expected != null && !accepted.keys.containsAll(expected)) ||
+                (expected == null && accepted.size != candidates.size)) {
+                if (firstUnresolved == null) firstUnresolved = basePid + 1
             }
-
-            val hasNextPage = (bytes[3] and 0x01) != 0
-            if (!hasNextPage) return PidDiscovery(supported, null)
+            if (accepted.isEmpty()) return result(firstUnresolved)
+            val next = linkedSetOf<String?>()
+            for ((address, bytes) in accepted) {
+                if (address != null) byResponder.getOrPut(address) { linkedSetOf() }
+                for (bit in 0 until 31) {
+                    val mask = 1 shl (7 - (bit % 8))
+                    if ((bytes[bit / 8] and mask) != 0) {
+                        val pid = basePid + bit + 1
+                        supported += pid
+                        if (address != null) byResponder.getOrPut(address) { linkedSetOf() } += pid
+                    }
+                }
+                if ((bytes[3] and 0x01) != 0) next += address
+            }
+            if (next.isEmpty()) return result(firstUnresolved)
+            expectedResponders = next
             basePid += 0x20
         }
-        return PidDiscovery(supported, null)
+        // E0 continuation cannot lead to another one-byte bitmap PID.
+        return result(firstUnresolved ?: 0xE1)
     }
 
     /**
@@ -160,25 +335,83 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return ask("01%02X".format(Locale.US, pid), 1800L)
     }
 
-    suspend fun readLiveData(supportedPids: Set<Int>): List<ObdValue> {
-        val requested = listOf(
-            0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
-            0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x1C, 0x1F,
-            0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A,
-            0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34,
-            0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E,
-            0x3F, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A,
-            0x4B, 0x4C, 0x4D, 0x4E, 0x52, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F,
-            0x59, 0x61, 0x62, 0x63
-        )
+    suspend fun readLiveData(supportedPids: Set<Int>,
+        byResponder: Map<String, Set<Int>> = emptyMap()): List<ObdValue> =
+        collectMode01Reads(supportedPids, byResponder).first
+
+    /** Read every advertised data PID once, including those without a local
+     * definition. Bitmap page markers are discovery commands, not sensor data.
+     * Keep conflicting and anonymous replies as raw evidence, never measurements. */
+    private suspend fun collectMode01Reads(
+        supportedPids: Set<Int>,
+        byResponder: Map<String, Set<Int>>,
+        physicalCanResponder: String? = null,
+        inventoryVerified: Boolean = false
+    ): Pair<List<ObdValue>, List<ObdMode01Read>> {
         val values = mutableListOf<ObdValue>()
-        for (pid in requested) {
-            if (pid !in supportedPids) continue
+        val reads = mutableListOf<ObdMode01Read>()
+        val configByAddress = mutableMapOf<String,MutableMap<Int,MutableList<List<Int>?>>>()
+        val layoutByAddress=mutableMapOf<String,Int>()
+        val readinessByAddress=mutableMapOf<String,List<Int>>()
+        // Read equipment configuration before dependent values. Never query
+        // an unadvertised identifier and never share scales between ECUs.
+        val ordered = supportedPids.filter { it in 1..255 && it % 32 != 0 }
+            .sortedWith(compareBy<Int>({ if(ObdJ1979ScalingContext.isConfiguration(it)||it in setOf(1,0x1D))0 else 1 },{it}))
+        for (pid in ordered) {
+            currentCoroutineContext().ensureActive()
             val response = ask("01%02X".format(Locale.US, pid), 1200L)
-            val data = payload(response, 0x41, pid) ?: continue
-            values += decode(pid, data)
+            val observations = CamaroUdsProtocol.parsePidObservations(response, "%02X".format(Locale.ROOT, pid))
+            val groups = observations.groupBy { it.responder }
+            val hasAddress = groups.keys.any { it != null }
+            val evidence = mutableListOf<ObdMode01Observation>()
+            for ((responder, rows) in groups) {
+                val dataRows = rows.map { it.bytes }.distinct()
+                val address = responder ?: physicalCanResponder
+                val eligible = dataRows.size == 1 &&
+                    !(hasAddress && responder == null) &&
+                    !(responder == null && byResponder.isNotEmpty()) &&
+                    !(responder != null && byResponder.isNotEmpty() && pid !in byResponder[responder].orEmpty()) &&
+                    !(physicalCanResponder != null && responder != null && responder != physicalCanResponder)
+                for (data in dataRows) {
+                    if (ObdJ1979ScalingContext.isConfiguration(pid) && address != null) {
+                        val cfg = configByAddress.getOrPut(address){mutableMapOf()}
+                        cfg.getOrPut(pid){mutableListOf()}.add(
+                            if(eligible && ObdJ1979ScalingContext.validConfiguration(pid,data))listOf(0x41,pid)+data else null)
+                    }
+                    if(eligible&&address!=null){
+                        if(pid==0x1D&&data.size==1)layoutByAddress[address]=data[0]
+                        if(pid==1&&data.size==4)readinessByAddress[address]=data.toList()
+                    }
+                    val decoded = if (!eligible || ObdJ1979ScalingContext.isConfiguration(pid))emptyList()
+                        else if(ObdJ1979OperatingContext.isTrim(pid)){
+                            ObdJ1979OperatingContext.decodeTrim(listOf(1,pid),data,address?.let(layoutByAddress::get))?.signals.orEmpty().mapNotNull { signal ->
+                                signal.number?.let { ObdValue(pid,signal.name,it.toString(),signal.unit,data,address) }
+                            }
+                        } else if(pid==0x41){
+                            ObdJ1979OperatingContext.decodeCycle(data,address?.let(readinessByAddress::get))?.monitors.orEmpty()
+                                .filter { it.supported==true }.map { monitor ->
+                                    ObdValue(pid,monitor.name,if(monitor.complete==true)"COMPLETE" else "INCOMPLETE","",data,address)
+                                }
+                        }
+                        else if (ObdJ1979ScalingContext.dependency(pid)!=null && address!=null) {
+                            val supported = byResponder[address] ?: if(physicalCanResponder==address)supportedPids else emptySet()
+                            val verified = inventoryVerified && (byResponder.containsKey(address)||physicalCanResponder==address)
+                            val context = ObdJ1979ScalingContext.fromSupport(supported,verified,configByAddress[address].orEmpty())
+                            val record = context.decode(listOf(1,pid),listOf(0x41,pid)+data)
+                            if(record==null)emptyList() else record.signals.map { signal ->
+                                ObdValue(pid,signal.name,signal.number?.let {
+                                    String.format(Locale.US,"%.6f",it).trimEnd('0').trimEnd('.')
+                                } ?: data.joinToString(" ") { "%02X".format(Locale.US,it) },
+                                    if(signal.number==null)"raw" else signal.unit,data,address)
+                            }
+                        } else decode(pid,data).map { it.copy(responder=address) }
+                    values += decoded
+                    evidence += ObdMode01Observation(address, data, eligible, decoded.size)
+                }
+            }
+            reads += ObdMode01Read(pid, response, evidence)
         }
-        return values
+        return values to reads
     }
 
     suspend fun readDtcs(): Triple<List<ObdDtc>, List<ObdDtc>, List<ObdDtc>> = Triple(
@@ -211,12 +444,30 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         ) to proved
     }
 
+    /** Fail closed when either speed or RPM is unavailable or nonzero.
+     * Called immediately before the separately consented Mode 04 operation
+     * within the manager's exclusive command session. No mutation here. */
+    suspend fun hasFreshStationaryEvidence(): Boolean = withHeaderlessRecords {
+        ObdStationaryEvidence.provesZero(0x0D, ask("010D", 1800L)) &&
+            ObdStationaryEvidence.provesZero(0x0C, ask("010C", 1800L))
+    }
+
+    /** Per-service observations distinguish a positive zero count from no response. */
+    suspend fun readDtcModeEvidence(): Map<Int, List<ObdDtc>?> = withHeaderlessRecords {
+        linkedMapOf(
+            3 to decodeDtcResponseOrNull(ask("03", 2500L), 0x43, "confirmed"),
+            7 to decodeDtcResponseOrNull(ask("07", 2500L), 0x47, "pending"),
+            10 to decodeDtcResponseOrNull(ask("0A", 2500L), 0x4A, "permanent")
+        )
+    }
+
     /** Reads the DTC that caused freeze-frame storage (Mode 02, PID 02, frame 00). */
     suspend fun readFreezeFrameDtc(): ObdDtc? {
-        val data = payload(ask("020200"), 0x42, 0x02) ?: return null
-        // Mode 02 payload begins with the frame number, followed by the two DTC bytes.
-        if (data.size < 3 || data[0] != 0x00) return null
-        val raw = (data[1] shl 8) or data[2]
+        freezeFrameSourcePinned = false
+        freezeFrameSource = null
+        freezeFrameSupportComplete = null
+        val data = freezeFrameValue(ask("020200"), 0x02, nonzeroDtc = true) ?: return null
+        val raw = (data[0] shl 8) or data[1]
         if (raw == 0) return null
         val prefix = "PCBU"[(raw shr 14) and 0x03]
         val digit = (raw shr 12) and 0x03
@@ -230,12 +481,11 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     suspend fun discoverFreezeFrameSupportedPids(): Set<Int> {
         val supported = linkedSetOf<Int>()
         var basePid = 0x00
+        freezeFrameSupportComplete = false
         repeat(8) {
+            currentCoroutineContext().ensureActive()
             val response = ask("02%02X00".format(Locale.US, basePid))
-            val data = payload(response, 0x42, basePid) ?: return supported
-            // Mode 02 echoes the requested frame number before the four bitmap bytes.
-            if (data.size < 5 || data[0] != 0x00) return supported
-            val bitmap = data.drop(1).take(4)
+            val bitmap = freezeFrameValue(response, basePid)?.takeIf { it.size == 4 } ?: return supported
             for (bit in 0 until 32) {
                 val mask = 1 shl (7 - (bit % 8))
                 if ((bitmap[bit / 8] and mask) != 0 && bit != 31) {
@@ -243,7 +493,10 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
                 }
             }
             val hasNextPage = (bitmap[3] and 0x01) != 0
-            if (!hasNextPage) return supported
+            if (!hasNextPage) {
+                freezeFrameSupportComplete = true
+                return supported
+            }
             basePid += 0x20
         }
         return supported
@@ -253,31 +506,61 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
      * Reads freeze-frame values only for PIDs advertised by the Mode 02 support bitmap.
      * Each Mode 02 response contains the frame number before the actual PID data.
      */
-    suspend fun readFreezeFrame(supportedPids: Set<Int>? = null): Map<Int, List<Int>> {
+    suspend fun readFreezeFrame(supportedPids: Set<Int>? = null): Map<Int, List<Int>> =
+        collectFreezeFrameReads(supportedPids ?: discoverFreezeFrameSupportedPids()).first
+
+    private suspend fun collectFreezeFrameReads(supportedPids: Set<Int>):
+        Pair<Map<Int, List<Int>>, List<ObdFreezeFrameRead>> {
         val result = linkedMapOf<Int, List<Int>>()
-        val pids = listOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42)
-        for (pid in pids) {
-            if (supportedPids != null && pid !in supportedPids) continue
-            val data = payload(ask("02%02X00".format(Locale.US, pid)), 0x42, pid) ?: continue
-            if (data.isEmpty() || data[0] != 0x00) continue
-            val valueBytes = data.drop(1) // Drop only the echoed frame number.
-            if (valueBytes.isNotEmpty()) result[pid] = valueBytes
+        val reads = mutableListOf<ObdFreezeFrameRead>()
+        // PID 02 has already been read to identify the triggering DTC.
+        for (pid in supportedPids.filter { it in 1..255 && it % 32 != 0 && it != 2 }.sorted()) {
+            currentCoroutineContext().ensureActive()
+            val response = ask("02%02X00".format(Locale.US, pid))
+            val data = freezeFrameValue(response, pid)
+            reads += ObdFreezeFrameRead(pid, response, data)
+            if (data != null) result[pid] = data
         }
-        return result
+        return result to reads
     }
 
-    suspend fun readVin(): String? =
-        decodeAsciiRecords(ask("0902"), 0x49, 0x02, 17).singleOrNull()
+    private suspend fun readVinRecord(timeoutMs: Long): String? =
+        decodeAsciiRecords(ask("0902", timeoutMs), 0x49, 0x02, 17).distinct().singleOrNull()
             ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
 
+    suspend fun readVin(): String? = withHeaderlessRecords { readVinRecord(3500L) }
+
+    /** A fresh VIN observation with normal ELM formatting and one bounded retry.
+     * Never substitutes the saved or previously displayed VIN for a new response.
+     */
+    suspend fun readVinForVerification(): String? = withHeaderlessRecords {
+        if (!physicalElmHeaders) {
+            ask("ATH0")
+            ask("ATS0")
+        }
+        readVinRecord(3500L) ?: readVinRecord(5000L)
+    }
+
+    // Some functional Mode 09 replies interleave numbered blocks from
+    // several ECUs once headers are removed. Never guess their association.
+    // A single retry with headers restores the source information.
+    private suspend fun readIdentityField(command: String, decode: (String) -> List<String>): List<String> {
+        val first = withHeaderlessRecords { decode(ask(command, 3500L)) }
+        if (first.isNotEmpty() || !physicalElmHeaders) return first
+        // withHeaderlessRecords restored ATH1/ATS0 in its finally block.
+        val retry = ask(command, 3500L)
+        if (!ObdNumberedIdentityFrames.hasPhysicalHeaders(retry)) return emptyList()
+        return decode(retry)
+    }
+
     suspend fun readCalibrationIds(): List<String> =
-        decodeAsciiRecords(ask("0904"), 0x49, 0x04, 16)
+        readIdentityField("0904") { decodeAsciiRecords(it, 0x49, 0x04, 16) }
 
     suspend fun readCalibrationVerificationNumbers(): List<String> =
-        decodeHexRecords(ask("0906"), 0x49, 0x06, 4)
+        readIdentityField("0906") { decodeHexRecords(it, 0x49, 0x06, 4) }
 
     suspend fun readEcuName(): List<String> =
-        decodeAsciiRecords(ask("090A"), 0x49, 0x0A, 20)
+        readIdentityField("090A") { decodeAsciiRecords(it, 0x49, 0x0A, 20) }
     /** Reads standardized OBD identity fields independently; unsupported optional records do not abort the read. */
     suspend fun readEcuIdentification(): ObdEcuIdentification {
         val responders = readOrDefault(emptyList()) { discoverFunctionalObdResponders() }
@@ -293,30 +576,123 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             read()
         } catch (cancelled: CancellationException) {
             throw cancelled
+        } catch (formatting: ObdElmFormattingException) {
+            throw formatting
         } catch (_: Exception) {
             default
         }
 
     suspend fun readReadiness(): String? {
-        val data = payload(ask("0101"), 0x41, 0x01) ?: return null
-        if (data.size < 4) return null
-        val mil = (data[0] and 0x80) != 0
-        val dtcCount = data[0] and 0x7F
-        return "MIL=${if (mil) "ON" else "OFF"}; DTC_COUNT=$dtcCount; RAW=${data.joinToString(" ") { "%02X".format(Locale.US, it) }}"
+        val grouped = CamaroUdsProtocol.parsePidObservations(ask("0101"), "01")
+            .filter { it.bytes.size == 4 }.groupBy { it.responder }
+        val sources = if (grouped.keys.any { it != null }) grouped.filterKeys { it != null } else grouped
+        return sources.flatMap { (responder, rows) ->
+            rows.map { it.bytes }.distinct().map { data ->
+                val mil = (data[0] and 0x80) != 0
+                val dtcCount = data[0] and 0x7F
+                val prefix = responder?.let { "CAN $it: " }.orEmpty()
+                "${prefix}MIL=${if (mil) "ON" else "OFF"}; DTC_COUNT=$dtcCount; RAW=${data.joinToString(" ") { "%02X".format(Locale.US, it) }}"
+            }
+        }.joinToString("\n").ifBlank { null }
     }
 
+    /** CAN Mode 06 is a separate namespace from Mode 01 PIDs.
+     * Query only MIDs actually advertised by a valid support bitmap.
+     * Report encoded words and UASID; do not invent engineering units or pass/fail. */
     suspend fun readMonitorTests(): String? =
-        ask("0600", 2500L).takeUnless {
-            it.contains("NO DATA", true) || it.contains("?", true) || it.contains("UNABLE TO CONNECT", true)
+        readMonitorTests(20_000L) { System.nanoTime() / 1_000_000L }
+
+    /** A shared request budget, not a new 2.5 s budget for every advertised MID.
+     * The channel must honor the supplied timeout; ELM setup/restore is outside
+     * this budget and still executes under the exclusive session. */
+    internal suspend fun readMonitorTests(
+        budgetMs: Long,
+        monotonicMs: () -> Long
+    ): String? = withHeaderlessRecords {
+        require(budgetMs > 0)
+        val started = monotonicMs()
+        suspend fun request(mid: Int): String? {
+            currentCoroutineContext().ensureActive()
+            val remaining = budgetMs - (monotonicMs() - started)
+            if (remaining <= 0) return null
+            val response = ask("06%02X".format(Locale.ROOT, mid), minOf(2500L, remaining))
+            currentCoroutineContext().ensureActive()
+            return response
         }
 
-    suspend fun fullReadOnlyScan(): ObdScanReport {
+        val supported = linkedSetOf<Int>()
+        var baseMid = 0
+        var discovered = false
+        var incomplete = false
+        for (pageIndex in 0 until 8) {
+            val response = request(baseMid)
+            val page = response?.let { ObdCanMonitorRecords.support(it, baseMid) }
+            if (page == null) {
+                if (discovered) incomplete = true
+                break
+            }
+            discovered = true
+            supported += page.mids
+            if (!page.more || baseMid == 0xE0) break
+            baseMid += 0x20
+        }
+        if (!discovered) return@withHeaderlessRecords null
+        val result = mutableListOf<String>()
+        val mids = supported.toList()
+        for ((index, mid) in mids.withIndex()) {
+            val response = request(mid)
+            if (response == null) {
+                incomplete = true
+                result += "UNQUERIED_MIDS=" + mids.drop(index).joinToString(",") {
+                    "%02X".format(Locale.ROOT, it)
+                }
+                break
+            }
+            val records = ObdCanMonitorRecords.results(response, mid)
+            if (records.isNullOrEmpty()) {
+                incomplete = true
+                result += "MID=%02X: N/A".format(Locale.ROOT, mid)
+            } else result += records.map { it.rawText() }
+        }
+        // A valid empty support bitmap is evidence, unlike no response.
+        if (result.isEmpty()) result += "DISCOVERED_MIDS=0"
+        if (incomplete) result += "PARTIAL"
+        currentCoroutineContext().ensureActive()
+        result.joinToString("\n")
+    }
+
+    suspend fun fullReadOnlyScan(expectedLegacyProtocol: Int? = null): ObdScanReport {
+        require(expectedLegacyProtocol == null || expectedLegacyProtocol in 1..5)
         log.clear()
-        val adapter = initialize()
+        // The live adapter is already configured by its transport. Resetting it
+        // here would silently switch 29-bit/250 kbit/s/legacy OBD to CAN 11-bit.
+        val adapter = inspectAdapter()
         val respondingEcus = discoverFunctionalObdResponders()
-        return collectReadOnlyScan(adapter, respondingEcus, readDtcRecords = {
-            val (confirmed,pending,permanent) = readDtcs()
-            PhysicalObdDtcSnapshot(confirmed,pending,permanent)
+        val negotiated = ObdLegacyOxygenTests.protocolNumber(ask("ATDPN"))
+        if (expectedLegacyProtocol != null) check(negotiated == expectedLegacyProtocol) {
+            "The negotiated ELM protocol does not match the selected legacy recipe."
+        }
+        if (negotiated != null && negotiated in 1..5) {
+            // Legacy headers are not CAN ISO-TP framing. Let ELM validate
+            // link-layer checksums and expose anonymous application records.
+            return withHeaderlessRecords {
+                val legacyEngine = Obd2FeatureEngine(channel)
+                val report = legacyEngine.collectReadOnlyScan(adapter, emptyList(),
+                    negotiatedProtocol = negotiated, readDtcRecords = {
+                        PhysicalObdDtcSnapshot(
+                            ObdLegacyRecords.dtcs("03", legacyEngine.ask("03", 2500L), "confirmed"),
+                            ObdLegacyRecords.dtcs("07", legacyEngine.ask("07", 2500L), "pending"),
+                            ObdLegacyRecords.dtcs("0A", legacyEngine.ask("0A", 2500L), "permanent"))
+                    })
+                if (expectedLegacyProtocol != null) check(report.firstUnresolvedPid != 1) {
+                    "No verified initial legacy PID support response."
+                }
+                report.copy(rawLog = log.toList() + report.rawLog)
+            }
+        }
+        return collectReadOnlyScan(adapter, respondingEcus, negotiatedProtocol = negotiated, readDtcRecords = {
+            val modes = readDtcModeEvidence()
+            PhysicalObdDtcSnapshot(modes[3], modes[7], modes[10])
         })
     }
 
@@ -335,35 +711,115 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return collectReadOnlyScan(adapterInfo, listOf(responderCanId),
             physicalCanResponder = responderCanId, readDtcRecords = {
                 PhysicalObdDtcSnapshot(
-                    requireNotNull(decodeDtcPayload(3, ask("03"))) { "Confirmed DTC read is unavailable." },
+                    decodeDtcPayload(3, ask("03")),
                     decodeDtcPayload(7, ask("07")), decodeDtcPayload(10, ask("0A")))
             })
+    }
+
+    private data class VehicleInfoInventory(val supported: Set<Int>, val complete: Boolean,
+        val reads: List<ObdVehicleInfoRead>, val anonymousVin: String? = null)
+
+    /** Strip only the exact command echo; never discard an unrelated diagnostic record.
+     * ELM echo settings are not guaranteed on every supported connector. */
+    private fun mode09Records(response: String, type: Int): List<List<Int>> {
+        val command = "09%02X".format(Locale.ROOT, type)
+        val clean = response.lineSequence()
+            .filterNot { it.trim().removeSuffix(">").filterNot(Char::isWhitespace).equals(command, ignoreCase = true) }
+            .joinToString("\n")
+        return ObdNumberedIdentityFrames.parseAll(clean).orEmpty()
+    }
+
+    /** The union is only an inventory, not proof that every ECU supports each type.
+     * Preserve complete records separately; no invented units or counter labels. */
+    private suspend fun discoverVehicleInfo(legacy: Boolean = false): VehicleInfoInventory = withHeaderlessRecords {
+        val supported = linkedSetOf<Int>()
+        val reads = mutableListOf<ObdVehicleInfoRead>()
+        var complete = false
+        for (base in 0..0xE0 step 0x20) {
+            currentCoroutineContext().ensureActive()
+            val response = ask("09%02X".format(Locale.ROOT, base), 2500L)
+            val messages = mode09Records(response, base)
+            val offset = if (legacy) 3 else 2
+            val records = if (legacy) ObdLegacyRecords.infoPage(base, response).orEmpty()
+                else messages.filter { it.size == 6 && it[0] == 0x49 && it[1] == base &&
+                    (base != 0xE0 || it.last() and 1 == 0) }
+            reads += ObdVehicleInfoRead(base, response, records)
+            if (records.isEmpty()) break
+            // Keep verified observations, but do not certify completeness when
+            // another responder returned a malformed or unrelated record.
+            val pageComplete = messages.size == records.size
+            for (record in records) {
+                for (bit in 0 until 31) {
+                    if ((record[offset + bit / 8] and (1 shl (7 - bit % 8))) != 0)
+                        supported += base + bit + 1
+                }
+            }
+            if (!pageComplete) break
+            if (records.none { (it.last() and 1) != 0 }) {
+                complete = true
+                break
+            }
+        }
+        // These four identity records are acquired by the existing verified
+        // VIN/CAL ID/CVN/ECU-name readers, including their fallback formatting.
+        for (type in supported.filterNot { !legacy && it in setOf(2,4,6,10) }.sorted()) {
+            currentCoroutineContext().ensureActive()
+            val response = ask("09%02X".format(Locale.ROOT, type), 2500L)
+            val records = if (legacy) ObdLegacyRecords.infoRecords(type, response).orEmpty()
+                else mode09Records(response, type).filter { it.size > 2 && it[0] == 0x49 && it[1] == type }
+            val extended = if (!legacy && type in ObdJ1979ExtendedVehicleInfo.extendedTypes)
+                records.mapNotNull { ObdJ1979ExtendedVehicleInfo.can(type,it) }
+            else emptyList() // Anonymous legacy fragments must never be merged.
+            reads += ObdVehicleInfoRead(type, response, records, extended)
+        }
+        val candidate = if (legacy) ObdLegacyRecords.anonymousVin(
+            reads.firstOrNull { it.infoType == 1 }?.positiveRecords.orEmpty(),
+            reads.firstOrNull { it.infoType == 2 }?.positiveRecords.orEmpty()) else null
+        VehicleInfoInventory(supported, complete, reads, candidate)
     }
 
     private suspend fun collectReadOnlyScan(
         adapter: Map<String, String>,
         respondingEcus: List<String>,
         physicalCanResponder: String? = null,
+        negotiatedProtocol: Int? = null,
         readDtcRecords: suspend () -> PhysicalObdDtcSnapshot
     ): ObdScanReport {
-        val supported = discoverSupportedPids()
-        val live = readLiveData(supported)
+        val discovery = discoverPidAvailability()
+        val supported = discovery.supported
+        val (live, mode01Reads) = collectMode01Reads(supported, discovery.byResponder, physicalCanResponder,
+            discovery.firstUnresolvedPid==null && !discovery.attributionIncomplete)
         val dtcSnapshot = readDtcRecords()
         val freezeFrameDtc = readFreezeFrameDtc()
         val freezeFrameSupported = if (freezeFrameDtc != null) discoverFreezeFrameSupportedPids() else emptySet()
-        val freeze = if (freezeFrameDtc != null) readFreezeFrame(freezeFrameSupported) else emptyMap()
-        val vin = readVin()
-        val calIds = readCalibrationIds()
-        val cvns = readCalibrationVerificationNumbers()
-        val ecuNames = readEcuName()
+        val (freeze, freezeReads) = if (freezeFrameDtc != null) collectFreezeFrameReads(freezeFrameSupported)
+            else emptyMap<Int, List<Int>>() to emptyList<ObdFreezeFrameRead>()
+        val protocolNumber = negotiatedProtocol
+        val legacy = protocolNumber != null && protocolNumber in 1..5
+        val canEvidence = physicalCanResponder != null || respondingEcus.isNotEmpty() ||
+            protocolNumber != null && protocolNumber in 6..9
+        val vehicleInfo = discoverVehicleInfo(legacy)
+        // A legacy anonymous segmented response must never be decoded by
+        // the CAN identity parser or used as a verified physical VIN.
+        val vin = if (legacy) null else readVin()
+        val calIds = if (legacy) emptyList() else readCalibrationIds()
+        val cvns = if (legacy) emptyList() else readCalibrationVerificationNumbers()
+        val ecuNames = if (legacy) emptyList() else readEcuName()
         val readiness = readReadiness()
-        val mode06 = readMonitorTests()?.takeIf {
-            physicalCanResponder == null || payload(it, 0x46, 0x00) != null
-        }
+        val mode05 = if (protocolNumber != null && legacy) withHeaderlessRecords {
+            ObdLegacyOxygenTests.scan(protocolNumber, { command, timeout -> ask(command, timeout) })
+        } else null
+        // Distinct legacy TID/CID records and CAN MID/TID/UASID records.
+        val mode06 = if (legacy) withHeaderlessRecords {
+            ObdLegacyOxygenTests.scanMode06({ command, timeout -> ask(command, timeout) })
+        } else if (canEvidence) readMonitorTests() else null
+        val mode08 = if (legacy || canEvidence) withHeaderlessRecords {
+            ObdMode08Discovery.discover(legacy, physicalCanResponder) { command, timeout -> ask(command, timeout) }
+        } else null
         return ObdScanReport(
             supportedPids = supported,
             liveData = live,
-            confirmedDtcs = dtcSnapshot.confirmed,
+            confirmedDtcs = dtcSnapshot.confirmed.orEmpty(),
             pendingDtcs = dtcSnapshot.pending.orEmpty(),
             permanentDtcs = dtcSnapshot.permanent.orEmpty(),
             vin = vin,
@@ -378,7 +834,25 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             rawLog = log.toList(),
             freezeFrameDtc = freezeFrameDtc,
             physicalCanResponder = physicalCanResponder,
-            unavailableDtcModes = dtcSnapshot.unavailableModes
+            unavailableDtcModes = dtcSnapshot.unavailableModes,
+            supportedPidsByResponder = if (physicalCanResponder != null)
+                mapOf(physicalCanResponder to supported) else discovery.byResponder,
+            firstUnresolvedPid = discovery.firstUnresolvedPid,
+            pidAttributionIncomplete = physicalCanResponder == null && discovery.attributionIncomplete,
+            mode01Reads = mode01Reads,
+            freezeFrameSupportedPids = freezeFrameSupported,
+            freezeFrameReads = freezeReads,
+            freezeFrameSupportComplete = freezeFrameSupportComplete,
+            freezeFrameResponder = if (freezeFrameSourcePinned) freezeFrameSource ?: physicalCanResponder else null,
+            vehicleInfoSupportedTypes = vehicleInfo.supported,
+            vehicleInfoSupportComplete = vehicleInfo.complete,
+            vehicleInfoReads = vehicleInfo.reads,
+            mode05 = mode05,
+            mode08 = mode08,
+            negotiatedElmProtocol = protocolNumber.takeIf { discovery.firstUnresolvedPid != 1 },
+            anonymousLegacyVinCandidate = vehicleInfo.anonymousVin,
+            pidInventoryComplete = discovery.firstUnresolvedPid == null,
+            verifiedDtcModes = dtcSnapshot.modeCounts.filterValues { it != null }.keys.toSet()
         )
     }
 
@@ -418,14 +892,28 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return bytes.takeIf { it.isNotEmpty() }
     }
 
+    private fun identityRecords(response: String, service: Int, pid: Int, width: Int): List<List<Int>>? {
+        val messages = ObdNumberedIdentityFrames.parseAll(response) ?: return null
+        val matching = messages.filter { it.getOrNull(0) == service && it.getOrNull(1) == pid }
+        if (matching.isEmpty()) return null
+        val result = mutableListOf<List<Int>>()
+        for (message in matching) {
+            val data = message.drop(2)
+            val records = recordData(data, width) ?: return null
+            // VIN is one fixed record per responding ECU.
+            if (pid == 0x02 && records.size != 1) return null
+            result += records
+        }
+        return result
+    }
+
     private fun decodeAsciiRecords(
         response: String,
         service: Int,
         pid: Int,
         recordWidth: Int
     ): List<String> {
-        val data = payload(response, service, pid) ?: return emptyList()
-        val records = recordData(data, recordWidth) ?: return emptyList()
+        val records = identityRecords(response, service, pid, recordWidth) ?: return emptyList()
         val decoded = records.map { record ->
             val raw = record.map(Int::toChar).joinToString("")
             val trimmed = raw.trim(' ', '\u0000')
@@ -443,8 +931,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         pid: Int,
         recordWidth: Int
     ): List<String> {
-        val data = payload(response, service, pid) ?: return emptyList()
-        val records = recordData(data, recordWidth) ?: return emptyList()
+        val records = identityRecords(response, service, pid, recordWidth) ?: return emptyList()
         return records.map { record -> record.joinToString("") { "%02X".format(Locale.US, it) } }
     }
 
@@ -478,8 +965,29 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     private fun decodeDtcResponseOrNull(
         response: String, positiveService: Int, status: String
     ): List<ObdDtc>? {
-        val decoded = response.lineSequence().mapNotNull { rawLine ->
-            val line = rawLine.trim().uppercase(Locale.ROOT)
+        val lines = response.lineSequence().map { it.trim().removeSuffix(">").trim().uppercase(Locale.ROOT) }
+            .filter { it.isNotEmpty() }.toList()
+        // Physical multi-frame CAN replies retain their responder while
+        // reassembling ISO-TP. Never decode a first/consecutive frame alone.
+        if (ObdNumberedDtcRecords.hasMultiFrame(response, positiveService)) {
+            val records = ObdNumberedDtcRecords.parsePhysical(response, positiveService) ?: return null
+            val positive = records.filter { it.firstOrNull() == positiveService }
+            if (positive.isEmpty() || positive.any { !ObdNumberedDtcRecords.validPositive(it, positiveService) })
+                return null
+            return positive.flatMap { decodeSingleDtcPayload(it.drop(1), status).orEmpty() }
+                .distinctBy(ObdDtc::code)
+        }
+        // Numbered ELM blocks must be complete, separately framed and
+        // internally consistent. They contain CAN DTC counts, not legacy pairs.
+        if (':' in response) {
+            val records = ObdNumberedDtcRecords.parse(response) ?: return null
+            val positive = records.filter { it.firstOrNull() == positiveService }
+            if (positive.isEmpty() || positive.any { !ObdNumberedDtcRecords.validPositive(it, positiveService) })
+                return null
+            return positive.flatMap { decodeSingleDtcPayload(it.drop(1), status).orEmpty() }
+                .distinctBy(ObdDtc::code)
+        }
+        val decoded = lines.mapNotNull { line ->
             if (line.isEmpty()) return@mapNotNull null
             // Decode each physical responder independently. Concatenating
             // several CAN frames can create synthetic fault codes.
@@ -507,13 +1015,24 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
                 dataText.any { it !in '0'..'9' && it !in 'A'..'F' }
             ) return@mapNotNull null
             val raw = dataText.chunked(2).map { it.toInt(16) }
-            val bytes = if (raw.first() in 1..8 && raw.first() == raw.size - 1) raw.drop(1)
-                else raw
+            // With a physical CAN header, accept ISO-TP single-frame padding
+            // only after the declared PCI length and service have been checked.
+            val physical = compactHeader != null || tagged.containsMatchIn(line)
+            val frame = if (physical && raw.size >= 3 && raw.first() == raw.size - 1 &&
+                raw[1] in 1..7 && raw[2] == positiveService) raw.drop(1) else raw
+            val bytes = when {
+                physical && frame.size <= 8 && frame.first() in 1..7 &&
+                    frame.first() <= frame.size - 1 && frame.getOrNull(1) == positiveService ->
+                    frame.drop(1).take(frame.first())
+                raw.first() in 1..8 && raw.first() == raw.size - 1 -> raw.drop(1)
+                else -> raw
+            }
             if (bytes.firstOrNull() != positiveService) return@mapNotNull null
             decodeSingleDtcPayload(bytes.drop(1), status)
         }.toList()
-        if (decoded.isEmpty()) return null
-        return decoded.flatten().distinctBy(ObdDtc::code)
+        val complete = decoded
+        if (complete.isEmpty()) return null
+        return complete.flatten().distinctBy(ObdDtc::code)
     }
 
     private fun decodeSingleDtcPayload(payload: List<Int>, status: String): List<ObdDtc>? {
@@ -521,7 +1040,11 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         val count = payload.first()
         val data = when {
             count == 0 && payload.size == 1 -> emptyList()
-            count > 0 && payload.size == 1 + 2 * count -> payload.drop(1)
+            count > 0 && payload.size == 1 + 2 * count -> {
+                val pairs = payload.drop(1)
+                if (pairs.chunked(2).any { it.all { byte -> byte == 0 } }) return null
+                pairs
+            }
             payload.size == 2 && payload.all { it == 0 } -> payload
             // Legacy ELM pairs often include a trailing 0000 DTC slot.
             // A single ambiguous 2-byte pair could be a truncated count.
@@ -565,26 +1088,20 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             )
         )
 
-        if (pid in 0x24..0x2B || pid in 0x34..0x3B) {
-            if (data.size != 4) return emptyList()
-            // Camaro uses a two-bank layout; the 3/4-bank PID-to-sensor
-            // arrangement is a different SAE table and needs explicit detection.
-            val currentFamily = pid in 0x34..0x3B
-            val index = pid - (if (currentFamily) 0x34 else 0x24)
-            val bank = if (index < 4) 1 else 2
-            val sensor = index % 4 + 1
-            val sensorLabel = "Bank $bank sensor $sensor"
-            val four = data.toIntArray()
-            val ratio = CamaroUdsProtocol.decodeWidebandLambda(four) ?: return emptyList()
-            val secondary = if (currentFamily)
-                CamaroUdsProtocol.decodeWidebandCurrent(four)
-            else CamaroUdsProtocol.decodeWidebandVoltage(four)
-            val reading = secondary ?: return emptyList()
-            val secondaryName = if (currentFamily) "current" else "voltage"
-            return value("O2 $sensorLabel equivalence ratio", ratio, "lambda") +
-                value("O2 $sensorLabel $secondaryName",
-                    reading, if (currentFamily) "mA" else "V")
+        val categorical = if (ObdJ1979Status.width(pid) != null) {
+            val states = ObdJ1979Status.decodeData(pid, data) ?: return emptyList()
+            states.map { state -> ObdValue(pid, state.name, state.code, "", data) }
+        } else emptyList()
+
+        if (ObdJ1979MultiSignal.width(pid) != null) {
+            val decoded = ObdJ1979MultiSignal.decodeData(pid, data) ?: return emptyList()
+            return categorical + decoded.map { signal ->
+                ObdValue(pid,signal.name,String.format(Locale.US,"%.6f",signal.number)
+                    .trimEnd('0').trimEnd('.'),signal.unit,data)
+            }
         }
+
+        if (ObdJ1979Status.width(pid) != null) return categorical
 
         val decoded: Pair<String, Pair<Double, String>> = when (pid) {
             0x01 -> return emptyList() // Monitor status is displayed in the dedicated readiness card.
@@ -614,7 +1131,12 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             0x2F -> "Fuel tank level" to (percent(a) to "%")
             0x30 -> "Warm-ups since DTC clear" to (a.toDouble() to "count")
             0x31 -> "Distance since DTC clear" to ((word() ?: return emptyList()).toDouble() to "km")
-            0x32 -> "Evaporative system vapour pressure" to (((word() ?: return emptyList()) - 32768) / 4.0 to "Pa")
+            0x32 -> {
+                // SAE J1979 table B23: signed 16-bit, 0.25 Pa per bit.
+                // 0000 = zero; 8000 = -8192 Pa, not a biased unsigned zero.
+                if (data.size != 2) return emptyList()
+                "Evaporative system vapour pressure" to ((word() ?: return emptyList()).toShort().toDouble() / 4.0 to "Pa")
+            }
             0x33 -> "Barometric pressure" to (a.toDouble() to "kPa")
             0x3C, 0x3D, 0x3E, 0x3F -> {
                 val sensor = when (pid) {
@@ -644,7 +1166,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             }
             0x59 -> "Fuel rail absolute pressure" to ((word() ?: return emptyList()) * 10.0 to "kPa")
             0x5A -> "Relative accelerator pedal position" to (percent(a) to "%")
-            0x5B -> "Hybrid battery pack remaining life" to (percent(a) to "%")
+            0x5B -> "Reported traction battery remaining" to (percent(a) to "%")
             0x5C -> "Engine oil temperature" to ((a - 40).toDouble() to "°C")
             0x5D -> "Fuel injection timing" to (((word() ?: return emptyList()) / 128.0) - 210.0 to "°")
             0x5E -> "Engine fuel rate" to ((word() ?: return emptyList()) / 20.0 to "L/h")
@@ -652,6 +1174,10 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             0x61 -> "Driver demand engine torque" to ((a - 125).toDouble() to "%")
             0x62 -> "Actual engine torque" to ((a - 125).toDouble() to "%")
             0x63 -> "Engine reference torque" to ((word() ?: return emptyList()).toDouble() to "Nm")
+            0xA6 -> {
+                if (data.size != 4) return emptyList()
+                "Odometer" to (data.fold(0L) { acc, byte -> (acc shl 8) or byte.toLong() } / 10.0 to "km")
+            }
             else -> return emptyList()
         }
         return value(decoded.first, decoded.second.first, decoded.second.second)

@@ -1,0 +1,193 @@
+package com.camarodiag.gen5.ui
+
+import org.junit.Assert.*
+import org.junit.Test
+
+class PhysicalRecoveryFolderTest {
+    @Test fun requiresOneUnambiguousPair() {
+        assertEquals("a.journal", PhysicalRecoveryFolder.journalName(setOf("a.journal"), setOf("a.journal.blocks")))
+        assertNull(PhysicalRecoveryFolder.journalName(setOf("a", "b"), setOf("a.blocks", "b.blocks")))
+        assertNull(PhysicalRecoveryFolder.journalName(setOf("a"), setOf("other.blocks")))
+        assertFalse(PhysicalRecoveryFolder.safeName("../a"))
+        assertFalse(PhysicalRecoveryFolder.safeName("a/b"))
+        assertFalse(PhysicalRecoveryFolder.safeName(".."))
+        assertTrue(PhysicalRecoveryFolder.safeName("CALIBRATION-1000-8.ecu-block"))
+    }
+    @Test fun inventoryRejectsAliasesAndChangingDocumentIds() {
+        fun entry(name: String, id: String, directory: Boolean = false) =
+            PhysicalRecoveryFolder.Entry(name, id, directory)
+        val journal = entry("a.journal", "one")
+        val blocks = entry("a.journal.blocks", "two", true)
+        val original = listOf(journal, blocks)
+        assertTrue(PhysicalRecoveryFolder.sameInventory(original, original.reversed()))
+        assertFalse(PhysicalRecoveryFolder.sameInventory(original, listOf(journal, blocks.copy(id = "three"))))
+        assertFalse(PhysicalRecoveryFolder.sameInventory(original, listOf(journal)))
+        assertFalse(PhysicalRecoveryFolder.sameInventory(original, listOf(journal, blocks.copy(directory = false))))
+        assertFalse(PhysicalRecoveryFolder.uniqueEntries(listOf(journal, blocks.copy(id = "one"))))
+        assertFalse(PhysicalRecoveryFolder.uniqueEntries(listOf(journal, journal.copy(id = "different"))))
+        assertFalse(PhysicalRecoveryFolder.uniqueEntries(listOf(journal.copy(id = ""))))
+    }
+
+    @Test fun treeInventoryRejectsCrossLevelAliases() {
+        val root = listOf(PhysicalRecoveryFolder.Entry("journal", "j", false),
+            PhysicalRecoveryFolder.Entry("journal.blocks", "b", true),
+            PhysicalRecoveryFolder.Entry("other", "o", false))
+        val block = PhysicalRecoveryFolder.Entry("region.ecu-block", "r", false)
+        assertTrue(PhysicalRecoveryFolder.uniqueTree("root", root, listOf(block)))
+        for (alias in listOf("j", "b", "o", "root"))
+            assertFalse(PhysicalRecoveryFolder.uniqueTree("root", root, listOf(block.copy(id = alias))))
+        assertFalse(PhysicalRecoveryFolder.uniqueTree("j", root, listOf(block)))
+    }
+
+    @Test fun stagingChecksFullDigestEvenWhenSizeIsUnchanged() {
+        val file = java.io.File.createTempFile("recovery", ".block")
+        try {
+            val data = byteArrayOf(1, 2, 3, 4)
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(data)
+            file.writeBytes(data)
+            PhysicalRecoveryFolder.verifyStagedFile(file, 4, digest) {}
+            file.writeBytes(byteArrayOf(1, 2, 3, 5))
+            assertThrows(IllegalStateException::class.java) {
+                PhysicalRecoveryFolder.verifyStagedFile(file, 4, digest) {}
+            }
+            file.writeBytes(byteArrayOf(1, 2, 3))
+            assertThrows(IllegalStateException::class.java) {
+                PhysicalRecoveryFolder.verifyStagedFile(file, 4, digest) {}
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test fun repeatedSourceVerificationRejectsSameLengthChangesAndTruncation() {
+        val original = byteArrayOf(1, 2, 3, 4)
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(original)
+        fun verify(bytes: ByteArray) = PhysicalRecoveryFolder.verifyBytes(
+            bytes.inputStream(), original.size.toLong(), hash) {}
+        verify(original)
+        for (changed in listOf(byteArrayOf(1, 2, 3, 5), byteArrayOf(1, 2, 3),
+            byteArrayOf(1, 2, 3, 4, 5))) {
+            assertThrows(IllegalStateException::class.java) { verify(changed) }
+        }
+        verify(original)
+        var checks = 0
+        assertThrows(java.util.concurrent.CancellationException::class.java) {
+            PhysicalRecoveryFolder.verifyBytes(original.inputStream(), original.size.toLong(), hash) {
+                if (++checks == 2) throw java.util.concurrent.CancellationException()
+            }
+        }
+    }
+
+    @Test fun stagingCannotVerifyThroughSymbolicLink() {
+        val folder = java.nio.file.Files.createTempDirectory("recovery-test")
+        val outside = java.nio.file.Files.createTempFile("original", ".block")
+        val link = folder.resolve("alias.ecu-block")
+        try {
+            val data = byteArrayOf(1,2,3)
+            java.nio.file.Files.write(outside,data)
+            try {
+                java.nio.file.Files.createSymbolicLink(link,outside)
+            } catch (unsupported: UnsupportedOperationException) {
+                org.junit.Assume.assumeNoException(unsupported)
+            } catch (unsupported: java.nio.file.FileSystemException) {
+                org.junit.Assume.assumeNoException(unsupported)
+            }
+            val hash = java.security.MessageDigest.getInstance("SHA-256").digest(data)
+            assertThrows(IllegalStateException::class.java) {
+                PhysicalRecoveryFolder.verifyStagedFile(link.toFile(),3,hash) {}
+            }
+            assertArrayEquals(data,java.nio.file.Files.readAllBytes(outside))
+        } finally {
+            java.nio.file.Files.deleteIfExists(link)
+            java.nio.file.Files.deleteIfExists(folder)
+            java.nio.file.Files.deleteIfExists(outside)
+        }
+    }
+
+    @Test fun sameLengthSameBytesReplacementCannotReuseKnownStagedIdentity() {
+        val folder=java.nio.file.Files.createTempDirectory("recovery-identity")
+        val original=folder.resolve("original.ecu-block")
+        val saved=folder.resolve("saved.ecu-block")
+        try {
+            java.nio.file.Files.write(original,byteArrayOf(1,2,3))
+            val identity=PhysicalRecoveryFolder.stagedIdentity(original.toFile(),false)
+            org.junit.Assume.assumeNotNull(identity.key)
+            java.nio.file.Files.move(original,saved)
+            java.nio.file.Files.write(original,byteArrayOf(1,2,3))
+            PhysicalRecoveryFolder.requireStagedIdentity(saved.toFile(),identity)
+            assertThrows(IllegalStateException::class.java) {
+                PhysicalRecoveryFolder.requireStagedIdentity(original.toFile(),identity)
+            }
+            assertFalse(PhysicalRecoveryFolder.uniqueStagedIdentities(listOf(identity,identity)))
+            assertTrue(PhysicalRecoveryFolder.uniqueStagedIdentities(listOf(identity,
+                PhysicalRecoveryFolder.stagedIdentity(original.toFile(),false))))
+        } finally {
+            java.nio.file.Files.deleteIfExists(original)
+            java.nio.file.Files.deleteIfExists(saved)
+            java.nio.file.Files.deleteIfExists(folder)
+        }
+    }
+
+    @Test fun cleanupDeletesOnlyRegisteredStagingEntries() {
+        val root=java.nio.file.Files.createTempDirectory("recovery-clean").toFile()
+        val blocks=java.io.File(root,"journal.blocks")
+        val journal=java.io.File(root,"journal")
+        val block=java.io.File(blocks,"original.ecu-block")
+        try {
+            val rootId=PhysicalRecoveryFolder.stagedIdentity(root,true)
+            assertTrue(blocks.mkdir())
+            journal.writeBytes(byteArrayOf(1))
+            block.writeBytes(byteArrayOf(2))
+            val created=linkedMapOf(
+                blocks to PhysicalRecoveryFolder.stagedIdentity(blocks,true),
+                journal to PhysicalRecoveryFolder.stagedIdentity(journal,false),
+                block to PhysicalRecoveryFolder.stagedIdentity(block,false))
+            val unexpected=java.io.File(blocks,"unknown")
+            assertTrue(unexpected.mkdir())
+            val preserved=java.io.File(unexpected,"preserve")
+            preserved.writeText("preserve")
+            assertThrows(IllegalStateException::class.java) {
+                PhysicalRecoveryFolder.cleanupStaging(root,rootId,created)
+            }
+            assertTrue(journal.exists())
+            assertTrue(block.exists())
+            assertEquals("preserve",preserved.readText())
+            assertTrue(preserved.delete())
+            assertTrue(unexpected.delete())
+            PhysicalRecoveryFolder.cleanupStaging(root,rootId,created)
+            assertFalse(root.exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun cleanupRefusesReplacedBlockDirectoryEvenWithIdenticalContents() {
+        val root=java.nio.file.Files.createTempDirectory("recovery-clean-id").toFile()
+        val saved=java.nio.file.Files.createTempDirectory("recovery-clean-saved").toFile()
+        val blocks=java.io.File(root,"journal.blocks")
+        try {
+            val rootId=PhysicalRecoveryFolder.stagedIdentity(root,true)
+            assertTrue(blocks.mkdir())
+            val identity=PhysicalRecoveryFolder.stagedIdentity(blocks,true)
+            org.junit.Assume.assumeNotNull(identity.key)
+            java.nio.file.Files.move(blocks.toPath(),saved.toPath().resolve("original"))
+            assertTrue(blocks.mkdir())
+            assertThrows(IllegalStateException::class.java) {
+                PhysicalRecoveryFolder.cleanupStaging(root,rootId,mapOf(blocks to identity))
+            }
+            assertTrue(blocks.isDirectory)
+            assertTrue(java.io.File(saved,"original").isDirectory)
+        } finally {
+            root.deleteRecursively()
+            saved.deleteRecursively()
+        }
+    }
+
+    @Test fun requiresIndependentCompleteIdentity() {
+        val identity = PhysicalRecoveryIdentity("1G1FA1RXXR0123456", "E39", "ECM", "OS-A")
+        assertTrue(identity.valid)
+        assertFalse(identity.copy(vin = "I123").valid)
+        assertFalse(identity.copy(firmware = "").valid)
+        assertFalse(identity.copy(controller = "ECM\n").valid)
+    }
+}

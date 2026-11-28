@@ -1,5 +1,7 @@
 # PR #95 — Audit de reprise des chantiers C1 / C2 / C4 / C6 / C8
 
+> **Mise à jour actuelle PR #117 (26/11/2026)** — cet audit contient des références historiques à la PR #95 désormais fermée. Le développement actif est [PR #117](https://github.com/Hellorheaven/CamaroDiag/pull/117), branche `chore/unified-ci`. DoIP ISO 13400 a réussi sa [validation logicielle complète au SHA e3b5f2a5](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45805147429) ; cela ne qualifie ni un ECU physique ni la programmation OEM. **C6 reste actif** : isolation par instance de pilote Android et de transport banc E39, annulation avant effacement/écriture et classification des capacités par firmware/zone/voie ajoutées après ce SHA. Ces nouveaux changements nécessitent leur validation de fin de C6 ; aucun test intermédiaire de ce lot n'a été lancé. Les vrais pilotes Android programmant les ECU et les fonctions de récupération restent selon #109/#110 ; C8 n'est pas engagé.
+
 > **Décision du propriétaire, 24/11/2026 (prioritaire sur les mentions historiques ci-dessous)** :
 > aucun essai sur voiture ou ECU réel n'est demandé ni exigé pour fermer la PR #95.
 > L'intégration PR utilise tests automatisés, simulations et compilations sans

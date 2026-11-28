@@ -170,6 +170,8 @@ internal static class NativeE39RamLoader
             throw new ArgumentException("No qualified RAM staging supply window.");
         await RequireSupplyAsync();
         var response = await link.ExchangeAsync(plan.RequestDownload, cancellationToken);
+        // Do not stream any RAM block after a late cancelled download ACK.
+        cancellationToken.ThrowIfCancellationRequested();
         // Stock GM bootloader acknowledges download with 0x74. Its response
         // is not the generic ISO-14229 maxBlockLength structure.
         if (response.Length == 3 && response[0] == 0x7F)
@@ -180,6 +182,7 @@ internal static class NativeE39RamLoader
         {
             await RequireSupplyAsync();
             response = await link.ExchangeAsync(frame.Payload, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             RequireAcknowledgment(response, frame.Executes);
         }
         await RequireSupplyAsync();

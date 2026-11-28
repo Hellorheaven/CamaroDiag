@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.ui
 
 import androidx.core.content.edit
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,12 +11,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
@@ -62,34 +64,49 @@ fun ObdScanScreen(
     vehicle: VehicleProfile,
     accountUid: String?,
     savedVehicleId: String?,
-    onRunScan: () -> Unit
+    onRunScan: () -> Unit,
+    onExport: ((ObdScanReport) -> Unit)? = null,
+    nativeUsbPanel: (@Composable () -> Unit)? = null,
+    onStopNativeScan: (() -> Unit)? = null
 ) {
     val unavailable = stringResource(R.string.obd_not_available)
+    val nativeSnapshot=report?.nativeUsbEvidence!=null
+    val nativeValues=remember(report?.nativeUsbEvidence) {
+        report?.nativeUsbEvidence?.let { runCatching { NativeUsbFunctionalEvidence.scanValues(org.json.JSONObject(it)) }.getOrNull() }
+    }
+    val sensorSelectionAvailable=isConnected||nativeSnapshot
 
     val context = LocalContext.current
     val preferences = remember(context) {
         context.getSharedPreferences("obd_sensor_selection", android.content.Context.MODE_PRIVATE)
     }
-    val vehicleKey = report?.vin?.trim()?.uppercase()?.takeIf { it.length == 17 }
-    // An unknown VIN must never share a persistent selection with another vehicle.
-    // A saved garage profile provides a stable identity before the ECU VIN is read.
-    val vehicleIdentity = savedVehicleId?.takeIf(String::isNotBlank)?.let { "garage_$it" }
-        ?: vehicleKey?.let { "vin_$it" }
+    val simulatedReport = report?.adapterInfo?.get("IDENTIFICATION").orEmpty()
+        .contains("SIMULATED", ignoreCase = true)
+    val vehicleKey = report?.vin?.trim()?.uppercase(java.util.Locale.ROOT)
+        ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) && !simulatedReport }
+    // Only the physically observed VIN identifies a persistent selection.
+    // The selected garage vehicle may differ from the connected vehicle.
+    val vehicleIdentity = vehicleKey?.takeUnless { nativeSnapshot }?.let { "vin_$it" }
     val preferenceKey = SensorSelectionScope.key(accountUid, vehicleIdentity)
     val storedPids = remember(preferenceKey, preferences) {
         preferenceKey?.let { preferences.getString(it, null)?.split(",")?.mapNotNull(String::toIntOrNull) }
     }
-    val knownPids = listOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0B, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42, 0x52)
-    val catalogPids = (knownPids + report?.supportedPids.orEmpty() + report?.liveData.orEmpty().map { it.pid }).distinct().sorted()
+    val catalogPids = report?.liveData.orEmpty().map { it.pid }.distinct().sorted()
     val sensorNames = catalogPids.associateWith { localizedObdPidName(it) }
     val measuredPids = report?.liveData.orEmpty().map { it.pid }.toSet()
-    var choosingSensors by rememberSaveable(preferenceKey) { mutableStateOf(false) }
-    var sensorQuery by rememberSaveable(preferenceKey) { mutableStateOf("") }
-    var chosenPids by rememberSaveable(preferenceKey) { mutableStateOf(storedPids.orEmpty()) }
-    var selectionApplied by rememberSaveable(preferenceKey) { mutableStateOf(storedPids != null) }
-    if (choosingSensors && report != null) {
-        var pendingPids by remember(preferenceKey, choosingSensors) {
-            mutableStateOf(if (selectionApplied) chosenPids else report.liveData.map { it.pid })
+    // When no physical VIN is known, keep the selection in this report only.
+    val transientReport = report.takeIf { preferenceKey == null }
+    var choosingSensors by remember(preferenceKey, transientReport) { mutableStateOf(false) }
+    var sensorQuery by remember(preferenceKey, transientReport) { mutableStateOf("") }
+    var chosenPids by remember(preferenceKey, transientReport) { mutableStateOf(storedPids.orEmpty()) }
+    var selectionApplied by remember(preferenceKey, transientReport) { mutableStateOf(storedPids != null) }
+    LaunchedEffect(sensorSelectionAvailable, isScanning, measuredPids) {
+        if (!sensorSelectionAvailable || isScanning || measuredPids.isEmpty()) choosingSensors = false
+    }
+    if (choosingSensors && report != null && sensorSelectionAvailable && !isScanning && measuredPids.isNotEmpty()) {
+        var pendingPids by remember(preferenceKey, choosingSensors, measuredPids) {
+            mutableStateOf((if (selectionApplied) chosenPids else report.liveData.map { it.pid })
+                .filter { it in measuredPids }.distinct())
         }
         AlertDialog(
             onDismissRequest = { choosingSensors = false },
@@ -108,19 +125,23 @@ fun ObdScanScreen(
                                 sensorNames[pid].orEmpty().contains(sensorQuery, ignoreCase = true)
                         }, key = { it }) { pid ->
                             Row(
-                                modifier = Modifier.fillMaxWidth().clickable(enabled = pid in measuredPids) {
-                                    pendingPids = if (pid in pendingPids)
-                                        pendingPids - pid else pendingPids + pid
-                                },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = pid in measuredPids && pid in pendingPids,
+                                modifier = Modifier.fillMaxWidth().toggleable(
+                                    value = pid in pendingPids,
                                     enabled = pid in measuredPids,
-                                    onCheckedChange = { checked ->
-                                        pendingPids = if (checked) pendingPids + pid
+                                    role = Role.Checkbox,
+                                    onValueChange = { checked ->
+                                        pendingPids = if (checked) (pendingPids + pid).distinct()
                                             else pendingPids - pid
                                     }
+                                ),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // One toggle target for the entire row, including
+                                // the checkbox; no competing nested click handlers.
+                                Checkbox(
+                                    checked = pid in pendingPids,
+                                    enabled = pid in measuredPids,
+                                    onCheckedChange = null
                                 )
                                 Column {
                                     Text(sensorNames[pid] ?: stringResource(R.string.obd_pid_generic, pid))
@@ -135,7 +156,7 @@ fun ObdScanScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    chosenPids = pendingPids.distinct()
+                    chosenPids = pendingPids.filter { it in measuredPids }.distinct()
                     selectionApplied = true
                     preferenceKey?.let { key ->
                         preferences.edit { putString(key, chosenPids.joinToString(",")) }
@@ -159,10 +180,10 @@ fun ObdScanScreen(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(stringResource(R.string.obd_scan_title),
                     color = CamaroAmber, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
-                Text(
-                    stringResource(R.string.obd_scan_description),
-                    color = TextMuted, fontSize = 12.sp
-                )
+                // Text(
+                    // stringResource(R.string.obd_scan_description),
+                    // color = TextMuted, fontSize = 12.sp
+                // )
                 Button(
                     onClick = onRunScan,
                     enabled = isConnected && !isScanning,
@@ -171,7 +192,18 @@ fun ObdScanScreen(
                     if (isScanning) CircularProgressIndicator()
                     else Text(stringResource(R.string.obd_run_full_scan))
                 }
-                if (!isConnected) Text(
+                if (report != null && onExport != null) {
+                    Button(onClick = { onExport(report) }, enabled = !isScanning,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.obd_export_full_scan))
+                    }
+                }
+                if (isScanning && onStopNativeScan!=null) {
+                    Button(onClick=onStopNativeScan,modifier=Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.functional_native_usb_scan_stop))
+                    }
+                }
+                if (!isConnected && nativeUsbPanel==null && !nativeSnapshot) Text(
                     stringResource(R.string.obd_connect_adapter_notice),
                     color = CamaroAmber, fontSize = 12.sp
                 )
@@ -181,7 +213,11 @@ fun ObdScanScreen(
             }
         }
 
+        nativeUsbPanel?.let { panel -> item { panel() } }
         if (report != null) {
+            if(nativeSnapshot) item {
+                Text(stringResource(R.string.functional_native_usb_scan_scope),color=CamaroAmber,fontWeight=FontWeight.Bold)
+            }
             val isSimulated = report.adapterInfo["IDENTIFICATION"].orEmpty()
                 .contains("SIMULATED", ignoreCase = true)
             if (isSimulated) {
@@ -200,7 +236,28 @@ fun ObdScanScreen(
                     InfoLine(stringResource(R.string.obd_cal_id), report.calibrationIds.joinToString(" | ").ifBlank { unavailable })
                     InfoLine(stringResource(R.string.obd_cvn), report.calibrationVerificationNumbers.joinToString(" | ").ifBlank { unavailable })
                     InfoLine(stringResource(R.string.obd_ecu_name), report.ecuNames.joinToString(" | ").ifBlank { unavailable })
-                    InfoLine(stringResource(R.string.obd_supported_pids), report.supportedPids.size.toString())
+                    if (report.vehicleInfoSupportComplete != null) {
+                        InfoLine(stringResource(R.string.obd_mode09_types),
+                            report.vehicleInfoSupportedTypes.sorted().joinToString(" ") { "%02X".format(it) }.ifBlank { unavailable })
+                        if (report.vehicleInfoSupportComplete == false)
+                            Text(stringResource(R.string.obd_mode09_partial), color = CamaroAmber, fontSize = 11.sp)
+                        report.vehicleInfoReads.filter { it.infoType % 32 != 0 }.forEach { read ->
+                            Text(stringResource(R.string.obd_mode09_raw, read.infoType), fontSize = 11.sp)
+                            Text(read.rawResponse.take(1024), fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                            read.extendedRecords.forEach { J1979ExtendedVehicleInfoContent(it) }
+                        }
+                    }
+                    InfoLine(stringResource(R.string.obd_supported_pids),
+                        if (report.pidInventoryComplete == null || report.firstUnresolvedPid == 1)
+                            unavailable else report.supportedPids.size.toString())
+                    report.supportedPidsByResponder.toSortedMap().forEach { (address, pids) ->
+                        InfoLine(stringResource(R.string.obd_pid_count_by_ecu, address), pids.size.toString())
+                    }
+                    if (report.pidAttributionIncomplete)
+                        Text(stringResource(R.string.obd_pid_attribution_incomplete), color = CamaroAmber, fontSize = 11.sp)
+                    report.firstUnresolvedPid?.let { pid ->
+                        Text(stringResource(R.string.obd_pid_discovery_partial, pid), color = CamaroAmber, fontSize = 11.sp)
+                    }
                     InfoLine(
                         stringResource(R.string.obd_responding_can_ids),
                         report.respondingEcuAddresses.joinToString(", ").ifBlank { stringResource(R.string.obd_none_identified) }
@@ -223,7 +280,9 @@ fun ObdScanScreen(
 
             item {
                 InfoCard(title = stringResource(R.string.obd_readiness)) {
-                    Text(report.readiness ?: stringResource(R.string.obd_data_unavailable),
+                    val readiness=nativeValues?.readiness
+                    if(readiness!=null) NativeUsbReadinessContent(readiness)
+                    else Text(report.readiness ?: stringResource(R.string.obd_data_unavailable),
                         color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                 }
             }
@@ -232,15 +291,41 @@ fun ObdScanScreen(
                 SectionTitle(stringResource(R.string.obd_returned_live_data))
             }
             item {
-                Button(onClick = { choosingSensors = true }, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = { choosingSensors = true }, enabled = measuredPids.isNotEmpty() && sensorSelectionAvailable && !isScanning, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.obd_choose_sensors))
                 }
             }
             if (report.liveData.isEmpty()) {
                 item { Text(stringResource(R.string.obd_no_live_data), color = TextMuted) }
             } else {
-                items(report.liveData.filter { !selectionApplied || it.pid in chosenPids }, key = { it.pid }) { value ->
+                items(report.liveData.filter { !selectionApplied || it.pid in chosenPids }, key = {
+                    "${it.responder.orEmpty()}:${it.pid}:${it.name}:${it.unit}"
+                }) { value ->
                     ObdValueCard(value)
+                }
+            }
+
+            val unresolvedReads = report.mode01Reads.filter { read ->
+                read.observations.isEmpty() || read.observations.any { it.decodedValueCount == 0 }
+            }
+            if (unresolvedReads.isNotEmpty()) {
+                item {
+                    SectionTitle(stringResource(R.string.obd_raw_pid_title))
+                    Text(stringResource(R.string.obd_raw_pid_notice), color = TextMuted, fontSize = 12.sp)
+                }
+                items(unresolvedReads, key = { "mode01-raw-${it.pid}" }) { read ->
+                    InfoCard(title = stringResource(R.string.obd_pid_generic, read.pid)) {
+                        if (read.observations.isEmpty()) {
+                            Text(stringResource(R.string.obd_raw_pid_no_value), color = CamaroAmber)
+                            Text(read.rawResponse.take(1024), fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                        } else read.observations.filter { it.decodedValueCount == 0 }.forEach { observation ->
+                            observation.responder?.let { Text(stringResource(R.string.obd_value_source, it), color = TextMuted) }
+                            Text(stringResource(if (observation.eligibleForDecode) R.string.obd_raw_pid_undecoded
+                                else R.string.obd_raw_pid_unattributed), color = CamaroAmber)
+                            Text(observation.bytes.joinToString(" ") { "%02X".format(it) },
+                                fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        }
+                    }
                 }
             }
 
@@ -248,19 +333,20 @@ fun ObdScanScreen(
                 SectionTitle(stringResource(R.string.obd_dtc_title))
             }
             val allCodes = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
-            if (report.unavailableDtcModes.isNotEmpty()) {
+            val unknownDtcModes = report.unverifiedDtcModes
+            if (unknownDtcModes.isNotEmpty()) {
                 item {
                     Text(stringResource(R.string.obd_data_unavailable) + ": OBD " +
-                        report.unavailableDtcModes.sorted().joinToString(" / ") { mode -> "%02X".format(java.util.Locale.ROOT, mode) },
+                        unknownDtcModes.sorted().joinToString(" / ") { mode -> "%02X".format(java.util.Locale.ROOT, mode) },
                         color = CamaroAmber, fontSize = 11.sp)
                 }
             }
             if (allCodes.isEmpty()) {
-                if (report.unavailableDtcModes.isEmpty()) {
+                if (unknownDtcModes.isEmpty()) {
                     item { Text(stringResource(R.string.obd_no_dtcs), color = OkGreen) }
                 }
             } else {
-                val matchesVehicle = ObdDtcGuidancePolicy.hasMatchedEcm(
+                val matchesVehicle = !nativeSnapshot && ObdDtcGuidancePolicy.hasMatchedEcm(
                     selectedVin = vehicle.vin,
                     reportedVin = report.vin,
                     responderAddresses = report.respondingEcuAddresses,
@@ -275,13 +361,40 @@ fun ObdScanScreen(
                 InfoCard(title = stringResource(R.string.obd_freeze_frame)) {
                     InfoLine(
                         stringResource(R.string.obd_trigger_dtc),
-                        report.freezeFrameDtc?.code ?: unavailable
+                        report.freezeFrameDtc?.code ?: if(nativeSnapshot&&nativeValues?.freeze?.present==false)
+                            stringResource(R.string.functional_native_usb_freeze_absent) else unavailable
                     )
+                    report.freezeFrameResponder?.let { InfoLine(stringResource(R.string.obd_value_source, it), it) }
+                    if (report.freezeFrameSupportComplete == false)
+                        Text(stringResource(R.string.obd_freeze_partial), color = CamaroAmber, fontSize = 11.sp)
                     if (report.freezeFrame.isEmpty()) {
-                        Text(stringResource(R.string.obd_no_freeze_frame), color = TextMuted, fontSize = 12.sp)
+                        Text(stringResource(if(nativeSnapshot) when(nativeValues?.freeze?.present) {
+                            null->R.string.functional_native_usb_freeze_missing
+                            true->R.string.functional_native_usb_freeze_values_missing
+                            false->R.string.functional_native_usb_freeze_absent
+                        } else R.string.obd_no_freeze_frame), color = TextMuted, fontSize = 12.sp)
                     } else {
                         report.freezeFrame.forEach { (pid, bytes) ->
                             InfoLine("PID %02X".format(pid), bytes.joinToString(" ") { "%02X".format(it) })
+                        }
+                    }
+                    report.freezeFrameReads.filter { it.verifiedBytes == null }.forEach { read ->
+                        Text(stringResource(R.string.obd_freeze_unresolved, read.pid), color = CamaroAmber, fontSize = 11.sp)
+                        Text(read.rawResponse.take(1024), fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                    }
+                }
+            }
+
+            report.mode05?.let { mode ->
+                item {
+                    InfoCard(title = stringResource(R.string.obd_mode05_results)) {
+                        if (!mode.complete)
+                            Text(stringResource(R.string.obd_mode05_partial), color = CamaroAmber, fontSize = 11.sp)
+                        Text(stringResource(R.string.obd_mode05_raw_notice), color = TextMuted, fontSize = 11.sp)
+                        mode.reads.forEach { read ->
+                            InfoLine(read.command, read.positiveRecords.takeIf { it.isNotEmpty() }
+                                ?.joinToString("\n") { record -> record.joinToString(" ") { "%02X".format(it) } }
+                                ?: stringResource(R.string.obd_not_available))
                         }
                     }
                 }
@@ -289,8 +402,24 @@ fun ObdScanScreen(
 
             item {
                 InfoCard(title = stringResource(R.string.obd_mode06_results)) {
+                    if(nativeValues?.monitors?.isNotEmpty()==true) {
+                        Text(stringResource(R.string.functional_native_usb_monitor_encoded_scope),color=TextMuted,fontSize=11.sp)
+                        nativeValues.monitors.forEach { monitor -> NativeUsbMonitorContent(monitor) }
+                    }
                     Text(report.monitorTestRaw ?: stringResource(R.string.obd_not_available),
                         color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                }
+            }
+
+            report.mode08?.let { mode ->
+                item {
+                    InfoCard(title = stringResource(R.string.obd_mode08_inventory)) {
+                        if (!mode.complete)
+                            Text(stringResource(R.string.obd_mode08_partial), color = CamaroAmber, fontSize = 11.sp)
+                        Text(mode.supportedTests.sorted().joinToString(", ") { "TID %02X".format(it) }
+                            .ifBlank { stringResource(R.string.obd_not_available) }, color = TextPrimary)
+                        Text(stringResource(R.string.obd_mode08_no_execution), color = TextMuted, fontSize = 11.sp)
+                    }
                 }
             }
 
@@ -351,7 +480,19 @@ private fun localizedObdPidName(pid: Int): String = when (pid) {
     0x0F -> stringResource(R.string.live_pid_iat)
     0x10 -> stringResource(R.string.live_pid_maf)
     0x11 -> stringResource(R.string.live_pid_throttle)
+    0x1C -> stringResource(R.string.obd_pid_standard)
+    0x1F -> stringResource(R.string.obd_pid_runtime)
+    0x21 -> stringResource(R.string.obd_pid_mil_distance)
+    0x30 -> stringResource(R.string.obd_pid_warmups)
+    0x31 -> stringResource(R.string.obd_pid_clear_distance)
     0x42 -> stringResource(R.string.live_pid_bat)
+    0x43 -> stringResource(R.string.live_pid_abs_load)
+    0x44 -> stringResource(R.string.live_pid_eq_ratio)
+    0x46 -> stringResource(R.string.live_pid_ambient)
+    0x49 -> stringResource(R.string.live_pid_app_d)
+    0x4A -> stringResource(R.string.live_pid_app_e)
+    0xA6 -> stringResource(R.string.obd_pid_odometer)
+    0x5B -> stringResource(R.string.live_pid_hybrid_bat_life)
     0x52 -> stringResource(R.string.live_pid_ethanol)
     else -> stringResource(R.string.obd_pid_generic, pid)
 }
@@ -363,8 +504,17 @@ private fun ObdValueCard(value: ObdValue) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(stringResource(R.string.obd_pid_generic, value.pid), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 Text(localizedObdPidName(value), color = TextMuted, fontSize = 12.sp)
+                value.responder?.let { Text(stringResource(R.string.obd_value_source, it),
+                    color = TextMuted, fontSize = 11.sp) }
+                if (value.temperatureAtEncodingLimit) {
+                    Text(stringResource(R.string.obd_temperature_encoding_limit,
+                        value.raw.joinToString(" ") { "%02X".format(it) }),
+                        color = CamaroAmber, fontSize = 11.sp)
+                }
             }
-            Text("${value.value} ${value.unit}", color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+            Text("${value.value} ${value.unit}",
+                color = if (value.temperatureAtEncodingLimit) CamaroAmber else TextPrimary,
+                fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
         }
     }
 }
@@ -451,8 +601,9 @@ private fun DtcResultCard(
             verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(dtc.code, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(stringResource(R.string.obd_powertrain_ecm),
-                    color = TextMuted, fontSize = 10.sp)
+                // A generic OBD DTC has no physical module attribution here.
+                // Text(stringResource(R.string.obd_powertrain_ecm),
+                //     color = TextMuted, fontSize = 10.sp)
             }
             Text(status, color = statusColor, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
         }

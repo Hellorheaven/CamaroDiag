@@ -246,15 +246,19 @@ internal static class StandardProtocolCli
     {
         try
         {
+            ValidateDoIpArguments(args, "--doip-status",
+                ["--host", "--power-mode", "--timeout-ms", "--doip-version", "--trace-file"], []);
             var host = Required(args, "--host");
             var power = bool.Parse(Optional(args, "--power-mode") ?? "false");
             var timeoutMs = int.Parse(Optional(args, "--timeout-ms") ?? "2000",
                 CultureInfo.InvariantCulture);
             var version = checked((byte)Number(
                 Optional(args, "--doip-version") ?? "2"));
+            using var journal = OpenDoIpUdpTrace(args);
             var status = await DoIpVehicleDiscovery.QueryStatusAsync(
                 host, power, TimeSpan.FromMilliseconds(timeoutMs),
-                CancellationToken.None, protocolVersion: version);
+                CancellationToken.None, protocolVersion: version,
+                trace: journal is null ? null : journal.RecordDatagram);
             Console.WriteLine(DoIpConsolePresentation.FormatStatus(status, power));
             Console.WriteLine(DoIpConsolePresentation.Text("StatusNotice"));
             return 0;
@@ -272,6 +276,9 @@ internal static class StandardProtocolCli
     {
         try
         {
+            ValidateDoIpArguments(args, "--doip-discover", ["--host", "--broadcast-ip",
+                "--listen", "--listen-ipv6-ifindex", "--multicast-ipv6-ifindex", "--timeout-ms",
+                "--vin", "--eid", "--trace-file"], []);
             var host = Optional(args, "--host");
             var broadcastIp = Optional(args, "--broadcast-ip");
             var passiveListen = bool.Parse(Optional(args, "--listen") ?? "false");
@@ -300,6 +307,8 @@ internal static class StandardProtocolCli
                 throw new ArgumentException("Choose VIN or EID, not both.");
             var eid = eidHex is null ? null : Convert.FromHexString(eidHex);
             var timeout = TimeSpan.FromMilliseconds(timeoutMs);
+            using var journal = OpenDoIpUdpTrace(args);
+            DoIpVehicleDiscovery.DatagramTrace? trace = journal is null ? null : journal.RecordDatagram;
             IReadOnlyList<DoIpVehicleDiscovery.Identity> identities;
             if (passiveListen)
             {
@@ -308,22 +317,22 @@ internal static class StandardProtocolCli
                         "Passive DoIP listening cannot apply an outgoing VIN/EID request.");
                 identities = ipv6Interface.HasValue ?
                     await DoIpVehicleDiscovery.ListenIpv6MulticastAsync(
-                        ipv6Interface.Value, timeout, CancellationToken.None) :
+                        ipv6Interface.Value, timeout, CancellationToken.None, trace: trace) :
                     await DoIpVehicleDiscovery.ListenAsync(
-                        timeout, CancellationToken.None);
+                        timeout, CancellationToken.None, trace: trace);
             }
             else if (activeIpv6Interface.HasValue)
                 identities = await DoIpVehicleDiscovery.DiscoverIpv6MulticastAsync(
                     activeIpv6Interface.Value, timeout, CancellationToken.None,
-                    vin: requestedVin, eid: eid);
+                    vin: requestedVin, eid: eid, trace: trace);
             else if (broadcastIp is not null)
                 identities = await DoIpVehicleDiscovery.DiscoverBroadcastAsync(
                     broadcastIp, timeout, CancellationToken.None,
-                    vin: requestedVin, eid: eid);
+                    vin: requestedVin, eid: eid, trace: trace);
             else
                 identities = [await DoIpVehicleDiscovery.DiscoverAsync(
                     host!, timeout, CancellationToken.None,
-                    vin: requestedVin, eid: eid)];
+                    vin: requestedVin, eid: eid, trace: trace)];
             if (identities.Count == 0)
                 throw new TimeoutException("No DoIP gateway identity received.");
             foreach (var identity in identities)
@@ -353,7 +362,7 @@ internal static class StandardProtocolCli
                 "(scaling and meaning require vehicle/ODX metadata).");
     }
 
-    private static void PrintObdOnUdsResponse(byte[] request, byte[] response)
+    private static void PrintObdOnUdsResponse(byte[] request, byte[] response, int? extendedRecordSize = null)
     {
         if (request.Length == 3 && request[0] == 0x22)
         {
@@ -382,6 +391,104 @@ internal static class StandardProtocolCli
                     $"raw={Convert.ToHexString(raw)} " +
                     "(physical units and availability require SAE J1979DA).");
             }
+        }
+        else if (request.Length >= 2 && request[0] == 0x19 && request[1] is >= 7 and <= 9)
+        {
+            var report = ObdOnUdsServices.DecodeSeverity(request, response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                severity_subfunction = report.Subfunction, availability_mask = report.AvailabilityMask,
+                count = report.Count, format_identifier = report.FormatIdentifier,
+                records = report.Records.Select(r => new { dtc = $"{r.Dtc:X6}", severity = r.Severity,
+                    functional_unit = r.FunctionalUnit, status = r.Status })
+            }));
+        }
+        else if (request.SequenceEqual(ObdOnUdsServices.ReadFaultCounters()))
+        {
+            var rows = ObdOnUdsServices.DecodeFaultCounters(response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                fault_counters = rows.Select(r => new { dtc = $"{r.Dtc:X6}", counter = r.Counter })
+            }));
+        }
+        else if (request.Length == 2 && request[0] == 0x19 && request[1] is >= 0x0B and <= 0x0E)
+        {
+            var report = ObdOnUdsServices.DecodeHistoricalDtc(request[1], response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                historical_subfunction = request[1], availability_mask = report.AvailabilityMask,
+                records = report.Codes.Select(c => new { dtc = $"{c.Code:X6}", status = c.Status })
+            }));
+        }
+        else if (request.SequenceEqual(ObdOnUdsServices.ReadSupportedDtcs()))
+        {
+            var report = ObdOnUdsServices.DecodeSupportedDtcs(response);
+            Console.WriteLine($"Supported DTCs={report.Codes.Count} available-mask=0x{report.AvailabilityMask:X2}");
+            foreach (var code in report.Codes)
+                Console.WriteLine($"DTC=0x{code.Code:X6} status=0x{code.Status:X2}");
+        }
+        else if (request.Length >= 2 && request[0] == 0x19 && request[1] is >= 0x0F and <= 0x13)
+        {
+            var report = ObdOnUdsServices.DecodeLegacyDtc(request, response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                subfunction = report.Subfunction, legacy = true, scope = report.Subfunction <= 0x11 ? "mirror" : "emissions",
+                availability_mask = report.List?.AvailabilityMask ?? report.Count?.StatusAvailabilityMask,
+                format = report.Count?.DtcFormatIdentifier, count = report.Count?.Count,
+                records = report.List?.Codes.Select(r => new { dtc = $"{r.Code:X6}", status = r.Status }),
+                dtc = report.Detail?.Dtc.ToString("X6"), status = report.Detail?.Status,
+                raw_records = report.Detail is null ? null : Convert.ToHexString(report.Detail.RawExtendedDataRecords)
+            }));
+        }
+        else if (request.Length == 3 && request[0] == 0x19 && request[1] == 5 && request[2] != 255)
+        {
+            var report = ObdOnUdsServices.DecodeStoredRecord(request[2], response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                subfunction = 5, record = report.Record, present = report.Dtc.HasValue,
+                dtc = report.Dtc?.ToString("X6"), status = report.Status,
+                did_count = report.Dtc.HasValue ? (int?)report.RawData[0] : null,
+                raw_stored_data = Convert.ToHexString(report.RawData),
+                raw_response = Convert.ToHexString(report.RawResponse)
+            }));
+        }
+        else if (request.Length == 3 && request[0] == 0x19 &&
+            (request[1] == 0x1A || (request[1] == 0x16 && extendedRecordSize.HasValue)))
+        {
+            var report = ObdOnUdsServices.DecodeExtendedRecord(request[2], extendedRecordSize, response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                subfunction = request[1], record = report.Record, availability_mask = report.Availability,
+                record_size = extendedRecordSize, records = report.Entries.Select(r => new
+                { dtc = $"{r.Dtc:X6}", status = r.Status, data = extendedRecordSize.HasValue ? Convert.ToHexString(r.Data) : null })
+            }));
+        }
+        else if (request.Length >= 2 && request[0] == 0x19 && request[1] is >= 0x17 and <= 0x19)
+        {
+            var report = ObdOnUdsServices.DecodeUserMemory(request, response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                subfunction = request[1], memory = report.Memory, availability_mask = report.List?.AvailabilityMask,
+                records = report.List?.Codes.Select(c => new { dtc = $"{c.Code:X6}", status = c.Status }),
+                dtc = report.Dtc?.ToString("X6"), status = report.Status,
+                raw_records = report.RawRecords is null ? null : Convert.ToHexString(report.RawRecords)
+            }));
+        }
+        else if (request.SequenceEqual(ObdOnUdsServices.ReadPermanentDtcs()))
+        {
+            var report = ObdOnUdsServices.DecodePermanentDtcs(response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                kind = "permanent-dtcs", availability_mask = report.AvailabilityMask,
+                records = report.Codes.Select(c => new { dtc = $"{c.Code:X6}", status = c.Status })
+            }));
+        }
+        else if (request.SequenceEqual(ObdOnUdsServices.ReadSnapshotIndex()))
+        {
+            var rows = ObdOnUdsServices.DecodeSnapshotIndex(response);
+            Console.WriteLine($"Snapshot references={rows.Count}");
+            foreach (var row in rows)
+                Console.WriteLine($"DTC=0x{row.Dtc:X6} record=0x{row.Record:X2}");
         }
         else if (request.Length == 5 && request[0] == 0x19 &&
             request[1] == 0x42 && response.Length > 0 && response[0] == 0x59)
@@ -959,11 +1066,9 @@ internal static class StandardProtocolCli
         var extendedDtc = Optional(args, "--obd-extended-dtc");
         var extendedRecord = Optional(args, "--obd-extended-record");
         if (snapshotRecord is not null && snapshotDtc is null)
-            throw new ArgumentException(
-                "DTC snapshot record option requires --obd-snapshot.");
+            throw new ArgumentException("DTC snapshot record option requires --obd-snapshot.");
         if (extendedRecord is not null && extendedDtc is null)
-            throw new ArgumentException(
-                "DTC extended-data record option requires --obd-extended-dtc.");
+            throw new ArgumentException("DTC extended-data record option requires --obd-extended-dtc.");
         var wwhSeverity = Optional(args, "--obd-wwh-severity");
         var wwhPermanent = args.Contains("--obd-wwh-permanent",
             StringComparer.OrdinalIgnoreCase);
@@ -1153,7 +1258,7 @@ internal static class StandardProtocolCli
         string? ReceiveFile = null,
         string? ClientCertificateThumbprint = null,
         int DoIpP2Ms = 30000, int DoIpP2StarMs = 30000,
-        byte RoutingActivationType = 0x00, byte[]? RoutingOemData = null);
+        byte RoutingActivationType = 0x00, byte[]? RoutingOemData = null, string? TraceFile = null);
     internal sealed record PassThruOptions(int AdapterIndex, uint ProtocolId,
         uint Baud, uint Flags, byte[] Data, byte[]? Mask, byte[]? Pattern,
         byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
@@ -1204,7 +1309,8 @@ internal static class StandardProtocolCli
     private static ushort Address(string value)
     {
         // DoIP logical tester/ECU addresses are conventionally displayed in hex.
-        if (!ushort.TryParse(value.TrimStart('0', 'x', 'X'),
+        var hex = value.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? value[2..] : value;
+        if (hex.Length is < 1 or > 4 || !ushort.TryParse(hex,
             NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var number))
             throw new ArgumentException("DoIP logical address must be a 16-bit hex value.");
         return number;
@@ -1218,17 +1324,135 @@ internal static class StandardProtocolCli
         return Convert.FromHexString(value);
     }
 
+    private static ushort ParseTypedDid(string text)
+    {
+        var hex = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? text[2..] : text;
+        return DoIpVinReader.ParseLogicalAddress(hex);
+    }
+
+    internal static void ValidateDoIpArguments(string[] args, string command,
+        IReadOnlyCollection<string> valueOptions, IReadOnlyCollection<string> flagOptions)
+    {
+        var values = new HashSet<string>(valueOptions, StringComparer.OrdinalIgnoreCase);
+        var flags = new HashSet<string>(flagOptions, StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = args.Length > 0 && args[0].Equals(command, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            i < args.Length; i++)
+        {
+            var option = args[i];
+            if (!seen.Add(option))
+                throw new ArgumentException("Repeated DoIP option: " + option);
+            if (flags.Contains(option)) continue;
+            if (!values.Contains(option))
+                throw new ArgumentException("Unknown DoIP option: " + option);
+            if (i + 1 == args.Length || string.IsNullOrWhiteSpace(args[i + 1]) ||
+                args[i + 1].StartsWith("--", StringComparison.Ordinal))
+                throw new ArgumentException("Missing DoIP option value: " + option);
+            i++;
+        }
+    }
+
     internal static DoIpOptions ParseDoIp(string[] args)
     {
+        ValidateDoIpArguments(args, DoIpCommand, [
+            "--host", "--tester", "--ecu", "--payload", "--payload-file", "--expected-vin",
+            "--uds-dids", "--uds-did", "--uds-scaling-did", "--obd-verified", "--obd-did",
+            "--obd-dtc-mask", "--obd-dtc-count-mask", "--uds-historical-dtc",
+            "--uds-severity-count", "--uds-severity-list", "--uds-severity-info", "--uds-severity-status",
+            "--uds-memory", "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended", "--uds-memory-record",
+            "--uds-stored-record", "--uds-all-stored-records", "--stored-did-lengths", "--uds-extended-record-support", "--uds-extended-record-data", "--uds-extended-record-size",
+            "--uds-mirror-mask", "--uds-mirror-count", "--uds-mirror-extended", "--uds-mirror-record",
+            "--uds-legacy-emissions-mask", "--uds-legacy-emissions-count",
+            "--uds-dtc-mask", "--uds-dtc-count-mask", "--uds-snapshot", "--uds-snapshot-record", "--snapshot-did-lengths", "--extended-record-lengths",
+            "--uds-extended-dtc", "--uds-extended-record", "--obd-wwh-status", "--obd-readiness-group",
+            "--obd-snapshot", "--obd-snapshot-record", "--obd-extended-dtc", "--obd-extended-record",
+            "--obd-wwh-severity", "--timeout-ms", "--uds-p2-ms", "--uds-p2-star-ms", "--tls",
+            "--doip-version", "--routing-activation-type", "--routing-oem-data", "--rx-file",
+            "--client-cert-thumbprint", "--trace-file"
+        ], ["--uds-supported-dtcs", "--uds-permanent-dtcs", "--uds-snapshot-index", "--uds-fault-counters",
+            "--obd-wwh-permanent", "--obd-identify"]);
         var host = Required(args, "--host");
         var tester = Address(Required(args, "--tester"));
         var ecu = Address(Required(args, "--ecu"));
         var hexPayload = Optional(args, "--payload");
         var payloadFile = Optional(args, "--payload-file");
         var udsDids = Optional(args, "--uds-dids");
+        var udsDid = Optional(args, "--uds-did");
+        var scalingDid = Optional(args, "--uds-scaling-did");
+        if ((udsDid is not null || scalingDid is not null) && Optional(args, "--expected-vin") is null)
+            throw new ArgumentException("Typed UDS DID reads require --expected-vin.");
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
         var obdDtcCountMask = Optional(args, "--obd-dtc-count-mask");
+        var supportedDtcs = args.Contains("--uds-supported-dtcs", StringComparer.OrdinalIgnoreCase);
+        var permanentDtcs = args.Contains("--uds-permanent-dtcs", StringComparer.OrdinalIgnoreCase);
+        var snapshotIndex = args.Contains("--uds-snapshot-index", StringComparer.OrdinalIgnoreCase);
+        var historicalDtc = Optional(args, "--uds-historical-dtc");
+        var faultCounters = args.Contains("--uds-fault-counters", StringComparer.OrdinalIgnoreCase);
+        var severityCount = Optional(args, "--uds-severity-count");
+        var severityList = Optional(args, "--uds-severity-list");
+        var severityInfo = Optional(args, "--uds-severity-info");
+        var severityStatus = Optional(args, "--uds-severity-status");
+        if ((severityStatus is not null) != (severityCount is not null || severityList is not null))
+            throw new ArgumentException("Severity filters require explicit status mask.");
+        if ((supportedDtcs || permanentDtcs || snapshotIndex || faultCounters || historicalDtc is not null ||
+            severityCount is not null || severityList is not null || severityInfo is not null) && Optional(args, "--expected-vin") is null)
+            throw new ArgumentException("DTC inventory requires --expected-vin.");
+        var mirrorMask = Optional(args, "--uds-mirror-mask");
+        var mirrorCount = Optional(args, "--uds-mirror-count");
+        var mirrorExtended = Optional(args, "--uds-mirror-extended");
+        var mirrorRecord = Optional(args, "--uds-mirror-record");
+        var legacyEmissionsMask = Optional(args, "--uds-legacy-emissions-mask");
+        var legacyEmissionsCount = Optional(args, "--uds-legacy-emissions-count");
+        var legacySelectors = new[] { mirrorMask, mirrorCount, mirrorExtended, legacyEmissionsMask, legacyEmissionsCount }.Count(v => v is not null);
+        if (legacySelectors > 1 || (mirrorRecord is not null) != (mirrorExtended is not null) ||
+            (legacySelectors == 1 && Optional(args, "--expected-vin") is null))
+            throw new ArgumentException("Legacy DTC reads require VIN, one selector and explicit mirror record for detail.");
+        var allStoredRecords = Optional(args, "--uds-all-stored-records");
+        if (allStoredRecords is not null)
+        {
+            if (Optional(args, "--expected-vin") is null) throw new ArgumentException("Stored records require explicit VIN.");
+            _ = ObdOnUdsServices.ParseStoredDidLengths(allStoredRecords);
+        }
+        var storedRecord = Optional(args, "--uds-stored-record");
+        var singleStoredCatalog = Optional(args, "--stored-did-lengths");
+        if (singleStoredCatalog is not null)
+        {
+            if (storedRecord is null) throw new ArgumentException("Stored DID lengths require an individual stored record selector.");
+            _ = ObdOnUdsServices.ParseStoredDidLengths(singleStoredCatalog);
+        }
+        if (storedRecord is not null && Optional(args, "--expected-vin") is null)
+            throw new ArgumentException("Stored DTC record requires explicit VIN.");
+        var extendedRecordSupport = Optional(args, "--uds-extended-record-support");
+        var extendedRecordData = Optional(args, "--uds-extended-record-data");
+        var extendedRecordSize = Optional(args, "--uds-extended-record-size");
+        var extendedRecordSelectors = (extendedRecordSupport is null ? 0 : 1) + (extendedRecordData is null ? 0 : 1);
+        if (extendedRecordSelectors > 1 || (extendedRecordSize is not null) != (extendedRecordData is not null) ||
+            (extendedRecordSelectors == 1 && Optional(args, "--expected-vin") is null))
+            throw new ArgumentException("Extended record reads require VIN, one selector and size for data.");
+        var memory = Optional(args, "--uds-memory");
+        var memoryMask = Optional(args, "--uds-memory-mask");
+        var memorySnapshot = Optional(args, "--uds-memory-snapshot");
+        var memoryExtended = Optional(args, "--uds-memory-extended");
+        var memoryRecord = Optional(args, "--uds-memory-record");
+        var memorySelectors = (memoryMask is null ? 0 : 1) + (memorySnapshot is null ? 0 : 1) + (memoryExtended is null ? 0 : 1);
+        if (memorySelectors > 1 || (memory is not null) != (memorySelectors == 1) ||
+            (memoryRecord is not null) != (memorySnapshot is not null || memoryExtended is not null) ||
+            (memorySelectors == 1 && Optional(args, "--expected-vin") is null))
+            throw new ArgumentException("User-memory reads require VIN, memory and one explicit selector.");
+        var udsDtcMask = Optional(args, "--uds-dtc-mask");
+        var udsDtcCountMask = Optional(args, "--uds-dtc-count-mask");
+        var udsSnapshot = Optional(args, "--uds-snapshot");
+        var udsSnapshotRecord = Optional(args, "--uds-snapshot-record");
+        var udsExtended = Optional(args, "--uds-extended-dtc");
+        var udsExtendedRecord = Optional(args, "--uds-extended-record");
+        if ((udsDtcMask is not null || udsDtcCountMask is not null ||
+             udsSnapshot is not null || udsExtended is not null) &&
+            Optional(args, "--expected-vin") is null)
+            throw new ArgumentException("Typed UDS DTC reads require --expected-vin.");
+        if ((udsSnapshotRecord is not null) != (udsSnapshot is not null) ||
+            (udsExtendedRecord is not null) != (udsExtended is not null))
+            throw new ArgumentException("Generic DTC details require an explicit DTC and record.");
         var wwhStatus = Optional(args, "--obd-wwh-status");
         var wwhReadiness = Optional(args, "--obd-readiness-group");
         var snapshotDtc = Optional(args, "--obd-snapshot");
@@ -1241,6 +1465,26 @@ internal static class StandardProtocolCli
         if (extendedRecord is not null && extendedDtc is null)
             throw new ArgumentException(
                 "DTC extended-data record option requires --obd-extended-dtc.");
+        var extendedCatalog = Optional(args, "--extended-record-lengths");
+        if (extendedCatalog is not null)
+        {
+            if ((udsExtended is null ? 0 : 1) + (extendedDtc is null ? 0 : 1) + (memoryExtended is null ? 0 : 1) != 1 ||
+                Optional(args, "--expected-vin") is null ||
+                (extendedDtc is not null && extendedRecord is null))
+                throw new ArgumentException("Decoded extended data requires VIN, one DTC selector and explicit record.");
+            _ = ObdOnUdsServices.ReadDecodedExtended(Number(udsExtended ?? extendedDtc ?? memoryExtended!),
+                checked((byte)Number(udsExtendedRecord ?? extendedRecord ?? memoryRecord!)),
+                ObdOnUdsServices.ParseExtendedRecordLengths(extendedCatalog));
+        }
+        var snapshotCatalog = Optional(args, "--snapshot-did-lengths");
+        if (snapshotCatalog is not null)
+        {
+            if ((udsSnapshot is null ? 0 : 1) + (snapshotDtc is null ? 0 : 1) + (memorySnapshot is null ? 0 : 1) != 1 ||
+                Optional(args, "--expected-vin") is null ||
+                (snapshotDtc is not null && snapshotRecord is null))
+                throw new ArgumentException("Decoded snapshots require VIN, one DTC selector and explicit record.");
+            _ = ObdOnUdsServices.ParseStoredDidLengths(snapshotCatalog);
+        }
         var wwhSeverity = Optional(args, "--obd-wwh-severity");
         var wwhPermanent = args.Contains("--obd-wwh-permanent",
             StringComparer.OrdinalIgnoreCase);
@@ -1252,9 +1496,21 @@ internal static class StandardProtocolCli
         if ((hexPayload is null ? 0 : 1) +
             (payloadFile is null ? 0 : 1) +
             (udsDids is null ? 0 : 1) +
+            (udsDid is null ? 0 : 1) +
+            (scalingDid is null ? 0 : 1) +
             (obdDid is null ? 0 : 1) +
             (obdDtcMask is null ? 0 : 1) +
             (obdDtcCountMask is null ? 0 : 1) +
+            (supportedDtcs ? 1 : 0) +
+            (permanentDtcs ? 1 : 0) + memorySelectors + extendedRecordSelectors + legacySelectors + (storedRecord is null ? 0 : 1) + (allStoredRecords is null ? 0 : 1) +
+            (snapshotIndex ? 1 : 0) +
+            (historicalDtc is null ? 0 : 1) +
+            (faultCounters ? 1 : 0) +
+            (severityCount is null ? 0 : 1) + (severityList is null ? 0 : 1) + (severityInfo is null ? 0 : 1) +
+            (udsDtcMask is null ? 0 : 1) +
+            (udsDtcCountMask is null ? 0 : 1) +
+            (udsSnapshot is null ? 0 : 1) +
+            (udsExtended is null ? 0 : 1) +
             (wwhStatus is null ? 0 : 1) +
             (wwhReadiness is null ? 0 : 1) +
             (snapshotDtc is null ? 0 : 1) +
@@ -1262,7 +1518,7 @@ internal static class StandardProtocolCli
             (wwhPermanent ? 1 : 0) +
             (obdIdentify ? 1 : 0) != 1)
             throw new ArgumentException(
-                "Supply exactly one of --payload, --obd-did or --obd-dtc-mask.");
+                "Supply exactly one diagnostic payload or typed read selector.");
         if (payloadFile is not null &&
             new FileInfo(payloadFile).Length > DoIpCodec.MaxPayload - 4)
             throw new ArgumentException(
@@ -1270,11 +1526,49 @@ internal static class StandardProtocolCli
         var bytes = obdIdentify ? ObdOnUdsServices.ReadProtocolIdentification() :
             udsDids is not null ? UdsMultiDidCli.BuildRequest(
                 UdsMultiDidCli.Parse(udsDids)) :
+            udsDid is not null ? UdsStandardServices.ReadDid(ParseTypedDid(udsDid)) :
+            scalingDid is not null ? UdsStandardServices.ReadScalingDid(ParseTypedDid(scalingDid)) :
             obdDid is not null ? ObdOnUdsServices.ReadObdDid(
                 checked((ushort)uint.Parse(
                     obdDid.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ?
                         obdDid[2..] : obdDid,
                     NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture))) :
+            supportedDtcs ? ObdOnUdsServices.ReadSupportedDtcs() :
+            permanentDtcs ? ObdOnUdsServices.ReadPermanentDtcs() :
+            mirrorMask is not null ? ObdOnUdsServices.ReadLegacyDtc(0x0F, checked((byte)Number(mirrorMask))) :
+            mirrorCount is not null ? ObdOnUdsServices.ReadLegacyDtc(0x11, checked((byte)Number(mirrorCount))) :
+            legacyEmissionsMask is not null ? ObdOnUdsServices.ReadLegacyDtc(0x13, checked((byte)Number(legacyEmissionsMask))) :
+            legacyEmissionsCount is not null ? ObdOnUdsServices.ReadLegacyDtc(0x12, checked((byte)Number(legacyEmissionsCount))) :
+            mirrorExtended is not null ? ObdOnUdsServices.ReadLegacyDtc(0x10, 0, Number(mirrorExtended), checked((byte)Number(mirrorRecord!))) :
+            allStoredRecords is not null ? ObdOnUdsServices.ReadAllStoredRecords() :
+            storedRecord is not null ? ObdOnUdsServices.ReadStoredRecord(checked((byte)Number(storedRecord))) :
+            extendedRecordSupport is not null ? ObdOnUdsServices.ReadExtendedRecord(checked((byte)Number(extendedRecordSupport)), null) :
+            extendedRecordData is not null ? ObdOnUdsServices.ReadExtendedRecord(checked((byte)Number(extendedRecordData)),
+                int.Parse(extendedRecordSize!, NumberStyles.None, CultureInfo.InvariantCulture)) :
+            memoryMask is not null ? ObdOnUdsServices.ReadUserMemory(0x17, checked((byte)Number(memory!)), checked((byte)Number(memoryMask))) :
+            memorySnapshot is not null ? ObdOnUdsServices.ReadUserMemory(0x18, checked((byte)Number(memory!)), 0,
+                Number(memorySnapshot), checked((byte)Number(memoryRecord!))) :
+            memoryExtended is not null ? ObdOnUdsServices.ReadUserMemory(0x19, checked((byte)Number(memory!)), 0,
+                Number(memoryExtended), checked((byte)Number(memoryRecord!))) :
+            snapshotIndex ? ObdOnUdsServices.ReadSnapshotIndex() :
+            faultCounters ? ObdOnUdsServices.ReadFaultCounters() :
+            severityCount is not null ? ObdOnUdsServices.ReadSeverity(7, checked((byte)Number(severityCount)), checked((byte)Number(severityStatus!))) :
+            severityList is not null ? ObdOnUdsServices.ReadSeverity(8, checked((byte)Number(severityList)), checked((byte)Number(severityStatus!))) :
+            severityInfo is not null ? ObdOnUdsServices.ReadSeverity(9, 0, 0, Number(severityInfo)) :
+            historicalDtc is not null ? ObdOnUdsServices.ReadHistoricalDtc(checked((byte)Number(historicalDtc))) :
+            udsDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
+                checked((byte)Number(udsDtcMask))) :
+            udsDtcCountMask is not null ? ObdOnUdsServices.ReadDtcCountByStatusMask(
+                checked((byte)Number(udsDtcCountMask))) :
+            extendedCatalog is not null ? ObdOnUdsServices.ReadDecodedExtended(
+                Number(udsExtended ?? extendedDtc!), checked((byte)Number(udsExtendedRecord ?? extendedRecord!)),
+                ObdOnUdsServices.ParseExtendedRecordLengths(extendedCatalog)) :
+            snapshotCatalog is not null ? ObdOnUdsServices.ReadDecodedSnapshot(
+                Number(udsSnapshot ?? snapshotDtc!), checked((byte)Number(udsSnapshotRecord ?? snapshotRecord!))) :
+            udsSnapshot is not null ? ObdOnUdsServices.ReadDtcSnapshot(
+                Number(udsSnapshot), checked((byte)Number(udsSnapshotRecord!))) :
+            udsExtended is not null ? ObdOnUdsServices.ReadDtcExtendedData(
+                Number(udsExtended), checked((byte)Number(udsExtendedRecord!))) :
             obdDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
                 checked((byte)Number(obdDtcMask))) :
             obdDtcCountMask is not null ? ObdOnUdsServices.ReadDtcCountByStatusMask(
@@ -1314,6 +1608,14 @@ internal static class StandardProtocolCli
             throw new ArgumentException(
                 "DoIP OEM routing-activation data must be exactly four bytes.");
         var receiveFile = Optional(args, "--rx-file");
+        if (receiveFile is not null)
+        {
+            receiveFile = Path.GetFullPath(receiveFile);
+            if (File.Exists(receiveFile) || Directory.Exists(receiveFile) ||
+                !Directory.Exists(Path.GetDirectoryName(receiveFile)))
+                throw new ArgumentException("Choose a new DoIP reply file in an existing directory.");
+        }
+        var traceFile = ParseDoIpTracePath(args, receiveFile);
         var clientCert = Optional(args, "--client-cert-thumbprint");
         if (clientCert is not null &&
             (!useTls || clientCert.Length != 40 ||
@@ -1326,7 +1628,7 @@ internal static class StandardProtocolCli
             throw new ArgumentException("DoIP target or diagnostic PDU is invalid.");
         return new(host, tester, ecu, bytes, timeout, useTls,
             version, receiveFile, clientCert, p2Ms, p2StarMs,
-            routingType, routingOem);
+            routingType, routingOem, traceFile);
     }
 
     internal static PassThruOptions ParseJ2534(string[] args)
@@ -1442,10 +1744,699 @@ internal static class StandardProtocolCli
         output.Flush(flushToDisk: true);
     }
 
+    internal static string? ParseDoIpTracePath(string[] args, string? otherOutput = null)
+    {
+        var path = Optional(args, "--trace-file");
+        if (args.Count(x => x.Equals("--trace-file", StringComparison.OrdinalIgnoreCase)) > 1)
+            throw new ArgumentException("Repeated DoIP trace file option.");
+        if (path is null) return null;
+        if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("DoIP trace path cannot be empty.");
+        path = Path.GetFullPath(path);
+        if (File.Exists(path) || Directory.Exists(path) || !Directory.Exists(Path.GetDirectoryName(path)))
+            throw new ArgumentException("Choose a new DoIP trace file in an existing directory.");
+        if (otherOutput is not null && string.Equals(path, Path.GetFullPath(otherOutput), StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("DoIP trace and response files must be distinct.");
+        return path;
+    }
+
+    internal static string FormatDoIpDatagramTrace(string direction, System.Net.IPEndPoint endpoint,
+        byte[] data, DateTimeOffset utc) => System.Text.Json.JsonSerializer.Serialize(new
+        {
+            utc, direction, transport = "UDP", host = endpoint.Address.ToString(),
+            port = endpoint.Port, bytes = data.Length, pdu = Convert.ToHexString(data)
+        });
+
+    internal static string FormatDoIpTrace(DoIpOptions target, DoIpDiagnosticTransport.PduTrace frame) =>
+        System.Text.Json.JsonSerializer.Serialize(new
+        {
+            utc = frame.ObservedAtUtc, direction = frame.Direction,
+            transport = target.UseTls ? "TLS" : "TCP", host = target.Host,
+            tester = $"{target.Tester:X4}", ecu = $"{target.Ecu:X4}",
+            bytes = frame.Bytes.Length, pdu = Convert.ToHexString(frame.Bytes)
+        });
+
+    // The transport can invoke the observer on either its reader or writer.
+    // Keep complete JSON lines in chronological callback order. A failed file
+    // write is not silently ignored; the exchange must not claim full logging.
+    internal sealed class DoIpTraceJournal : IDisposable
+    {
+        private readonly object gate = new();
+        private readonly StreamWriter writer;
+        private readonly DoIpOptions? target;
+        private bool disposed;
+        internal DoIpTraceJournal(string path, DoIpOptions? target = null)
+        {
+            this.target = target;
+            writer = new StreamWriter(new FileStream(path, FileMode.CreateNew,
+                FileAccess.Write, FileShare.Read), new System.Text.UTF8Encoding(false)) { AutoFlush = true };
+        }
+        internal void Record(DoIpDiagnosticTransport.PduTrace frame) =>
+            Write(FormatDoIpTrace(target ?? throw new InvalidOperationException("TCP trace target missing."), frame));
+        internal void RecordForEcu(ushort ecu, DoIpDiagnosticTransport.PduTrace frame) =>
+            Write(FormatDoIpTrace((target ?? throw new InvalidOperationException("TCP trace target missing.")) with { Ecu = ecu }, frame));
+        internal void RecordDatagram(string direction, System.Net.IPEndPoint endpoint, byte[] data) =>
+            Write(FormatDoIpDatagramTrace(direction, endpoint, data, DateTimeOffset.UtcNow));
+        private void Write(string line)
+        {
+            lock (gate)
+            {
+                if (disposed) throw new ObjectDisposedException(nameof(DoIpTraceJournal));
+                try { writer.WriteLine(line); }
+                catch (IOException error) { throw new InvalidOperationException("DoIP trace journal write failed.", error); }
+            }
+        }
+        public void Dispose()
+        {
+            lock (gate)
+            {
+                if (disposed) return;
+                disposed = true;
+                writer.Dispose();
+            }
+        }
+    }
+
+    private static DoIpTraceJournal? OpenDoIpTrace(DoIpOptions target) =>
+        target.TraceFile is null ? null : new DoIpTraceJournal(target.TraceFile, target);
+
+    private static DoIpTraceJournal? OpenDoIpUdpTrace(string[] args) =>
+        ParseDoIpTracePath(args) is string path ? new DoIpTraceJournal(path) : null;
+
+    internal sealed record DoIpSequenceOptions(DoIpOptions Target, string Vin,
+        byte[][] Commands, bool ExplicitVersion);
+
+    internal static DoIpSequenceOptions ParseDoIpSequence(string[] args)
+    {
+        // Parse every option as an explicit pair, reject duplicated or
+        // unrelated options instead of silently changing the approved target.
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "--host", "--tester", "--ecu", "--expected-vin", "--sequence", "--timeout-ms",
+            "--tls", "--doip-version", "--client-cert-thumbprint", "--uds-p2-ms",
+            "--uds-p2-star-ms", "--routing-activation-type", "--routing-oem-data", "--trace-file"
+        };
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = args.Length > 0 && args[0].Equals(DoIpCommand, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+             i < args.Length; i += 2)
+        {
+            if (i + 1 >= args.Length || !allowed.Contains(args[i]) ||
+                args[i + 1].StartsWith("--", StringComparison.Ordinal) ||
+                !values.TryAdd(args[i], args[i + 1]))
+                throw new ArgumentException("Unexpected or repeated DoIP sequence option.");
+        }
+        if (!values.TryGetValue("--expected-vin", out var vin) ||
+            !DoIpVehicleDiscovery.IsVehicleVin(vin) ||
+            !values.TryGetValue("--sequence", out var sequence))
+            throw new ArgumentException("Explicit expected VIN and sequence required.");
+        var commands = DoIpConsolePresentation.ParseCommands(sequence);
+        var explicitVersion = values.ContainsKey("--doip-version");
+        values.Remove("--sequence");
+        values.Remove("--expected-vin");
+        values["--payload"] = Convert.ToHexString(commands[0]);
+        if (!values.ContainsKey("--tls")) values["--tls"] = "true";
+        var target = ParseDoIp(values.SelectMany(x => new[] { x.Key, x.Value }).ToArray());
+        if (!System.Net.IPAddress.TryParse(target.Host, out _))
+            throw new ArgumentException("DoIP sequence requires a numeric unicast IP.");
+        return new DoIpSequenceOptions(target, vin, commands, explicitVersion);
+    }
+
+    private static async Task<int> RunDoIpSequenceAsync(string[] args)
+    {
+        var sequence = ParseDoIpSequence(args);
+        var o = sequence.Target;
+        if (Console.IsInputRedirected)
+            throw new InvalidOperationException("Interactive terminal required for ECU consent.");
+        using var cancellation = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; cancellation.Cancel(); };
+        Console.CancelKeyPress += cancel;
+        DoIpSequenceProgress? progress = null;
+        try
+        {
+            var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            int count;
+            DoIpSequenceProgress activeProgress;
+            {
+            // Only publish completion after both transport and trace journal
+            // have closed successfully. Individual replies remain provisional.
+            using var journal = OpenDoIpTrace(o);
+            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout,
+                cancellation.Token, vin: sequence.Vin, trace: journal is null ? null : journal.RecordDatagram);
+            if (gateway.Vin != sequence.Vin ||
+                (sequence.ExplicitVersion && gateway.ProtocolVersion != o.Version) ||
+                gateway.LogicalAddress == o.Tester)
+                throw new InvalidDataException("Observed DoIP gateway differs from the sequence target.");
+            if (!Confirm($"DoIP {(o.UseTls ? "TLS" : "TCP")} VIN={sequence.Vin} " +
+                $"IP={o.Host} gateway=0x{gateway.LogicalAddress:X4} ECU=0x{o.Ecu:X4} tester=0x{o.Tester:X4} " +
+                $"v=0x{gateway.ProtocolVersion:X2} routing=0x{o.RoutingActivationType:X2} " +
+                $"OEM={(o.RoutingOemData is null ? "none" : Convert.ToHexString(o.RoutingOemData))} " +
+                $"commands={string.Join("; ", sequence.Commands.Select(c => Convert.ToHexString(c)))}"))
+                return 2;
+            progress = new DoIpSequenceProgress(sequence.Vin, o.Host, gateway.LogicalAddress,
+                o.Tester, o.Ecu, o.UseTls, sequence.Commands.Length);
+            activeProgress = progress;
+            cancellation.Token.ThrowIfCancellationRequested();
+            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
+                trace: journal is null ? null : journal.RecordDatagram);
+            await using (var transport = await DoIpDiagnosticTransport.ConnectAsync(
+                o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
+                useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
+                clientCertificateThumbprint: o.ClientCertificateThumbprint,
+                activationType: o.RoutingActivationType, activationOemData: o.RoutingOemData,
+                expectedGatewayAddress: gateway.LogicalAddress,
+                trace: journal is null ? null : journal.Record))
+            {
+            count = await DoIpVinReader.ExchangeSequenceVerifiedAsync(transport, gateway,
+                sequence.Commands, timeout, cancellation.Token, (index, reply) =>
+                {
+                    // A verified response is still partial until all commands
+                    // and both resource disposals have succeeded.
+                    Console.Error.WriteLine(activeProgress.RecordVerified(index, reply));
+                    Console.WriteLine(string.Format(DoIpConsolePresentation.Text("SequenceReply"),
+                        index, Convert.ToHexString(reply)));
+                },
+                TimeSpan.FromMilliseconds(o.DoIpP2Ms), TimeSpan.FromMilliseconds(o.DoIpP2StarMs));
+            }
+            // The final gateway check runs only after the diagnostic socket
+            // has been disposed and before the optional trace closes.
+            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout,
+                cancellation.Token, trace: journal is null ? null : journal.RecordDatagram);
+            }
+            if (count != activeProgress.CommandsCompleted)
+                throw new InvalidDataException("DoIP sequence reply count changed.");
+            Console.Error.WriteLine(activeProgress.Summary(complete: true));
+            Console.WriteLine(string.Format(DoIpConsolePresentation.Text("SequenceComplete"), count));
+            return 0;
+        }
+        catch
+        {
+            if (progress is not null)
+            {
+                try { Console.Error.WriteLine(progress.Summary(complete: false)); }
+                catch (IOException) { /* Preserve the original failure. */ }
+                catch (InvalidDataException) { /* Preserve the original failure. */ }
+            }
+            throw;
+        }
+        finally { Console.CancelKeyPress -= cancel; }
+    }
+
+    internal sealed record DoIpMonitorOptions(DoIpOptions Target, string Vin, ushort Did,
+        int Count, int IntervalMs, bool Obd, bool ExplicitVersion, IReadOnlyList<UdsMultiDidCli.Entry>? Layout = null);
+
+    internal static DoIpMonitorOptions ParseDoIpMonitor(string[] args)
+    {
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "--host", "--tester", "--ecu", "--expected-vin", "--monitor-did", "--obd-monitor-did",
+            "--monitor-dids", "--obd-monitor-dids", "--samples", "--interval-ms", "--timeout-ms", "--tls", "--doip-version",
+            "--client-cert-thumbprint", "--routing-activation-type", "--routing-oem-data",
+            "--uds-p2-ms", "--uds-p2-star-ms", "--trace-file"
+        };
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = args.Length > 0 && args[0].Equals(DoIpCommand, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+             i < args.Length; i += 2)
+        {
+            if (i + 1 >= args.Length || !allowed.Contains(args[i]) ||
+                args[i + 1].StartsWith("--", StringComparison.Ordinal) ||
+                !values.TryAdd(args[i], args[i + 1]))
+                throw new ArgumentException("Unexpected or repeated DoIP monitoring option.");
+        }
+        var obdSingle = values.TryGetValue("--obd-monitor-did", out var obdDid);
+        var genericSingle = values.TryGetValue("--monitor-did", out var genericDid);
+        var obdMulti = values.TryGetValue("--obd-monitor-dids", out var obdLayout);
+        var genericMulti = values.TryGetValue("--monitor-dids", out var genericLayout);
+        if (new[] { obdSingle, genericSingle, obdMulti, genericMulti }.Count(x => x) != 1 ||
+            !values.TryGetValue("--expected-vin", out var vin) || !DoIpVehicleDiscovery.IsVehicleVin(vin))
+            throw new ArgumentException("One monitoring selection and an explicit expected VIN required.");
+        var obd = obdSingle || obdMulti;
+        var layout = obdMulti || genericMulti ? UdsMultiDidCli.ValidateMonitor(
+            UdsMultiDidCli.Parse(obdMulti ? obdLayout! : genericLayout!)) : null;
+        var did = layout is null ? Address(obdSingle ? obdDid! : genericDid!) : layout[0].Did;
+        if (obd && (layout is null ? ObdOnUdsServices.ClassifyDid(did) == ObdOnUdsServices.DataGroup.NotLegislated :
+            layout.Any(e => ObdOnUdsServices.ClassifyDid(e.Did) == ObdOnUdsServices.DataGroup.NotLegislated)))
+            throw new ArgumentException("Legislated OBDonUDS DID required.");
+        var count = int.Parse(values.GetValueOrDefault("--samples", "10"), CultureInfo.InvariantCulture);
+        var interval = int.Parse(values.GetValueOrDefault("--interval-ms", "1000"), CultureInfo.InvariantCulture);
+        if (count is < 1 or > 3600 || interval is < 250 or > 60000)
+            throw new ArgumentOutOfRangeException(nameof(args), "Invalid monitoring count or interval.");
+        var explicitVersion = values.ContainsKey("--doip-version");
+        var totalMs = int.Parse(values.GetValueOrDefault("--timeout-ms", "5000"), CultureInfo.InvariantCulture);
+        var p2 = values.GetValueOrDefault("--uds-p2-ms", totalMs.ToString(CultureInfo.InvariantCulture));
+        var p2Star = values.GetValueOrDefault("--uds-p2-star-ms", totalMs.ToString(CultureInfo.InvariantCulture));
+        var timing = DoIpDiagnosticTransport.SessionOptions.Parse(totalMs, p2, p2Star, "00", "");
+        values["--uds-p2-ms"] = timing.P2Ms.ToString(CultureInfo.InvariantCulture);
+        values["--uds-p2-star-ms"] = timing.P2StarMs.ToString(CultureInfo.InvariantCulture);
+        foreach (var key in new[] { "--monitor-did", "--obd-monitor-did", "--monitor-dids",
+            "--obd-monitor-dids", "--samples", "--interval-ms", "--expected-vin" }) values.Remove(key);
+        values["--payload"] = layout is null ? $"22{did:X4}" : Convert.ToHexString(UdsMultiDidCli.BuildRequest(layout));
+        if (!values.ContainsKey("--tls")) values["--tls"] = "true";
+        var target = ParseDoIp(values.SelectMany(x => new[] { x.Key, x.Value }).ToArray());
+        if (!System.Net.IPAddress.TryParse(target.Host, out var address) ||
+            !DoIpVehicleDiscovery.IsExplicitUnicast(address))
+            throw new ArgumentException("DoIP monitoring requires a numeric unicast IP.");
+        return new DoIpMonitorOptions(target, vin, did, count, interval, obd, explicitVersion, layout);
+    }
+
+    private static async Task<int> RunDoIpMonitorAsync(string[] args)
+    {
+        var monitor = ParseDoIpMonitor(args);
+        var o = monitor.Target;
+        var capture = new DoIpMonitoringProgress(monitor.Count);
+        ushort? observedGateway = null;
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+        void Finish(string status) => Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+        {
+            complete = capture.Complete,
+            samples = capture.VerifiedSamples, requestedSamples = capture.RequestedSamples,
+            status, vin = monitor.Vin, gateway = observedGateway?.ToString("X4"),
+            tester = $"{o.Tester:X4}", ecu = $"{o.Ecu:X4}",
+            transport = o.UseTls ? "TLS" : "TCP", protocol = monitor.Obd ? "OBDonUDS" : "UDS"
+        }));
+        using var cancellation = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; cancellation.Cancel(); };
+        Console.CancelKeyPress += cancel;
+        try
+        {
+            var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            // Dispose the transport and flush the trace before claiming a complete capture.
+            {
+                using var journal = OpenDoIpTrace(o);
+                var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout,
+                    cancellation.Token, vin: monitor.Vin, trace: journal is null ? null : journal.RecordDatagram);
+                if (gateway.Vin != monitor.Vin ||
+                    (monitor.ExplicitVersion && gateway.ProtocolVersion != o.Version) ||
+                    gateway.LogicalAddress == o.Tester)
+                    throw new InvalidDataException("Observed DoIP gateway differs from the monitoring target.");
+                await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
+                    trace: journal is null ? null : journal.RecordDatagram);
+                await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
+                    o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
+                    useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
+                    clientCertificateThumbprint: o.ClientCertificateThumbprint,
+                    expectedGatewayAddress: gateway.LogicalAddress,
+                    trace: journal is null ? null : journal.Record,
+                    sessionOptions: new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms,
+                        o.DoIpP2StarMs, o.RoutingActivationType,
+                        o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)));
+                observedGateway = gateway.LogicalAddress;
+                var interval = TimeSpan.FromMilliseconds(monitor.IntervalMs);
+                void Sample(int index, byte[] data)
+                {
+                    capture.RecordVerified(index);
+                    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
+                        new { sample = index, utc = DateTimeOffset.UtcNow, elapsedMs = elapsed.ElapsedMilliseconds,
+                            vin = monitor.Vin, gateway = $"{gateway.LogicalAddress:X4}", tester = $"{o.Tester:X4}",
+                            ecu = $"{o.Ecu:X4}", did = $"{monitor.Did:X4}", transport = o.UseTls ? "TLS" : "TCP",
+                            protocol = monitor.Obd ? "OBDonUDS" : "UDS",
+                            payload = Convert.ToHexString(data), verified = true, partial = true }));
+                }
+                if (monitor.Layout is not null)
+                    await DoIpVinReader.MonitorVerifiedMultiDidAsync(transport, gateway, monitor.Vin,
+                        monitor.Layout, monitor.Obd, monitor.Count, interval, timeout, cancellation.Token,
+                        (index, values) =>
+                        {
+                            capture.RecordVerified(index);
+                            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                sample = index, utc = DateTimeOffset.UtcNow, elapsedMs = elapsed.ElapsedMilliseconds,
+                                vin = monitor.Vin, gateway = $"{gateway.LogicalAddress:X4}", tester = $"{o.Tester:X4}",
+                                ecu = $"{o.Ecu:X4}", transport = o.UseTls ? "TLS" : "TCP",
+                                protocol = monitor.Obd ? "OBDonUDS" : "UDS", verified = true, partial = true,
+                                dids = values.Select(v => new { did = $"{v.Did:X4}", payload = Convert.ToHexString(v.Data) })
+                            }));
+                        });
+                else if (monitor.Obd)
+                    await DoIpVinReader.MonitorVerifiedObdAsync(transport, monitor.Vin, monitor.Did,
+                        monitor.Count, interval, timeout, cancellation.Token, Sample);
+                else
+                {
+                    var vin = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
+                        timeout, cancellation.Token, null, null);
+                    async Task VerifySampleAsync()
+                    {
+                        var after = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
+                            timeout, cancellation.Token, null, null);
+                        if (vin != after) throw new InvalidDataException("ECU VIN changed during monitoring.");
+                    }
+                    await DoIpVinReader.MonitorDidAsync(transport, monitor.Did, monitor.Count,
+                        interval, timeout, cancellation.Token, Sample, expectedVin: vin,
+                        verifySample: VerifySampleAsync);
+                }
+            }
+            cancellation.Token.ThrowIfCancellationRequested();
+            capture.MarkComplete();
+            Finish("complete");
+            return 0;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            Finish("canceled");
+            throw;
+        }
+        catch
+        {
+            Finish("failed");
+            throw;
+        }
+        finally { Console.CancelKeyPress -= cancel; }
+    }
+
+    internal sealed record VerifiedDoIpRead(DoIpOptions Target, string Vin, bool Obd, bool ExplicitVersion,
+        bool IdentityOnly = false);
+
+    internal static VerifiedDoIpRead ParseVerifiedDoIpRead(string[] args)
+    {
+        var vin = Required(args, "--expected-vin");
+        if (!DoIpVehicleDiscovery.IsVehicleVin(vin))
+            throw new ArgumentException("Explicit valid VIN required.");
+        // Optional verification mode is for typed reads, not a restriction on the raw exchange engine.
+        if (Optional(args, "--payload") is not null || Optional(args, "--payload-file") is not null)
+            throw new ArgumentException("For arbitrary UDS commands use the verified --sequence path.");
+        var multi = Optional(args, "--uds-dids");
+        var genericRead = new[] { "--uds-did", "--uds-scaling-did", "--uds-dtc-mask",
+            "--uds-dtc-count-mask", "--uds-snapshot", "--uds-extended-dtc",
+            "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended",
+            "--uds-stored-record", "--uds-all-stored-records", "--uds-extended-record-support", "--uds-extended-record-data", "--uds-mirror-mask", "--uds-mirror-count",
+            "--uds-mirror-extended", "--uds-legacy-emissions-mask", "--uds-legacy-emissions-count" }
+            .Any(selector => Optional(args, selector) is not null);
+        genericRead |= args.Contains("--uds-supported-dtcs", StringComparer.OrdinalIgnoreCase) ||
+            args.Contains("--uds-permanent-dtcs", StringComparer.OrdinalIgnoreCase) ||
+            args.Contains("--uds-snapshot-index", StringComparer.OrdinalIgnoreCase) ||
+            Optional(args, "--uds-historical-dtc") is not null ||
+            Optional(args, "--uds-severity-count") is not null || Optional(args, "--uds-severity-list") is not null ||
+            Optional(args, "--uds-severity-info") is not null ||
+            args.Contains("--uds-fault-counters", StringComparer.OrdinalIgnoreCase);
+        var obd = !genericRead && (multi is null || bool.Parse(Optional(args, "--obd-verified") ?? "false"));
+        if (Optional(args, "--obd-verified") is not null && multi is null)
+            throw new ArgumentException("--obd-verified is only needed with --uds-dids.");
+        if (obd && multi is not null && UdsMultiDidCli.Parse(multi).Any(e =>
+            ObdOnUdsServices.ClassifyDid(e.Did) == ObdOnUdsServices.DataGroup.NotLegislated))
+            throw new ArgumentException("Expected legislated DIDs.");
+        // An unknown identification is valid evidence for discovery, not permission
+        // to use an OBDonUDS data route.
+        var identityOnly = args.Contains("--obd-identify", StringComparer.OrdinalIgnoreCase);
+        var tlsDefault = Optional(args, "--tls") is null;
+        var target = ParseDoIp(tlsDefault ? [..args, "--tls", "true"] : args);
+        if (!System.Net.IPAddress.TryParse(target.Host, out var address) ||
+            !DoIpVehicleDiscovery.IsExplicitUnicast(address) ||
+            target.Request[0] is not (0x22 or 0x19 or 0x24))
+            throw new ArgumentException("Verified reads require numeric unicast IP and a typed read.");
+        var p2 = Math.Min(target.TimeoutMs, target.DoIpP2Ms);
+        var p2Star = Math.Min(target.TimeoutMs, target.DoIpP2StarMs);
+        if (p2 > p2Star || (Optional(args, "--uds-p2-ms") is not null && target.DoIpP2Ms > target.TimeoutMs) ||
+            (Optional(args, "--uds-p2-star-ms") is not null && target.DoIpP2StarMs > target.TimeoutMs))
+            throw new ArgumentException("Expected P2 <= P2* <= total timeout.");
+        return new(target with { DoIpP2Ms = p2, DoIpP2StarMs = p2Star }, vin, obd,
+            Optional(args, "--doip-version") is not null, identityOnly);
+    }
+
+    internal static byte[] DecodeVerifiedSingleDid(byte[] request, byte[] reply)
+    {
+        if (request.Length != 3 || request[0] is not (0x22 or 0x24) ||
+            reply.Length < 4 || reply[0] != request[0] + 0x40 ||
+            reply[1] != request[1] || reply[2] != request[2])
+            throw new InvalidDataException("Missing or uncorrelated UDS DID data.");
+        return reply[3..];
+    }
+
+    private static async Task<int> RunVerifiedDoIpReadAsync(string[] args)
+    {
+        var verified = ParseVerifiedDoIpRead(args);
+        var o = verified.Target;
+        using var stop = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; stop.Cancel(); };
+        Console.CancelKeyPress += cancel;
+        try
+        {
+            var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            using var journal = OpenDoIpTrace(o);
+            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout, stop.Token, vin: verified.Vin,
+                trace: journal is null ? null : journal.RecordDatagram);
+            if (gateway.Vin != verified.Vin || gateway.LogicalAddress == o.Tester ||
+                (verified.ExplicitVersion && gateway.ProtocolVersion != o.Version))
+                throw new InvalidDataException("Observed gateway differs from selected vehicle.");
+            if (!Confirm($"Verified {(verified.Obd ? "OBDonUDS" : "UDS")} read VIN={verified.Vin} " +
+                $"host={o.Host} ECU={o.Ecu:X4} TLS={o.UseTls} TX={Convert.ToHexString(o.Request)}"))
+                return 2;
+            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, stop.Token,
+                trace: journal is null ? null : journal.RecordDatagram);
+            await using var link = await DoIpDiagnosticTransport.ConnectAsync(o.Host, o.Tester, o.Ecu,
+                timeout, stop.Token, useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
+                clientCertificateThumbprint: o.ClientCertificateThumbprint,
+                expectedGatewayAddress: gateway.LogicalAddress,
+                trace: journal is null ? null : journal.Record,
+                sessionOptions: new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms, o.DoIpP2StarMs,
+                    o.RoutingActivationType, o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)));
+            if (verified.IdentityOnly)
+            {
+                var identity = await DoIpVinReader.ReadStableObdIdentityAsync(link, verified.Vin, timeout, stop.Token);
+                // F810 is decoded only from an exact four-byte positive response.
+                byte[] protocolReply = [0x62, 0xF8, 0x10, identity.ProtocolValue];
+                if (o.ReceiveFile is not null) await SaveDoIpReplyAsync(o.ReceiveFile, protocolReply);
+                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    complete = true, vin = identity.Vin, ecu = $"{o.Ecu:X4}",
+                    protocol_value = identity.ProtocolValue, obd_on_uds = identity.ProtocolValue == 1,
+                    raw = o.ReceiveFile is null ? Convert.ToHexString(protocolReply) : null
+                }));
+                return 0;
+            }
+            async Task VerifyAsync()
+            {
+                if (verified.Obd)
+                {
+                    var identity = await DoIpVinReader.ReadVerifiedObdAsync(link, verified.Vin, null, timeout, stop.Token);
+                    if (identity.ProtocolValue != 1)
+                        throw new InvalidDataException("Selected ECU did not identify as OBDonUDS.");
+                }
+                else if (await DoIpVinReader.VerifyObservedVinAsync(link, gateway, timeout, stop.Token, null, null) != verified.Vin)
+                    throw new InvalidDataException("ECU VIN mismatch.");
+            }
+            await VerifyAsync();
+            var reply = await link.ExchangeUdsAsync(o.Request, timeout, stop.Token);
+            var singleGeneric = !verified.Obd && o.Request.Length == 3 && o.Request[0] is (0x22 or 0x24);
+            var singleObd = verified.Obd && o.Request.Length == 3 && o.Request[0] == 0x22;
+            var singleData = singleGeneric || singleObd ? DecodeVerifiedSingleDid(o.Request, reply) : null;
+            if (singleObd && o.Request[1] == 0xF8)
+            {
+                if (o.Request[2] == 0x02 && ObdOnUdsVehicleIdentification.DecodeVin(reply) != verified.Vin)
+                    throw new InvalidDataException("Returned legislated VIN differs from selected vehicle.");
+                if (o.Request[2] == 0x10 && ObdOnUdsServices.DecodeProtocolIdentification(reply).Value != 1)
+                    throw new InvalidDataException("Returned protocol differs from verified OBDonUDS identity.");
+            }
+            var layoutText = Optional(args, "--uds-dids");
+            if (layoutText is not null)
+                UdsMultiDidCli.RequireIdentity(UdsMultiDidCli.Decode(UdsMultiDidCli.Parse(layoutText),
+                    o.Request, reply), verified.Vin, verified.Obd);
+            if (singleGeneric && o.Request.SequenceEqual(UdsStandardServices.ReadDid(0xF190)) &&
+                DoIpVinReader.ParseVin(reply) != verified.Vin)
+                throw new InvalidDataException("Returned VIN differs from selected vehicle.");
+            await VerifyAsync();
+            stop.Token.ThrowIfCancellationRequested();
+            PrintMultiDidResponse(args, o.Request, reply);
+            var sizeText = Optional(args, "--uds-extended-record-size");
+            var storedCatalog = Optional(args, "--uds-all-stored-records") ?? Optional(args, "--stored-did-lengths");
+            var snapshotCatalog = Optional(args, "--snapshot-did-lengths");
+            var extendedCatalog = Optional(args, "--extended-record-lengths");
+            if (extendedCatalog is not null)
+            {
+                uint dtc = ((uint)o.Request[2] << 16) | ((uint)o.Request[3] << 8) | o.Request[4];
+                var lengths = ObdOnUdsServices.ParseExtendedRecordLengths(extendedCatalog);
+                var report = o.Request[1] == 0x19
+                    ? ObdOnUdsServices.DecodeUserMemoryExtended(o.Request[6], dtc, o.Request[5], reply, lengths)
+                    : ObdOnUdsServices.DecodeExtendedRecords(dtc, o.Request[5], reply, lengths);
+                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    dtc = report.Dtc.ToString("X6"), status = report.Status,
+                    requested_record = report.RequestedRecord, memory = o.Request.Length == 7 ? (int?)o.Request[6] : null,
+                    raw_response = Convert.ToHexString(report.RawResponse),
+                    records = report.Records.Select(row => new
+                    {
+                        record = row.Number, length = row.Data.Length, data = Convert.ToHexString(row.Data)
+                    })
+                }));
+            }
+            else if (snapshotCatalog is not null)
+            {
+                uint dtc = ((uint)o.Request[2] << 16) | ((uint)o.Request[3] << 8) | o.Request[4];
+                var lengths = ObdOnUdsServices.ParseStoredDidLengths(snapshotCatalog);
+                var report = o.Request[1] == 0x18
+                    ? ObdOnUdsServices.DecodeUserMemorySnapshot(o.Request[6], dtc, o.Request[5], reply, lengths)
+                    : ObdOnUdsServices.DecodeSnapshotRecords(dtc, o.Request[5], reply, lengths);
+                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    dtc = report.Dtc.ToString("X6"), status = report.Status,
+                    requested_record = report.RequestedRecord, memory = o.Request.Length == 7 ? (int?)o.Request[6] : null,
+                    raw_response = Convert.ToHexString(report.RawResponse),
+                    records = report.Records.Select(row => new
+                    {
+                        record = row.Record, did_count = row.Dids.Count, raw_record = Convert.ToHexString(row.RawRecord),
+                        dids = row.Dids.Select(item => new { did = item.Did.ToString("X4"),
+                            length = item.Data.Length, data = Convert.ToHexString(item.Data) })
+                    })
+                }));
+            }
+            else if (storedCatalog is not null)
+            {
+                var report = ObdOnUdsServices.DecodeStoredRecords(o.Request[2], reply, ObdOnUdsServices.ParseStoredDidLengths(storedCatalog));
+                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    subfunction = 5, record = o.Request[2], raw_response = Convert.ToHexString(report.RawResponse),
+                    records = report.Records.Select(row => new
+                    {
+                        record = row.Record, dtc = row.Dtc.ToString("X6"), status = row.Status,
+                        did_count = row.Dids.Count, raw_record = Convert.ToHexString(row.RawRecord),
+                        dids = row.Dids.Select(item => new { did = item.Did.ToString("X4"),
+                            length = item.Data.Length, data = Convert.ToHexString(item.Data) })
+                    })
+                }));
+            }
+            else if (verified.Obd || o.Request[0] == 0x19) PrintObdOnUdsResponse(o.Request, reply,
+                sizeText is null ? null : int.Parse(sizeText, NumberStyles.None, CultureInfo.InvariantCulture));
+            if (o.ReceiveFile is not null) await SaveDoIpReplyAsync(o.ReceiveFile, reply);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                complete = true, vin = verified.Vin, ecu = $"{o.Ecu:X4}",
+                protocol = verified.Obd ? "OBDonUDS" : "UDS",
+                bytes = reply.Length, sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(reply)),
+                did = singleGeneric || singleObd ? Convert.ToHexString(o.Request.AsSpan(1, 2)) : null,
+                service = singleGeneric || singleObd ? o.Request[0].ToString("X2") : null,
+                data = singleData is not null && o.ReceiveFile is null && singleData.Length <= 4093
+                    ? Convert.ToHexString(singleData) : null,
+                raw = o.ReceiveFile is null && reply.Length <= 4096 ? Convert.ToHexString(reply) : null
+            }));
+            return 0;
+        }
+        finally { Console.CancelKeyPress -= cancel; }
+    }
+
+    internal sealed record DoIpInventoryOptions(DoIpOptions Target, string Vin, ushort[] Ecus,
+        bool ExplicitVersion, bool Obd);
+
+    internal static DoIpInventoryOptions ParseDoIpInventory(string[] args)
+    {
+        ValidateDoIpArguments(args, DoIpCommand, ["--host", "--tester", "--expected-vin",
+            "--ecu-inventory", "--obd-ecu-inventory", "--timeout-ms", "--tls", "--doip-version", "--client-cert-thumbprint",
+            "--uds-p2-ms", "--uds-p2-star-ms", "--routing-activation-type", "--routing-oem-data", "--trace-file"], []);
+        var vin = Required(args, "--expected-vin");
+        if (!DoIpVehicleDiscovery.IsVehicleVin(vin))
+            throw new ArgumentException("Explicit valid VIN required.");
+        var generic = Optional(args, "--ecu-inventory");
+        var legislated = Optional(args, "--obd-ecu-inventory");
+        if ((generic is null) == (legislated is null))
+            throw new ArgumentException("Choose exactly one ECU inventory operation.");
+        var obd = legislated is not null;
+        var ecus = DoIpVinReader.ParseInventoryAddresses(legislated ?? generic!);
+        var tester = Address(Required(args, "--tester"));
+        if (ecus.Contains(tester)) throw new ArgumentException("Tester must differ from every ECU.");
+        var forwarded = new List<string>();
+        for (var i = args.Length > 0 && args[0].Equals(DoIpCommand, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            i < args.Length; i += 2)
+            if (!args[i].Equals("--ecu-inventory", StringComparison.OrdinalIgnoreCase) &&
+                !args[i].Equals("--obd-ecu-inventory", StringComparison.OrdinalIgnoreCase) &&
+                !args[i].Equals("--expected-vin", StringComparison.OrdinalIgnoreCase))
+            {
+                forwarded.Add(args[i]);
+                forwarded.Add(args[i+1]);
+            }
+        forwarded.AddRange(["--ecu", $"{ecus[0]:X4}", "--payload", obd ? "22F802" : "22F190"]);
+        if (Optional(args, "--tls") is null) forwarded.AddRange(["--tls", "true"]);
+        var target = ParseDoIp(forwarded.ToArray());
+        if (!System.Net.IPAddress.TryParse(target.Host, out var address) ||
+            !DoIpVehicleDiscovery.IsExplicitUnicast(address))
+            throw new ArgumentException("ECU inventory requires a numeric unicast IP.");
+        var timing = DoIpDiagnosticTransport.SessionOptions.Parse(target.TimeoutMs,
+            Optional(args, "--uds-p2-ms") ?? "", Optional(args, "--uds-p2-star-ms") ?? "",
+            target.RoutingActivationType.ToString("X2"),
+            target.RoutingOemData is null ? "" : Convert.ToHexString(target.RoutingOemData));
+        return new(target with { DoIpP2Ms = timing.P2Ms, DoIpP2StarMs = timing.P2StarMs },
+            vin, ecus, Optional(args, "--doip-version") is not null, obd);
+    }
+
+    private static async Task<int> RunDoIpInventoryAsync(string[] args)
+    {
+        var inventory = ParseDoIpInventory(args);
+        var o = inventory.Target;
+        using var stop = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; stop.Cancel(); };
+        Console.CancelKeyPress += cancel;
+        try
+        {
+            var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            using var journal = OpenDoIpTrace(o);
+            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout, stop.Token, vin: inventory.Vin,
+                trace: journal is null ? null : journal.RecordDatagram);
+            if (gateway.Vin != inventory.Vin || gateway.LogicalAddress == o.Tester ||
+                (inventory.ExplicitVersion && gateway.ProtocolVersion != o.Version))
+                throw new InvalidDataException("Observed gateway differs from the selected inventory target.");
+            var rows = await DoIpVinReader.InventoryObservedAsync(gateway, inventory.Vin, o.Tester,
+                inventory.Ecus, o.UseTls, timeout, stop.Token, o.ClientCertificateThumbprint,
+                new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms, o.DoIpP2StarMs, o.RoutingActivationType,
+                    o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)),
+                journal is null ? null : journal.RecordDatagram,
+                journal is null ? null : journal.RecordForEcu, inventory.Obd,
+                (partial, total) =>
+                {
+                    var row = partial[^1];
+                    Console.Error.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        inventory_progress = new
+                        {
+                            vin = inventory.Vin, gateway_host = gateway.Source.ToString(),
+                            gateway_logical_address = gateway.LogicalAddress, tester = o.Tester,
+                            transport = o.UseTls ? "TLS" : "TCP",
+                            identification = inventory.Obd ? "F802/F810" : "F190",
+                            examined_count = partial.Count, requested_count = total,
+                            verified_count = partial.Count(entry => entry.Vin is not null),
+                            target = new { ecu = $"{row.Ecu:X4}", vin = row.Vin,
+                                status = row.Vin is null ? "unverified" : "vin_verified", reason = row.Reason,
+                    failure_code = row.FailureCode, requested_service = row.RequestedService,
+                    nrc = row.Reason == "uds_negative_response" ? row.FailureCode : null,
+                                protocol_value = row.ProtocolValue,
+                                obd_on_uds = row.ProtocolValue.HasValue ? row.ProtocolValue == 1 : (bool?)null },
+                            complete = false, physical_qualification = false
+                        }
+                    }));
+                    Console.Error.Flush();
+                });
+            // Do not announce completion while the journal can still fail to close.
+            journal?.Dispose();
+            stop.Token.ThrowIfCancellationRequested();
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                complete = true, vin = inventory.Vin, verified_count = rows.Count(row => row.Vin is not null),
+                identification = inventory.Obd ? "F802/F810" : "F190",
+                obd_on_uds_count = inventory.Obd ? rows.Count(row => row.ProtocolValue == 1) : (int?)null,
+                targets = rows.Select(row => new { ecu = $"{row.Ecu:X4}", vin = row.Vin,
+                    status = row.Vin is null ? "unverified" : "vin_verified", reason = row.Reason,
+                    failure_code = row.FailureCode, requested_service = row.RequestedService,
+                    nrc = row.Reason == "uds_negative_response" ? row.FailureCode : null,
+                    protocol_value = row.ProtocolValue, obd_on_uds = row.ProtocolValue.HasValue ? row.ProtocolValue == 1 : (bool?)null }),
+                physical_qualification = false
+            }));
+            return 0;
+        }
+        finally { Console.CancelKeyPress -= cancel; }
+    }
+
     internal static async Task<int> RunDoIpAsync(string[] args)
     {
         try
         {
+            if (args.Contains("--ecu-inventory", StringComparer.OrdinalIgnoreCase) ||
+                args.Contains("--obd-ecu-inventory", StringComparer.OrdinalIgnoreCase))
+                return await RunDoIpInventoryAsync(args);
+            if (args.Contains("--monitor-did", StringComparer.OrdinalIgnoreCase) ||
+                args.Contains("--obd-monitor-did", StringComparer.OrdinalIgnoreCase) ||
+                args.Contains("--monitor-dids", StringComparer.OrdinalIgnoreCase) ||
+                args.Contains("--obd-monitor-dids", StringComparer.OrdinalIgnoreCase))
+                return await RunDoIpMonitorAsync(args);
+            if (args.Contains("--sequence", StringComparer.OrdinalIgnoreCase))
+                return await RunDoIpSequenceAsync(args);
+            if (args.Contains("--expected-vin", StringComparer.OrdinalIgnoreCase))
+                return await RunVerifiedDoIpReadAsync(args);
+            if (args.Contains("--obd-verified", StringComparer.OrdinalIgnoreCase))
+                throw new ArgumentException("--obd-verified requires --expected-vin.");
             var o = ParseDoIp(args);
             if (!Confirm($"DoIP {(o.UseTls ? "TLS" : "TCP")} " +
                 $"{o.Host}:{(o.UseTls ? 3496 : 13400)} ECU=0x{o.Ecu:X4} " +
@@ -1455,13 +2446,15 @@ internal static class StandardProtocolCli
                 $"SHA256={Convert.ToHexString(
                     System.Security.Cryptography.SHA256.HashData(o.Request))}"))
                 return 2;
+            using var journal = OpenDoIpTrace(o);
             await using var link = await DoIpDiagnosticTransport.ConnectAsync(
                 o.Host, o.Tester, o.Ecu,
                 TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None,
                 useTls: o.UseTls, protocolVersion: o.Version,
                 clientCertificateThumbprint: o.ClientCertificateThumbprint,
                 activationType: o.RoutingActivationType,
-                activationOemData: o.RoutingOemData);
+                activationOemData: o.RoutingOemData,
+                trace: journal is null ? null : journal.Record);
             var reply = await link.ExchangeUdsAsync(o.Request,
                 TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None,
                 TimeSpan.FromMilliseconds(o.DoIpP2Ms),
@@ -1489,8 +2482,19 @@ internal static class StandardProtocolCli
         catch (Exception ex) when (ex is ArgumentException or
             IOException or SocketException or OperationCanceledException or
             InvalidDataException or TimeoutException or
-            System.Security.Authentication.AuthenticationException or FormatException or OverflowException)
+            System.Security.Authentication.AuthenticationException or FormatException or OverflowException or InvalidOperationException)
         {
+            if (ex is DoIpTransportRefusal refusal)
+                Console.Error.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    diagnostic_error = new { reason = refusal.Layer, failure_code = refusal.Code, complete = false }
+                }));
+            else if (ex is UdsServiceRefusal uds)
+                Console.Error.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    diagnostic_error = new { reason = "uds_negative_response", failure_code = uds.Code,
+                        nrc = uds.Code, requested_service = uds.Service, complete = false }
+                }));
             Console.Error.WriteLine("DoIP exchange failed: " + ex.Message);
             return 6;
         }

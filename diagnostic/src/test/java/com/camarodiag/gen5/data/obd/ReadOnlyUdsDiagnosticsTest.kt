@@ -78,13 +78,13 @@ class ReadOnlyUdsDiagnosticsTest {
     }
 
     @Test
-    fun readsUdsDtcInformationIncludingTheDeclaredFormatIdentifier() = runBlocking {
+    fun readsUdsDtcInformationWithoutInventingAFormatIdentifier() = runBlocking {
         val transport = FakeCanTransport(
-            listOf(CanFrame(0x7E8, byteArrayOf(0x04, 0x59, 0x02, 0xFF.toByte(), 0x01)))
+            listOf(CanFrame(0x7E8, byteArrayOf(0x03, 0x59, 0x02, 0xFF.toByte())))
         )
         val client = UdsReadOnlyClient(transport, 0x7E0, 0x7E8)
 
-        assertArrayEquals(byteArrayOf(0xFF.toByte(), 0x01), client.readDtcInformation())
+        assertArrayEquals(byteArrayOf(0xFF.toByte()), client.readDtcInformation())
         assertArrayEquals(byteArrayOf(0x03, 0x19, 0x02, 0xFF.toByte()), transport.sent.single().data)
     }
 
@@ -92,17 +92,17 @@ class ReadOnlyUdsDiagnosticsTest {
     fun readOnlyUdsClientReturnsDecodedDtcReportFromMultiframeResponse() = runBlocking {
         val transport = FakeCanTransport(
             listOf(
-                CanFrame(0x7E8, byteArrayOf(0x10, 0x08, 0x59, 0x02, 0xFF.toByte(), 0x00, 0x01, 0x01)),
-                CanFrame(0x7E8, byteArrayOf(0x21, 0x01, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00))
+                CanFrame(0x7E8, byteArrayOf(0x10, 0x0B, 0x59, 0x02, 0xFF.toByte(), 0x01, 0x01, 0x01)),
+                CanFrame(0x7E8, byteArrayOf(0x21, 0x08, 0x12, 0x34, 0x56, 0x01))
             )
         )
         val client = UdsReadOnlyClient(transport, 0x7E0, 0x7E8)
 
         val report = client.readDtcReport()
 
-        assertEquals(UdsDtcFormat.SAE_J2012_DA_FORMAT_00, report.format)
-        assertEquals("P0101-01", report.records.single().code)
-        assertTrue(report.records.single().status.confirmed)
+        assertEquals(null, report.format)
+        assertEquals(listOf("0x010101", "0x123456"), report.records.map { it.code })
+        assertTrue(report.records.first().status.confirmed)
         assertTrue(transport.sent.any { (it.data[0].toInt() and 0xF0) == 0x30 })
     }
 

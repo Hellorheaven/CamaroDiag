@@ -42,10 +42,8 @@ internal static class ObdJ1979Interpretation
             return new Result(
                 $"SAE J1979 Mode 06 MID=0x{request[1]:X2} " +
                 $"tests={tests.Count} " +
-                string.Join("; ", tests.Select(t =>
-                    $"TID=0x{t.TestId:X2} UASID=0x{t.UnitScalingId:X2} " +
-                    $"raw={t.Value} min={t.Minimum} max={t.Maximum}")) +
-                " (raw values; no UASID conversion or pass verdict)",
+                string.Join("; ", tests.Select(FormatMonitorTest)) +
+                " (no monitor pass verdict)",
                 true, reply.Service);
         }
 
@@ -75,6 +73,13 @@ internal static class ObdJ1979Interpretation
                 $"next={page.HasNextPage}" +
                 (page.FreezeFrameNumber is byte n ? $" freeze-frame={n}" : ""),
                 true, reply.Service);
+        }
+
+        if (request.Length == 2 && request[0] == 9 &&
+            ObdJ1979ExtendedVehicleInfo.IsExtended(request[1]))
+        {
+            var extended = ObdJ1979ExtendedVehicleInfo.Can(request[1],response);
+            return new Result(ObdJ1979ExtendedVehicleInfo.Format(extended),true,reply.Service);
         }
 
         if (request.Length == 2 && request[0] == 0x09 && request[1] == 0x00)
@@ -125,6 +130,35 @@ internal static class ObdJ1979Interpretation
         if (request[0] is 0x01 or 0x02 &&
             request.Length == (request[0] == 0x02 ? 3 : 2))
         {
+            if (request[0] == 1 && ObdJ1979Status.Width(request[1]) is not null)
+            {
+                var states=ObdJ1979Status.DecodeResponse(request,response)
+                    ?? throw new InvalidDataException("Invalid categorical PID record.");
+                if(ObdJ1979MultiSignal.Width(request[1]) is not null){
+                    var values=ObdJ1979MultiSignal.DecodeResponse(request,response)
+                        ?? throw new InvalidDataException("Invalid multi-signal PID record.");
+                    return new Result(ObdJ1979Status.Format(states)+"; "+ObdJ1979MultiSignal.Format(values),true,reply.Service);
+                }
+                return new Result(ObdJ1979Status.Format(states),true,reply.Service);
+            }
+            if (request[0] == 1 && ObdJ1979MultiSignal.Width(request[1]) is not null)
+            {
+                var signals=ObdJ1979MultiSignal.DecodeResponse(request,response)
+                    ?? throw new InvalidDataException("Invalid multi-signal PID record.");
+                return new Result(ObdJ1979MultiSignal.Format(signals),true,reply.Service);
+            }
+            if(ObdJ1979OperatingContext.IsTrim(request[1])){
+                var trim=ObdJ1979OperatingContext.DecodeTrim(request.ToArray(),response[(request[0]==2?3:2)..].ToArray(),null)
+                    ?? throw new InvalidDataException("Invalid fuel trim width.");
+                return new Result(string.Join("; ",trim.Signals.Select(signal=>signal.Name+"="+
+                    (signal.Number is double number?number.ToString("0.###",CultureInfo.InvariantCulture)+" %":
+                        "RAW="+signal.RawEncoded.ToString("X2",CultureInfo.InvariantCulture)))),true,reply.Service);
+            }
+            if(request[0]==1&&request[1]==0x41){
+                var cycle=ObdJ1979OperatingContext.DecodeCycle(response[2..].ToArray(),null)
+                    ?? throw new InvalidDataException("Invalid monitoring-cycle record.");
+                return new Result("PID 41 RAW="+cycle.RawHex,true,reply.Service);
+            }
             var value = ObdJ1979PidValues.Decode(request, response);
             if (value is not null)
                 return new Result(ObdJ1979PidValues.Format(value),
@@ -139,6 +173,15 @@ internal static class ObdJ1979Interpretation
             $"data={Convert.ToHexString(reply.Data)} (raw, no scaling or ECU effect verified)",
             true, reply.Service);
     }
+    private static string FormatMonitorTest(ObdJ1979Mode06.Test test)
+    {
+        string encoded = $"TID=0x{test.TestId:X2} UASID=0x{test.UnitScalingId:X2} " +
+            $"raw={test.Value} min={test.Minimum} max={test.Maximum}";
+        if (test.Scaled is not { } value) return encoded;
+        return encoded + FormattableString.Invariant(
+            $" value={value.Value:G} min_scaled={value.Minimum:G} max_scaled={value.Maximum:G} unit={value.Unit}");
+    }
+
     private static Result InterpretMultiplePids(ReadOnlySpan<byte> request, ObdJ1979Transaction.Reply reply)
     {
         var freeze = reply.Service == 0x02;
@@ -166,7 +209,8 @@ internal static class ObdJ1979Interpretation
             if (!pending.Remove((pid, frame)))
                 throw new InvalidDataException("Unexpected PID, frame number or excess duplicate.");
             int? length = pid % 32 == 0 || (!freeze && pid == 0x01) ? 4 :
-                freeze && pid == 0x02 ? 2 : ObdJ1979PidValues.DataLength(pid);
+                freeze && pid == 0x02 ? 2 : ObdJ1979OperatingContext.IsTrim(pid)?null:ObdJ1979PidValues.DataLength(pid) ??
+                    (freeze?null:ObdJ1979MultiSignal.Width(pid) ?? ObdJ1979Status.Width(pid));
             if (length is null)
             {
                 // Without the data width there is no unambiguous next identifier.

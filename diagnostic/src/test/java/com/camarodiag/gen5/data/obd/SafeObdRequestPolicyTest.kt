@@ -273,7 +273,7 @@ class SafeObdRequestPolicyTest {
     }
 
     @Test
-    fun unrelatedTwentyNineBitResponderMustNotConfirmPhysicalIdentityOrEthanol() {
+    fun genericTwentyNineBitResponderIsAcceptedButPhysicalIdentityRequiresExactAddress() {
         val ethanol = requireNotNull(SafeObdRequestPolicy.parse("0152"))
         val vin = requireNotNull(SafeObdRequestPolicy.parse("0902"))
         val payload = "49 02 01 " + "1G1FA1RXXR0123456"
@@ -282,14 +282,35 @@ class SafeObdRequestPolicyTest {
             }
         assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
             ethanol, "18DAF110 41 52 80"))
-        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
             ethanol, "18DAF111 41 52 80"))
-        assertEquals(false, SafeObdRequestPolicy.hasNegativeResponse(
+        assertEquals(true, SafeObdRequestPolicy.hasNegativeResponse(
             ethanol, "18DAF111 7F 01 11"))
-        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
             vin, "18DAF111 $payload"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+            vin, "18DAF111 $payload", expectedResponder = "18DAF110"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+            vin, payload, expectedResponder = "18DAF110"))
+        assertEquals(false, SafeObdRequestPolicy.hasNegativeResponse(
+            ethanol, "18DAF111 7F 01 11", expectedResponder = "18DAF110"))
         assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
             vin, "18DAF110 $payload"))
+    }
+
+    @Test
+    fun secondaryCanConsoleAcceptsExplicitDlcAndCompletePhysicalPadding() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("015B"))
+        for (reply in listOf("18DAF111 8 03 41 5B 80 AA AA AA AA",
+            "7E9 08 03 41 5B 80 00 00 00 00", "18DAF11103415B80AAAAAAAA")) {
+            assertEquals(reply, true, SafeObdRequestPolicy.hasPositiveResponse(request, reply))
+        }
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(request,
+            "18DAF111 7 03 41 5B 80 AA AA AA AA"))
+        assertEquals(true, SafeObdRequestPolicy.hasNegativeResponse(request,
+            "18DAF111 08 03 7F 01 11 AA AA AA AA"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(request,
+            "18DB33F1 03 41 5B 80"))
     }
 
     @Test

@@ -37,6 +37,31 @@ internal static class Program
         if (BridgeCommandLineHelp.IsHelpRequest(args))
             return BridgeCommandLineHelp.Run(args);
 
+        // Offline catalogue processing rejects mixed flags before any driver I/O.
+        if (args.Contains(ObdJ1979CatalogueCli.Command, StringComparer.OrdinalIgnoreCase))
+            return ObdJ1979CatalogueCli.Run(args);
+
+        // Reject mixed native live options before any other driver path.
+        if ((args.Contains(CamaroDiagConnectors.Windows.J1979MaintenanceUsbCli.Command,StringComparer.OrdinalIgnoreCase)||args.Contains(CamaroDiagConnectors.Windows.J1979MaintenanceUsbCli.ArchiveCommand,StringComparer.OrdinalIgnoreCase)))
+            return CamaroDiagConnectors.Windows.J1979MaintenanceUsbCli.Run(args);
+        if (args.Contains(CamaroDiagConnectors.Windows.J1979MaintenanceJournal.Command,StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(CamaroDiagConnectors.Windows.J1979MaintenanceJournal.PrefixCommand,StringComparer.OrdinalIgnoreCase))
+            return CamaroDiagConnectors.Windows.J1979MaintenanceJournal.Run(args);
+        if (args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.CaptureCommand,StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.InspectCommand,StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.CsvCommand,StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.ScalarCommand,StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.ScalarCsvCommand,StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.VerifyScalarCommand,StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.PrefixCommand,StringComparer.OrdinalIgnoreCase))
+            return CamaroDiagConnectors.Windows.J1979LiveNativeCli.Run(args);
+
+        // Parse the complete backup invocation first; a mixed command never
+        // falls through to an unrelated driver, programming or network path.
+        if (args.Contains(DoIpBackupCli.BackupCommand, StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(DoIpBackupCli.VerifyCommand, StringComparer.OrdinalIgnoreCase))
+            return await DoIpBackupCli.RunAsync(args);
+
         // Offline COM enumeration must win over every active diagnostic or
         // programming flag. The handler rejects mixed invocations, rather
         // than allowing any protocol handler to open a driver accidentally.
@@ -49,6 +74,21 @@ internal static class Program
 
         // Explicit bidirectional ISO/SAE exchanges. No default startup
         // programming and no network-listener fallback on malformed CLI.
+        if (args.Length > 0 && args[0] is CamaroDiagConnectors.Windows.J1979FreezeNativeCli.CaptureCommand or CamaroDiagConnectors.Windows.J1979FreezeNativeCli.InspectCommand or CamaroDiagConnectors.Windows.J1979FreezeNativeCli.PrefixCommand or CamaroDiagConnectors.Windows.J1979FreezeNativeCli.VerifyPrefixCommand)
+            return CamaroDiagConnectors.Windows.J1979FreezeNativeCli.Run(args);
+        if (args.Contains(ObdJ1979LegacyFreezeCli.Command, StringComparer.OrdinalIgnoreCase))
+            return ObdJ1979LegacyFreezeCli.Run(args);
+        if (args.Contains(ObdJ1979FreezeCli.Command, StringComparer.OrdinalIgnoreCase))
+            return ObdJ1979FreezeCli.Run(args);
+        if (args.Contains(ObdJ1979LiveCli.Command, StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(ObdJ1979LiveCli.LegacyCommand, StringComparer.OrdinalIgnoreCase))
+            return ObdJ1979LiveCli.Run(args);
+        if (args.Contains(ObdJ1979CanNetworkCli.Command, StringComparer.OrdinalIgnoreCase))
+            return await ObdJ1979CanNetworkCli.RunAsync(args);
+        if (args.Contains(ObdJ1979LegacyMutationCli.Command, StringComparer.OrdinalIgnoreCase))
+            return ObdJ1979LegacyMutationCli.Run(args);
+        if (args.Contains(ObdJ1979LegacyCli.Command, StringComparer.OrdinalIgnoreCase))
+            return ObdJ1979LegacyCli.Run(args);
         if (args.Contains(StandardProtocolCli.J1939FdCmdtCommand,
             StringComparer.OrdinalIgnoreCase))
             return await StandardProtocolCli.RunJ1939FdAsync(args);
@@ -227,11 +267,12 @@ internal static class Program
 
     private static int InspectWriteJournal(string[] args)
     {
-        if (args.Length != 2 ||
+        if (args.Length is < 2 or > 3 ||
             !args[0].Equals("--inspect-write-journal", StringComparison.OrdinalIgnoreCase) ||
-            string.IsNullOrWhiteSpace(args[1]))
+            string.IsNullOrWhiteSpace(args[1]) ||
+            (args.Length == 3 && string.IsNullOrWhiteSpace(args[2])))
         {
-            Console.Error.WriteLine("Usage: --inspect-write-journal <journal.jsonl>");
+            Console.Error.WriteLine("Usage: --inspect-write-journal <journal.jsonl> [original-3MiB.bin]");
             return 6;
         }
 
@@ -247,9 +288,51 @@ internal static class Program
             else Console.WriteLine("Journal sequence is incomplete, invalid, or contains an explicit recovery marker.");
             if (report.PossiblyIncompleteAddress is uint address)
                 Console.WriteLine($"Potentially incomplete sector: 0x{address:X8}");
-            Console.WriteLine("Offline evidence only; this command does not contact, reset or program an ECU.");
-            if (!report.RequiresAssessment) return 0;
-            Console.Error.WriteLine("No completed transaction recorded. Preserve the original backup and journal.");
+            var target = NativeE39SavedBlockAssessment.InspectTargetMetadata(args[1]);
+            Console.WriteLine("Target recovery metadata: " +
+                (target.Verified ? $"VIN {target.Vin}; ECU {target.Family}; OSID {target.OsId}" :
+                    "UNVERIFIED (" + target.Problem + ")"));
+            Console.WriteLine("Metadata is an offline target hint, not current live ECU identity.");
+            var backups = NativeE39SavedBlockAssessment.Inspect(args[1]);
+            Console.WriteLine($"Verified original ECU backup sectors: {backups.Blocks.Count}/{backups.ExpectedSectors}");
+            Console.WriteLine("Physical sector backups: " +
+                (backups.Verified ? "integrity verified" : "UNVERIFIED"));
+            var geometryConsistent = backups.Verified &&
+                EcuPostFlashAssessment.MatchesSiliconEraseGeometry(backups.Blocks);
+            if (backups.Verified)
+            {
+                Console.WriteLine("Known MPC5566 silicon erase boundaries: " +
+                    (geometryConsistent
+                        ? "consistent (not ECU board qualification)" : "mismatch / not qualified"));
+                foreach (var block in backups.Blocks)
+                    Console.WriteLine($"  0x{block.Address:X8}  {block.Length} bytes  SHA-256 {block.OriginalSha256}");
+            }
+            else Console.Error.WriteLine("Physical backup error: " + backups.Problem);
+            var referenceVerified = true;
+            if (args.Length == 3)
+            {
+                var reference = NativeE39RecoveryImageAssessment.Inspect(args[1], args[2]);
+                referenceVerified = reference.Verified;
+                Console.WriteLine("Original full BIN vs live physical sector captures: " +
+                    (referenceVerified ? $"MATCH ({reference.VerifiedSectors} sectors)" :
+                        "UNVERIFIED (" + reference.Problem + ")"));
+                if (reference.FailedSectorAddress is uint mismatchedAddress)
+                    Console.Error.WriteLine($"Unverified original sector: 0x{mismatchedAddress:X8}");
+            }
+            Console.WriteLine("Offline evidence only; no ECU contact, reset, programming or automatic restoration.");
+            if (!report.RequiresAssessment && backups.Verified && target.Verified &&
+                geometryConsistent && referenceVerified) return 0;
+            if (!target.Verified)
+                Console.Error.WriteLine("Original ECU identity metadata unavailable; verify VIN/OSID independently.");
+            if (!backups.Verified)
+                Console.Error.WriteLine("Physical originals incomplete or changed; do NOT attempt restoration.");
+            if (backups.Verified && !geometryConsistent)
+                Console.Error.WriteLine("Saved sectors do not match known silicon erase geometry; no restoration qualified.");
+            if (!referenceVerified)
+                Console.Error.WriteLine("Selected BIN differs from the recovery evidence; do NOT use it for ECU restoration.");
+            Console.Error.WriteLine(report.RequiresAssessment
+                ? "The ECU write journal does not prove a completed transaction; preserve its recovery evidence."
+                : "The ECU write journal is complete, but offline recovery evidence is incomplete or inconsistent.");
             return 8;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException

@@ -85,11 +85,53 @@ class Obd2FeatureEngineTest {
         val report = engine.fullReadOnlyScan()
 
         assertTrue(report.supportedPids.isEmpty())
-        assertTrue(commands.containsAll(listOf("ATZ", "ATSP6", "ATI", "AT@1", "03", "07", "0A", "0902", "0904", "0906", "090A", "0600")))
+        assertTrue(commands.containsAll(listOf("ATI", "AT@1", "03", "07", "0A", "0902", "0904", "0906", "090A", "0600")))
+        assertTrue(commands.none { it == "ATZ" || it.startsWith("ATSP") || it.startsWith("ATTP") })
+        assertEquals(setOf(3, 7, 10), report.unavailableDtcModes)
         assertTrue(commands.none { command ->
             command == "04" || command.startsWith("2E") || command.startsWith("31") ||
                 command.startsWith("34") || command.startsWith("36") || command.startsWith("11")
         })
+    }
+
+    @Test
+    fun fullScanKeepsPartialDtcEvidenceAndExistingProtocol() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "ATDP" -> "ISO 15765-4 CAN (29 bit ID, 250 kbaud)"
+                "0100" -> "410000000000"
+                "03" -> "NO DATA"
+                "07" -> "47010100"
+                "0A" -> "4A00"
+                else -> "NO DATA"
+            }
+        })
+        val report = engine.fullReadOnlyScan()
+        assertEquals(setOf(3), report.unavailableDtcModes)
+        assertEquals(listOf(ObdDtc("P0100", "pending")), report.pendingDtcs)
+        assertTrue(report.confirmedDtcs.isEmpty())
+        assertTrue(report.adapterInfo.getValue("PROTOCOL").contains("29 bit"))
+        assertTrue(commands.none { it == "ATZ" || it.startsWith("ATSP") })
+    }
+
+    @Test
+    fun physicalScanKeepsOtherModesWhenConfirmedIsExplicitlyUnavailable() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0100") "410000000000" else "NO DATA"
+        })
+        val report = engine.fullPhysicalCanScan("7E8", emptyMap()) { mode, _ ->
+            when (mode) {
+                3 -> null
+                7 -> listOf(ObdDtc("P0100", "pending"))
+                else -> emptyList()
+            }
+        }
+        assertEquals(setOf(3), report.unavailableDtcModes)
+        assertEquals(setOf(7,10), report.verifiedDtcModes)
+        assertEquals(true, report.pidInventoryComplete)
+        assertEquals("P0100", report.pendingDtcs.single().code)
     }
 
     @Test
@@ -137,6 +179,33 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun fullScanPreservesUnknownAdvertisedFreezeFrameAndPartialDiscovery() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "410000000000"
+                "020200" -> "4202000171"
+                "020000" -> "42000008000001"
+                "022000" -> "42200000000001"
+                "024000" -> "42400080000001"
+                "026000" -> "NO DATA"
+                "020500" -> "4205007F"
+                "024100" -> "42410001020304"
+                else -> "NO DATA"
+            }
+        })
+        val report = engine.fullReadOnlyScan()
+        assertEquals(setOf(5, 0x41), report.freezeFrameSupportedPids)
+        assertEquals(false, report.freezeFrameSupportComplete)
+        assertTrue("024100" in commands)
+        assertEquals(listOf(0x7F), report.freezeFrame[5])
+        assertEquals("42410001020304", report.freezeFrameReads.single { it.pid == 0x41 }.rawResponse)
+        assertTrue("020C00" !in commands)
+        Unit
+    }
+
+    @Test
     fun doesNotQueryFreezeFrameValuesWhenNoTriggerDtcIsStored() = runBlocking {
         val commands = mutableListOf<String>()
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
@@ -156,6 +225,111 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun fullScanRunsMode05OnlyOnNegotiatedLegacyProtocol() = runBlocking {
+        suspend fun scan(protocol: String): Pair<ObdScanReport, List<String>> {
+            val commands = mutableListOf<String>()
+            val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                commands += command
+                when (command) {
+                    "ATDPN" -> protocol
+                    "0100" -> "410000002000"
+                    "0113" -> "411301"
+                    "050001" -> "45000180000000"
+                    "050101" -> "4501015A"
+                    "0600" -> if (protocol == "A3") "4600FF80000000" else "460080000000"
+                    "0601" -> if (protocol == "A3") "46018400100000" else "460101240064000000C8"
+                    else -> "NO DATA"
+                }
+            })
+            return engine.fullReadOnlyScan() to commands
+        }
+        val (legacy, legacyCommands) = scan("A3")
+        assertEquals(3, legacy.mode05?.protocolNumber)
+        assertTrue(legacy.mode05?.hasTestResults == true)
+        assertTrue(legacy.mode05?.complete == true)
+        assertTrue(legacyCommands.containsAll(listOf("050001", "050101")))
+        assertTrue("0600" in legacyCommands)
+        assertTrue(legacy.monitorTestRaw?.contains("CID=04 LIMIT_TYPE=MIN") == true)
+        val (can, canCommands) = scan("A6")
+        assertNull(can.mode05)
+        assertFalse(canCommands.any { it.startsWith("05") })
+        assertTrue("0600" in canCommands)
+        val (unknown, unknownCommands) = scan("NO DATA")
+        assertNull(unknown.mode05)
+        assertFalse(unknownCommands.any { it.startsWith("05") })
+        Unit
+    }
+
+    @Test
+    fun mode09InventoryReadsOnlyAdvertisedExtraInformationTypes() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "410000000000"
+                "0900" -> "490041000000"
+                "0908" -> "49080100010002"
+                else -> "NO DATA"
+            }
+        })
+        val report = engine.fullReadOnlyScan()
+        assertEquals(setOf(2,8), report.vehicleInfoSupportedTypes)
+        assertEquals(true, report.vehicleInfoSupportComplete)
+        assertEquals(listOf(0x49,8,1,0,1,0,2), report.vehicleInfoReads.single { it.infoType == 8 }.positiveRecords.single())
+        assertFalse("090B" in commands)
+        assertEquals(1, commands.count { it == "0902" })
+        Unit
+    }
+
+    @Test
+    fun mode09InventoryAcceptsExactEchoAndPreservesRawEvidence() = runBlocking {
+        val report = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "410000000000"
+                "0900" -> "09 00\r490001000000\r>"
+                "0908" -> "0908\r49080100010002\r>"
+                else -> "NO DATA"
+            }
+        }).fullReadOnlyScan()
+        assertEquals(setOf(8), report.vehicleInfoSupportedTypes)
+        assertEquals(true, report.vehicleInfoSupportComplete)
+        val read = report.vehicleInfoReads.single { it.infoType == 8 }
+        assertEquals(listOf(0x49, 8, 1, 0, 1, 0, 2), read.positiveRecords.single())
+        assertTrue(read.rawResponse.startsWith("0908"))
+    }
+
+    @Test
+    fun mode09MixedMalformedResponderCannotCertifyCompleteInventory() = runBlocking {
+        val report = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "410000000000"
+                "0900" -> "490001000000\r490080"
+                "0908" -> "49080100010002"
+                else -> "NO DATA"
+            }
+        }).fullReadOnlyScan()
+        assertEquals(setOf(8), report.vehicleInfoSupportedTypes)
+        assertEquals(false, report.vehicleInfoSupportComplete)
+        assertEquals(1, report.vehicleInfoReads.first().positiveRecords.size)
+    }
+
+    @Test
+    fun mode09MissingContinuationIsNotACompleteInventory() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "410000000000"
+                "0900" -> "490000000001"
+                else -> "NO DATA"
+            }
+        })
+        val report = engine.fullReadOnlyScan()
+        assertEquals(false, report.vehicleInfoSupportComplete)
+        assertTrue(report.vehicleInfoSupportedTypes.isEmpty())
+        assertEquals(listOf(0,0x20), report.vehicleInfoReads.map { it.infoType })
+        Unit
+    }
+
+    @Test
     fun decodesMode09CalibrationIdAndCvnRecords() = runBlocking {
         val commands = mutableListOf<String>()
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
@@ -170,6 +344,36 @@ class Obd2FeatureEngineTest {
         assertEquals(listOf("ABCDEFGH12345678"), engine.readCalibrationIds())
         assertEquals(listOf("9F3E61C2"), engine.readCalibrationVerificationNumbers())
         assertTrue(commands.containsAll(listOf("0904", "0906")))
+    }
+
+    @Test
+    fun machEObservedPidValuesAndOdometerRemainSeparate() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0105" -> "7E8 03 41 05 FF 7EA 03 41 05 00 7EC 03 41 05 37"
+                "0131" -> "7E8 04 41 31 39 3D"
+                "01A6" -> "41A6000BD967"
+                "011C" -> "411C03 411C03"
+                "0101" -> "410100040000 410100278000"
+                else -> "NO DATA"
+            }
+        })
+        val rows = engine.readLiveData(setOf(5, 0x31, 0xA6, 0x1C))
+        assertEquals(setOf("7E8", "7EA", "7EC"), rows.filter { it.pid == 5 }.map { it.responder }.toSet())
+        val temperatures = rows.filter { it.pid == 5 }.associateBy { it.responder }
+        assertEquals("215.00", temperatures["7E8"]?.value)
+        assertEquals(true, temperatures["7E8"]?.temperatureAtEncodingLimit)
+        assertEquals("-40.00", temperatures["7EA"]?.value)
+        assertEquals(true, temperatures["7EA"]?.temperatureAtEncodingLimit)
+        assertEquals("15.00", temperatures["7EC"]?.value)
+        assertEquals(false, temperatures["7EC"]?.temperatureAtEncodingLimit)
+        assertEquals(false, rows.single { it.pid == 0xA6 }.temperatureAtEncodingLimit)
+        assertEquals("77655.10", rows.single { it.pid == 0xA6 }.value)
+        assertEquals("14653.00", rows.single { it.pid == 0x31 }.value)
+        assertEquals(listOf(3), rows.single { it.pid == 0x1C }.raw)
+        assertEquals(2, engine.readReadiness()?.lines()?.size)
+        assertEquals(77655.1, CamaroUdsProtocol.parseOdometerPidA6("41A6000BD967") ?: -1.0, 0.0001)
+        assertNull(CamaroUdsProtocol.parseOdometerPidA6("41A6000BD967\\r41A600000001".replace("\\r", "\r")))
     }
 
     @Test
@@ -205,12 +409,143 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun physicalElmRecordsRestoreHeadersAndRetainIndependentReplies() = runBlocking {
+        val commands = mutableListOf<String>()
+        val vin = "3FMTK3SU0PMA00001"
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0902" -> "490201" + vin.toByteArray().joinToString("") { "%02X".format(it) }
+                "03" -> "43 01 03 00\r43 01 01 00"
+                "07" -> "47 00"
+                "0A" -> "NO DATA"
+                "010C" -> "7E8 04 41 0C 1A F8\r7E9 04 41 0C 00 00"
+                else -> "OK"
+            }
+        }, physicalElmHeaders = true)
+        assertEquals(vin, engine.readVinForVerification())
+        assertEquals(listOf("ATH0", "ATS0", "0902", "ATH1", "ATS0"), commands)
+        commands.clear()
+        val modes = engine.readDtcModeEvidence()
+        assertEquals(setOf("P0300", "P0100"), modes[3]?.map { it.code }?.toSet())
+        assertEquals(emptyList<ObdDtc>(), modes[7])
+        assertNull(modes[10])
+        assertEquals(listOf("ATH0", "ATS0", "03", "07", "0A", "ATH1", "ATS0"), commands)
+        val rpm = engine.readLiveData(setOf(0x0C)).associateBy { it.responder }
+        assertEquals("1726.00", rpm["7E8"]?.value)
+        assertEquals("0.00", rpm["7E9"]?.value)
+    }
+
+    @Test
+    fun failedFormattingRestorationCannotBeReportedAsSuccessfulIdentity() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            if (command == "ATH1") "?" else "OK"
+        }, physicalElmHeaders = true)
+        var failed = false
+        try { engine.readVinForVerification() }
+        catch (_: ObdElmFormattingException) { failed = true }
+        assertTrue(failed)
+        assertEquals(listOf("ATH1", "ATS0"), commands.takeLast(2))
+    }
+
+    @Test
+    fun verifiesFreshVinWithBoundedRetryAndNoSavedFallback() = runBlocking {
+        val commands = mutableListOf<String>()
+        val vin = "3FMTK3SU0PMA00001"
+        var reads = 0
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0902" -> if (++reads == 1) "NO DATA" else "490201" + vin.toByteArray().joinToString("") { "%02X".format(it) }
+                else -> "OK"
+            }
+        })
+        assertEquals(vin, engine.readVinForVerification())
+        assertEquals(listOf("ATH0", "ATS0", "0902", "0902"), commands)
+    }
+
+    @Test
+    fun distinguishesZeroPidBitmapAndZeroDtcResponseFromNoResponse() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "410000000000"
+                "03" -> "4300"
+                "07" -> "NO DATA"
+                "0A" -> "4A00"
+                else -> "NO DATA"
+            }
+        })
+        val bitmap = engine.discoverPidAvailability()
+        assertTrue(bitmap.supported.isEmpty())
+        assertNull(bitmap.firstUnresolvedPid)
+        val modes = engine.readDtcModeEvidence()
+        assertEquals(emptyList<ObdDtc>(), modes[3])
+        assertNull(modes[7])
+        assertEquals(emptyList<ObdDtc>(), modes[10])
+    }
+
+    @Test
+    fun terminalBitmapContinuationRemainsUnresolved() = runBlocking {
+        val requested = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            requested += command
+            "41" + command.substring(2) + "00000001"
+        })
+        val result = engine.discoverPidAvailability()
+        assertEquals(listOf("0100","0120","0140","0160","0180","01A0","01C0","01E0"),requested)
+        assertEquals(0xE1,result.firstUnresolvedPid)
+        assertTrue(result.supported.isEmpty())
+    }
+
+    @Test
     fun doesNotTreatFunctionalObdRequestIdAsAnEcuResponse() = runBlocking {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             if (command == "0100") "7DF 06 41 00 FF FF FF FF" else "OK"
         })
 
         assertTrue(engine.discoverFunctionalObdResponders().isEmpty())
+    }
+
+    @Test
+    fun machEHeaderlessBitmapsRemainAUnionNotOneEcu() = runBlocking {
+        val replies = mapOf(
+            "0100" to "410098180013 410000000000 410098180003 410098180003 4100AA082013",
+            "0120" to "412080018001 412080018001 412080018001 41208003A001",
+            "0140" to "4140D4C08001 414040800000 414040800000 414040800020",
+            "0160" to "416002000001",
+            "0180" to "418000000049",
+            "01A0" to "41A004000000",
+            "01A6" to "41A6000BD967",
+            "0105" to "4105FF 410500 410537 4105FF"
+        )
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ -> replies[command] ?: "NO DATA" })
+        val result = engine.discoverPidAvailability()
+        assertTrue(result.attributionIncomplete)
+        assertTrue(result.byResponder.isEmpty())
+        assertTrue(0xA6 in result.supported)
+        assertNull(result.firstUnresolvedPid)
+        val measured = engine.readLiveData(result.supported)
+        assertEquals("77655.10", measured.single { it.pid == 0xA6 }.value)
+        assertTrue(measured.none { it.pid == 5 }) // anonymous conflicting values
+        assertTrue(engine.discoverPidAvailability(primaryPowertrainResponderOnly = true).supported.isEmpty())
+    }
+
+    @Test
+    fun taggedBitmapsKeepEmptyResponderAndRejectAnonymousMeasurement() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "7E8 06 41 00 08 00 00 00\r7EA 06 41 00 00 00 00 00"
+                "0105" -> "410537"
+                else -> "NO DATA"
+            }
+        })
+        val result = engine.discoverPidAvailability()
+        assertEquals(setOf(5), result.byResponder["7E8"])
+        assertEquals(emptySet<Int>(), result.byResponder["7EA"])
+        assertFalse(result.attributionIncomplete)
+        assertTrue(engine.readLiveData(result.supported, result.byResponder).isEmpty())
     }
 
     @Test
@@ -327,15 +662,24 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
-    fun decodesZeroEvaporativeVapourPressureAtTheStandardOffset() = runBlocking {
-        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
-            if (command == "0132") "4132 8000" else "NO DATA"
-        })
-
-        val value = engine.readLiveData(setOf(0x32)).single()
-
-        assertEquals("0.00", value.value)
-        assertEquals("Pa", value.unit)
+    fun decodesSignedEvaporativeVapourPressureWithoutUnsignedBias() = runBlocking {
+        for ((raw, expected) in listOf(
+            "0000" to "0.00", "0004" to "1.00", "FFFC" to "-1.00",
+            "8000" to "-8192.00", "7FFF" to "8191.75"
+        )) {
+            val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                if (command == "0132") "4132 $raw" else "NO DATA"
+            })
+            val value = engine.readLiveData(setOf(0x32)).single()
+            assertEquals(expected, value.value)
+            assertEquals("Pa", value.unit)
+        }
+        for (raw in listOf("80", "800000")) {
+            val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                if (command == "0132") "4132 $raw" else "NO DATA"
+            })
+            assertTrue(engine.readLiveData(setOf(0x32)).isEmpty())
+        }
     }
 
     @Test
@@ -704,4 +1048,104 @@ class Obd2FeatureEngineTest {
         assertTrue(engine.readLiveData(setOf(0x28, 0x38)).isEmpty())
     }
 
+    @Test
+    fun functionalAnonymousBitmapUnionDoesNotInventEcuAttribution() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "410008000000\r410000100000"
+                else -> "NO DATA"
+            }
+        })
+        val result = engine.discoverPidAvailability()
+        assertEquals(setOf(5, 12), result.supported)
+        assertTrue(result.byResponder.isEmpty())
+        val primary = engine.discoverPidAvailability(primaryPowertrainResponderOnly = true)
+        assertTrue(primary.supported.isEmpty())
+        assertEquals(1, primary.firstUnresolvedPid)
+    }
+
+
+    @Test
+    fun attributedPidInventoryRejectsAnonymousAndUnadvertisedMeasurements() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "7E8 06 41 00 00 10 00 00\r7E9 06 41 00 00 00 00 00"
+                "010C" -> "410C1AF8"
+                else -> "NO DATA"
+            }
+        })
+        val result = engine.discoverPidAvailability()
+        assertEquals(setOf(12), result.byResponder["7E8"])
+        assertEquals(emptySet<Int>(), result.byResponder["7E9"])
+        assertTrue(engine.readLiveData(result.supported, result.byResponder).isEmpty())
+    }
+
+
+    @Test
+    fun fullScanReadsAdvertisedUnknownPidsAndPreservesEvidence() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "7E8 06 41 00 00 00 00 01"
+                "0120" -> "7E8 06 41 20 00 00 00 01"
+                // 0x41, 0x42 and 0x51 advertised; only 0x42 decoded.
+                "0140" -> "7E8 06 41 40 C0 00 80 00"
+                "0141" -> "7E8 06 41 41 01 02 03 04"
+                "0142" -> "7E8 04 41 42 36 B0"
+                "0151" -> "NO DATA"
+                else -> "NO DATA"
+            }
+        })
+        val report = engine.fullReadOnlyScan()
+        assertEquals(setOf(0x41, 0x42, 0x51), report.mode01Reads.map { it.pid }.toSet())
+        val unknown = report.mode01Reads.single { it.pid == 0x41 }.observations.single()
+        assertEquals("7E8", unknown.responder)
+        assertEquals(listOf(1, 2, 3, 4), unknown.bytes)
+        assertTrue(unknown.eligibleForDecode)
+        assertEquals(0, unknown.decodedValueCount)
+        assertTrue(report.liveData.none { it.pid == 0x41 })
+        assertEquals(1, report.mode01Reads.single { it.pid == 0x42 }.observations.single().decodedValueCount)
+        assertTrue(report.mode01Reads.single { it.pid == 0x51 }.observations.isEmpty())
+        assertFalse("0143" in commands)
+        Unit
+    }
+
+    @Test
+    fun multiFramePidEvidenceKeepsRespondersAndRejectsIncompleteSequences() {
+        val first = "7E8 10 0A 41 65 01 02 03 04"
+        val second = "7EA 10 0A 41 65 11 12 13 14"
+        val tailA = "7E8 21 05 06 07 08"
+        val tailB = "7EA 21 15 16 17 18"
+        val observations = CamaroUdsProtocol.parsePidObservations(
+            listOf(first, second, tailB, tailA).joinToString("\r"), "65")
+        assertEquals((1..8).toList(), observations.single { it.responder == "7E8" }.bytes)
+        assertEquals((17..24).toList(), observations.single { it.responder == "7EA" }.bytes)
+        assertTrue(CamaroUdsProtocol.parsePidObservations("$first\r$second\r$tailA", "65").isEmpty())
+        assertTrue(CamaroUdsProtocol.parsePidObservations("$first\r7E8 22 05 06 07 08", "65").isEmpty())
+        assertEquals((1..8).toList(),
+            CamaroUdsProtocol.parsePidObservations("41650102030405060708", "65").single().bytes)
+        val anonymous = CamaroUdsProtocol.parsePidObservations(
+            "00A\r0: 41 65 01 02 03 04\r1: 05 06 07 08", "65").single()
+        assertNull(anonymous.responder)
+        assertEquals((1..8).toList(), anonymous.bytes)
+        assertTrue(CamaroUdsProtocol.parsePidObservations("00A\r0: 41 65 01 02 03 04", "65").isEmpty())
+    }
+
+    @Test
+    fun conflictingRawResponsesRemainSeparateAndNeverBecomeValues() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "7E8 06 41 00 08 00 00 00"
+                "0105" -> "7E8 03 41 05 37\r7E8 03 41 05 FF"
+                else -> "NO DATA"
+            }
+        })
+        val report = engine.fullReadOnlyScan()
+        val evidence = report.mode01Reads.single { it.pid == 5 }.observations
+        assertEquals(setOf(listOf(0x37), listOf(0xFF)), evidence.map { it.bytes }.toSet())
+        assertTrue(evidence.none { it.eligibleForDecode })
+        assertTrue(report.liveData.none { it.pid == 5 })
+        Unit
+    }
 }

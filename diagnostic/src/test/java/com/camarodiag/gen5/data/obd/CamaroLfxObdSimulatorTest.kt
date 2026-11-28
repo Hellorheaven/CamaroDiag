@@ -8,34 +8,45 @@ import org.junit.Test
 class CamaroLfxObdSimulatorTest {
 
     @Test fun fuelSupportComesFromTheSamePowertrainResponderAsMeasurements() = runBlocking {
-        val engine = Obd2FeatureEngine { command, _ ->
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             check(command == "0100")
             "7E9 06 41 00 FF FF FF FF\r7E8 06 41 00 04 00 00 00>"
-        }
+        })
         val found = engine.discoverPidAvailability(primaryPowertrainResponderOnly = true)
         assertEquals(setOf(0x06), found.supported)
         assertEquals(null, found.firstUnresolvedPid)
-        val otherOnly = Obd2FeatureEngine { _, _ -> "7E9 06 41 00 FF FF FF FF" }
+        val otherOnly = Obd2FeatureEngine(ObdCommandChannel { _, _ -> "7E9 06 41 00 FF FF FF FF" })
             .discoverPidAvailability(primaryPowertrainResponderOnly = true)
         assertEquals(1, otherOnly.firstUnresolvedPid)
         assertTrue(otherOnly.supported.isEmpty())
     }
 
     @Test fun missingAdvertisedSupportPagePreservesEarlierObservations() = runBlocking {
-        val engine = Obd2FeatureEngine { command, _ ->
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             when (command) {
                 "0100" -> "410004000001"
                 "0120" -> "412000000001"
                 "0140" -> "NO DATA"
                 else -> error("Unexpected PID request")
             }
-        }
+        })
         val discovery = engine.discoverPidAvailability()
         assertEquals(setOf(0x06), discovery.supported)
         assertEquals(0x41, discovery.firstUnresolvedPid)
-        val terminal = Obd2FeatureEngine { _, _ -> "410000000000" }.discoverPidAvailability()
+        val terminal = Obd2FeatureEngine(ObdCommandChannel { _, _ -> "410000000000" }).discoverPidAvailability()
         assertEquals(emptySet<Int>(), terminal.supported)
         assertEquals(null, terminal.firstUnresolvedPid)
+    }
+
+    @Test
+    fun freezeFrameDtcAndValuesRemainPinnedToSyntheticPhysicalEcu() = runBlocking {
+        val engine = CamaroLfxObdSimulator.createEngine()
+        assertEquals("P0171", engine.readFreezeFrameDtc()?.code)
+        val supported = engine.discoverFreezeFrameSupportedPids()
+        assertTrue("The synthetic Mode 02 bitmap must announce RPM", 0x0C in supported)
+        val data = engine.readFreezeFrame(supported)
+        assertEquals(listOf(0x0B, 0xB8), data[0x0C])
+        assertEquals(listOf(0x7F), data[0x05])
     }
 
     @Test
@@ -54,14 +65,17 @@ class CamaroLfxObdSimulatorTest {
         assertTrue(report.adapterInfo["DESCRIPTION"].orEmpty().contains("Offline Simulator"))
         assertTrue(report.readiness.orEmpty().contains("MIL=OFF"))
         assertTrue(report.readiness.orEmpty().contains("DTC_COUNT=2"))
-        assertTrue(report.liveData.any { it.pid == 0x0C && it.value == "750.00" })
+        assertTrue(report.liveData.any {
+            it.pid == 0x0C && it.value == "750.00" && it.responder == "7E8"
+        })
         assertTrue(report.liveData.any { it.pid == 0x22 && it.value == "79.00" })
         assertTrue(report.liveData.any { it.pid == 0x24 && it.name.contains("Bank 1 sensor 1") })
         assertEquals("P0171", report.freezeFrameDtc?.code)
         assertEquals(listOf(0x0B, 0xB8), report.freezeFrame[0x0C])
         assertEquals(listOf(0x7F), report.freezeFrame[0x05])
         assertEquals(setOf("P0133", "P0171"), report.confirmedDtcs.map { it.code }.toSet())
-        assertTrue(report.rawLog.any { it.contains("ATZ") })
+        assertTrue(report.rawLog.any { it.contains("ATI") })
+        assertTrue(report.rawLog.none { it.startsWith("> ATZ") || it.startsWith("> ATSP") })
     }
 
     @Test

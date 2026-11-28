@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_network_title">Réseau CAN J1979</string>
+    <string name="j1979_network_scope">Découverte fonctionnelle PID00, puis lectures physiques séparées des calculateurs sélectionnés. Ne constitue pas un inventaire complet du véhicule.</string>
+    <string name="j1979_network_confirm">Confirmer le réseau et le VIN %1$s</string>
+    <string name="j1979_network_discover">Découvrir les calculateurs répondants</string>
+    <string name="j1979_network_scan">Lire les calculateurs sélectionnés</string>
+    <string name="j1979_network_completed">Campagne réseau terminée</string>
+    <string name="j1979_network_incomplete">Campagne réseau incomplète</string>
+    <string name="j1979_network_steps">Requêtes enregistrées : %1$d</string>
+</resources>

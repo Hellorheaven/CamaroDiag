@@ -32,6 +32,16 @@ Ne pas confondre : norme publiée, codec validé par tests unitaires, transport 
 
 Le modèle de vérification `EcuPostFlashAssessment` représente ces preuves et refuse de transformer « non testé » en « OK » ; il **n'envoie aucune commande au calculateur**. Le transport DoIP peut transmettre des services UDS quelconques, y compris d'écriture ; la compatibilité matérielle reste à tester. Les services d'écriture nécessitent le consentement opérateur et les réelles sessions/conditions OEM.
 
+## Contrôle des sauvegardes et du BIN d'origine — C6 (PR117)
+
+Le pont Windows propose désormais une comparaison **hors ligne** du BIN original 3 Mio par le bouton « Comparer le BIN original » de l'onglet « Récupération ECU », et par la commande :
+
+`CamaroDiag.J2534Bridge.exe --inspect-write-journal tentative.jsonl original-3MiB.bin`
+
+Cette comparaison exige le manifeste `<journal>.meta.json` (VIN/OSID et SHA-256 de l'image d'origine), le journal et les blocs de secteur physiques intègres. Le BIN complet doit avoir le même SHA-256 ; chaque secteur physiquement sauvegardé est relu depuis le disque et comparé octet par octet à sa zone du BIN. Un échec interdit de présenter ce fichier comme une restauration qualifiée. L'intégrité du dossier **ne démontre pas** que le calculateur pourra démarrer, recevoir des données, ou être récupéré. Ne jamais effacer ni programmer automatiquement.
+
+Sur Android, `EcuWriteTransaction.inspectRecoveryEvidence(journalFile, target, vin)` inspecte le journal existant, son enchaînement SHA-256, les preuves `BASELINE_CHECKED` et les fichiers physiques `<journal>.blocks/*.ecu-block`. Le verdict différencie **originaux sauvegardés intègres** et **état de transaction potentiellement incomplet**. Aucune instance de pilote ECU n'est nécessaire ; les données ne sont ni modifiées ni envoyées à un réseau.
+
 ## Restauration des secteurs physiquement sauvegardés
 
 - Le moteur existant enregistre avant l'effacement les **octets originaux lus sur le véritable ECU** dans `<journal>.blocks/<adresse>-<taille>.ecu-block`. Les métadonnées incluent région, adresse, taille, SHA-256 et sont associées aux événements du journal. Conserver aussi `<journal>.meta.json` (VIN/OSID) et l'image de référence.
@@ -40,7 +50,13 @@ Le modèle de vérification `EcuPostFlashAssessment` représente ces preuves et 
 - **Avant chaque nouvelle écriture/restauration** : état ECU actuel et identité VIN/OSID vérifiés par une lecture indépendante, géométrie et état d'effacement compris, tension sécurisée, chemin de reprogrammation et mode récupération éprouvés sur ce matériel, vraie clé OEM si nécessaire, restauration des checksums et voisins selon le profil, puis **nouvel avertissement OK et confirmation Oui/Non**. Les sauvegardes sont immuables et une nouvelle transaction produit son propre journal.
 - ECU muet, alimentation interrompue, application qui ne démarre plus : le transport standard peut être inutilisable ; procédure boot/recovery bench, BDM/JTAG ou équipement constructeur suivant le modèle, **aucune promesse de rollback CAN/K-Line/DoIP**. Ne pas retenter un flash non qualifié.
 
-L'onglet **Récupération ECU** du pont Windows indique désormais combien de blocs originaux ont réellement passé les vérifications des fichiers physiques et que les tests du véhicule sont distincts de la fin du journal. Les contrôles de fichiers sont OFFLINE : ni connexion au véhicule, ni remise en état automatique.
+L'onglet **Récupération ECU** et la commande Windows `--inspect-write-journal <journal.jsonl>` vérifient désormais le journal **et** les sauvegardes physiques (adresses, tailles, SHA-256), avant tout verdict positif de l'inspection CLI. Le contrôle `MatchesSiliconEraseGeometry` exige les limites exactes de secteurs dans la carte silicium MPC5566 ; une sauvegarde tronquée, déplacée, dupliquée ou de taille incohérente n'est pas présentée comme une géométrie valide. Un secteur peut cependant être cohérent sur le silicium sans que la **carte électronique, le firmware ou la procédure OEM** soient qualifiés pour sa restauration.
+
+Le manifeste `<journal>.meta.json` est inspecté hors ligne avec une longueur maximale de 16 Kio, des champs uniques, VIN/OSID, famille E39/E39A et SHA-256 valides. Une absence ou une modification invalide le contexte d'identité sauvegardée sans supprimer les originaux. Il ne s'agit pas d'une preuve d'identité ECU en direct. La réservation interprocessus de DLL J2534 n'est garantie qu'entre les processus utilisant le même profil Windows, pas les comptes tiers ni les autres outils.
+
+L'inspecteur hors ligne de la CLI Windows retourne une erreur si une transaction est marquée terminée mais que la preuve de cible `.meta.json`, les blocs physiques ou leur géométrie sont absents/incohérents. L'interface détaille séparément les résultats afin de guider une vérification manuelle sans masquer un incident matériel.
+
+Un journal interrompu conserve l'accès à l'inspection hors ligne des octets originaux physiques : la console précise l'adresse potentiellement effacée et ne prétend jamais que l'ECU a été restauré. Aucune vérification hors ligne ne prouve l'état actuel du calculateur, le redémarrage moteur ou le retour des services de diagnostic. **Aucune reprise ni écriture automatique n'est déclenchée.**
 
 ## Vérification et limites de ce lot
 
@@ -501,3 +517,7 @@ Un seul protocole est actif pour ce travail : **ISO-TP CAN classique**, sans bas
 **Statut :** code et tests enregistrés dans la branche PR #95 ; checkpoint Debug unique demandé en fin de tranche. En l'absence du rapport GitHub Actions au SHA exact, écrire **NON VALIDÉ** et garder la valeur d'avancement logiciel indicative précédente. La qualification J2534 matériel, bus-off, timing réel, performances, compatibilité sur plusieurs ECU, opérations OEM d'écriture et restauration/anti-brick restent **OUVERTES**. Une validation logicielle isolée ne clôture pas le protocole au sens de la qualification véhicule.
 
 Références documentaires indépendantes : [Linux ISO-TP](https://docs.kernel.org/networking/iso15765-2.html), [python-can-isotp](https://can-isotp.readthedocs.io/en/latest/isotp/implementation.html). Aucune norme commerciale redistribuée.
+
+## Reprise SAE J1979 après clôture logicielle DoIP (26/11/2026)
+
+Le protocole actif est SAE J1979 classique. Scan Android Mode 01 : lecture de tous les PID annoncés hors pages de support, conservation des octets bruts même sans définition et export JSON `mode01Reads` avec attribution, éligibilité et nombre de valeurs décodées. Les réponses contradictoires ou anonymes non attribuables ne deviennent pas des mesures. Aucun service mutateur lancé par le scan. Ce lot n'est pas la clôture J1979 ; compléter les services et raccordements applicables avant validation groupée.

@@ -279,7 +279,7 @@ class UdsClient private constructor(
     suspend fun readDtcReport(statusMask: Int = 0xFF): UdsDtcReport {
         require(statusMask in 0..0xFF)
         val data = readDtcInformation(0x02, byteArrayOf(statusMask.toByte()))
-        return UdsDtcDecoder.decodeReadDtcInformation(data)
+        return UdsDtcDecoder.decodeStatusMaskReport(data, statusMask)
     }
 
     suspend fun readDtcByStatusMask(statusMask: Int = 0xFF): List<UdsDtcRecord> {
@@ -294,10 +294,7 @@ class UdsClient private constructor(
             UdsDtcRecord(
                 dtc = record.rawDtc,
                 status = record.statusByte,
-                raw = byteArrayOf(
-                    report.statusAvailabilityMask.toByte(),
-                    report.formatIdentifier.toByte()
-                ) + rawBytes
+                raw = byteArrayOf(report.statusAvailabilityMask.toByte()) + rawBytes
             )
         }
     }

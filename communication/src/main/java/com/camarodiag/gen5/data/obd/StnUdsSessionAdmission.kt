@@ -11,6 +11,19 @@ import com.camarodiag.gen5.domain.model.AdapterTier
  * The transport performs its own STI/STDI model verification before sending UDS.
  */
 internal object StnUdsSessionAdmission {
+    /** Admission for a read-only probe of a different ECU, even when OBD PID 00 was absent. */
+    fun allowsReadCandidate(adapter: AdapterCapabilities?, physicalCommandChannel: Boolean,
+        protocolNumber: Int): Boolean {
+        if (!physicalCommandChannel || adapter == null || !adapter.supportsCanHeaders ||
+            !adapter.firmwareId.contains("STN", ignoreCase = true)) return false
+        val model = StnUdsPayloadTransport.hardwareModel(adapter.hardwareId) ?: return false
+        return when (protocolNumber) {
+            33, 34, 35, 36 -> true
+            63, 64 -> adapter.supportsSwCan && model in setOf("MX", "MX+")
+            else -> false
+        }
+    }
+
     fun allowsRead(adapter: AdapterCapabilities?, physicalCommandChannel: Boolean): Boolean =
         physicalCommandChannel && adapter != null &&
             adapter.tier == AdapterTier.PRO_STN &&

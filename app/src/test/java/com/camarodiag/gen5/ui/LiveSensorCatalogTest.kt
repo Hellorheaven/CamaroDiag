@@ -12,6 +12,11 @@ class LiveSensorCatalogTest {
         assertEquals(catalog.size, catalog.map { it.id }.distinct().size)
         assertTrue(catalog.all { it.labelEn.isNotBlank() && it.labelFr.isNotBlank() })
         assertTrue(catalog.any { it.id == "ETHANOL" })
+        assertTrue(catalog.any { it.id == "ODOMETER" })
+        assertTrue(catalog.any { it.id == "HYBRID_BAT_LIFE" })
+        assertTrue(LiveSensorCatalog.availableEntries(emptyList()).none {
+            it.id in setOf("ODOMETER", "HYBRID_BAT_LIFE")
+        })
         assertTrue(catalog.any { it.id == "WBO2_B2S1" })
     }
 
@@ -23,6 +28,17 @@ class LiveSensorCatalogTest {
         assertEquals("Engine speed", entries.first { it.id == "RPM" }.labelEn)
         assertEquals(1, entries.count { it.id == "CUSTOM" })
         assertEquals(entries.sortedBy { it.id }, entries)
+    }
+
+    @Test fun onlyObservedSensorsAreSelectableAndDiscoverySurvivesPollingGaps() {
+        val speed = LiveSensorDefinition("SPD", "Speed", "Vitesse")
+        val voltage = LiveSensorDefinition("BAT", "Voltage", "Tension")
+        assertTrue(LiveSensorCatalog.availableEntries(emptyList()).isEmpty())
+        val first = LiveSensorCatalog.mergeObserved(emptyList(), listOf(speed))
+        val later = LiveSensorCatalog.mergeObserved(first, listOf(voltage))
+        assertEquals(setOf("SPD", "BAT"), later.map { it.id }.toSet())
+        assertEquals(later, LiveSensorCatalog.mergeObserved(later, emptyList()))
+        assertFalse(later.any { it.id == "RPM" || it.id == "OIL" })
     }
 
     @Test fun knownCatalogNeverImpliesMeasuredOrSupported() {

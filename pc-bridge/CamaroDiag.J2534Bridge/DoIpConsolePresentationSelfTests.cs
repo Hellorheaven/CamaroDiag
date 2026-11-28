@@ -14,11 +14,195 @@ internal static class DoIpConsolePresentationSelfTests
             if (!condition) throw new InvalidOperationException("DoIP console: " + name);
         }
 
+        var events = new List<string>();
+        var snapshots = new List<IReadOnlyList<DoIpVinReader.InventoryEntry>>();
+        var inventoryRows = DoIpVinReader.CollectInventoryAsync(new ushort[] { 0x1234, 0x1235 },
+            () => { events.Add("gateway"); return Task.CompletedTask; },
+            ecu =>
+            {
+                events.Add($"query-and-close:{ecu:X4}");
+                return ecu == 0x1234
+                    ? Task.FromResult(new DoIpVinReader.InventoryEntry(ecu, "1G1FA1RXXR0123456", null))
+                    : Task.FromException<DoIpVinReader.InventoryEntry>(new TimeoutException());
+            }, CancellationToken.None, (rows, total) =>
+            {
+                Check(total == 2, "Inventory retains requested target count.");
+                snapshots.Add(rows);
+                events.Add($"progress:{rows.Count}");
+            }).GetAwaiter().GetResult();
+        Check(events.SequenceEqual(new[] { "gateway", "query-and-close:1234", "gateway", "progress:1",
+            "query-and-close:1235", "gateway", "progress:2" }), "Inventory publishes only after gateway validation.");
+        Check(snapshots[0].Count == 1 && snapshots[1].Count == 2 &&
+            inventoryRows[0].Vin is not null && inventoryRows[1].Reason == "timeout",
+            "Inventory snapshots are independent and preserve failure cause.");
+        var gatewayChecks = 0;
+        var queried = 0;
+        var published = 0;
+        var driftRejected = false;
+        try
+        {
+            _ = DoIpVinReader.CollectInventoryAsync(new ushort[] { 0x1234, 0x1235 },
+                () => ++gatewayChecks == 2
+                    ? Task.FromException(new InvalidDataException("Gateway changed")) : Task.CompletedTask,
+                ecu => { queried++; return Task.FromResult(new DoIpVinReader.InventoryEntry(ecu, null, "timeout")); },
+                CancellationToken.None, (_, _) => published++).GetAwaiter().GetResult();
+        }
+        catch (InvalidDataException) { driftRejected = true; }
+        Check(driftRejected && queried == 1 && published == 0,
+            "Gateway drift prevents row publication and further ECU interrogation.");
+
+        var refusals = DoIpVinReader.CollectInventoryAsync(new ushort[] { 0x1234, 0x1235, 0x1236, 0x1237 },
+            () => Task.CompletedTask, ecu =>
+            {
+                Exception error = ecu switch
+                {
+                    0x1234 => new DoIpTransportRefusal("header_nack", 2, "header"),
+                    0x1235 => new DoIpTransportRefusal("routing_denied", 6, "routing"),
+                    0x1236 => new DoIpTransportRefusal("diagnostic_nack", 6, "diagnostic"),
+                    _ => new UdsServiceRefusal(0x22, 0x31)
+                };
+                return Task.FromException<DoIpVinReader.InventoryEntry>(error);
+            }, CancellationToken.None, null).GetAwaiter().GetResult();
+        Check(refusals.Select(row => row.Reason).SequenceEqual(new[] {
+            "header_nack", "routing_denied", "diagnostic_nack", "uds_negative_response" }) &&
+            refusals.Select(row => row.FailureCode).SequenceEqual(new byte?[] { 2, 6, 6, 0x31 }) &&
+            refusals[2].RequestedService is null && refusals[3].RequestedService == 0x22,
+            "Inventory preserves refusal layer/code and only UDS carries requested SID.");
+
+        var progress = new DoIpMonitoringProgress(2);
+        progress.RecordVerified(1);
+        Check(!progress.Complete && progress.VerifiedSamples == 1, "Verified partial capture.");
+        foreach (var index in new[] { 1, 3, 0 })
+        {
+            var rejected = false;
+            try { progress.RecordVerified(index); }
+            catch (InvalidDataException) { rejected = true; }
+            Check(rejected && progress.VerifiedSamples == 1, "Reject duplicate or out-of-order sample.");
+        }
+        var premature = false;
+        try { progress.MarkComplete(); }
+        catch (InvalidDataException) { premature = true; }
+        Check(premature && !progress.Complete, "Incomplete capture cannot succeed.");
+        progress.RecordVerified(2);
+        progress.MarkComplete();
+        Check(progress.Complete && progress.VerifiedSamples == progress.RequestedSamples, "Complete verified capture.");
+
+        var sequence = new DoIpSequenceProgress("1G1FA1RXXR0123456", "127.0.0.1",
+            0x1234, 0x0E80, 0x1235, tls: true, requestedCommands: 2);
+        using (var firstProgress = System.Text.Json.JsonDocument.Parse(
+            sequence.RecordVerified(1, [0x62,0xF1,0x90])))
+        {
+            var row = firstProgress.RootElement.GetProperty("sequence_progress");
+            Check(row.GetProperty("partial").GetBoolean() && !row.GetProperty("complete").GetBoolean() &&
+                row.GetProperty("index").GetInt32() == 1 &&
+                row.GetProperty("commands_completed").GetInt32() == 1 &&
+                row.GetProperty("requested_commands").GetInt32() == 2 &&
+                row.GetProperty("vin").GetString() == "1G1FA1RXXR0123456" &&
+                row.GetProperty("tester").GetUInt16() == 0x0E80 &&
+                row.GetProperty("ecu").GetUInt16() == 0x1235 &&
+                row.GetProperty("gateway_logical_address").GetUInt16() == 0x1234 &&
+                row.GetProperty("transport").GetString() == "TLS" &&
+                row.GetProperty("response").GetString() == "62F190",
+                "Sequence JSON records verified route and never claims early completion.");
+        }
+        foreach (var invalidIndex in new[] { 0, 1, 3 })
+        {
+            var rejected = false;
+            try { _ = sequence.RecordVerified(invalidIndex, [0x62]); }
+            catch (InvalidDataException) { rejected = true; }
+            Check(rejected && sequence.CommandsCompleted == 1,
+                "Duplicate or out-of-order DoIP sequence responses cannot advance progress.");
+        }
+        var prematureSequence = false;
+        try { _ = sequence.Summary(complete: true); }
+        catch (InvalidDataException) { prematureSequence = true; }
+        Check(prematureSequence, "Incomplete command sequence cannot publish success.");
+        using (var partialSummary = System.Text.Json.JsonDocument.Parse(sequence.Summary(complete: false)))
+        {
+            var row = partialSummary.RootElement.GetProperty("sequence_summary");
+            Check(row.GetProperty("commands_completed").GetInt32() == 1 &&
+                !row.GetProperty("sequence_complete").GetBoolean() &&
+                !row.GetProperty("complete").GetBoolean(),
+                "Failure summary retains verified partial progress.");
+        }
+        _ = sequence.RecordVerified(2, [0x59,0x01,0xFF]);
+        using (var closeFailed = System.Text.Json.JsonDocument.Parse(sequence.Summary(complete: false)))
+        {
+            var row = closeFailed.RootElement.GetProperty("sequence_summary");
+            Check(row.GetProperty("commands_completed").GetInt32() == 2 &&
+                !row.GetProperty("sequence_complete").GetBoolean(),
+                "Even a full reply count is not a clean-close proof.");
+        }
+        using (var finishedSequence = System.Text.Json.JsonDocument.Parse(sequence.Summary(complete: true)))
+        {
+            var row = finishedSequence.RootElement.GetProperty("sequence_summary");
+            Check(row.GetProperty("sequence_complete").GetBoolean() &&
+                row.GetProperty("complete").GetBoolean() &&
+                row.GetProperty("commands_completed").GetInt32() == 2,
+                "Completion summary is allowed only after every verified reply.");
+        }
+
+        var defaults = DoIpDiagnosticTransport.SessionOptions.Parse(3000, "", "", "00", "");
+        Check(defaults.P2Ms == 3000 && defaults.P2StarMs == 3000 &&
+            defaults.RoutingType == 0 && defaults.OemBytes is null, "Blank settings retain total timeout and default routing.");
+        var custom = DoIpDiagnosticTransport.SessionOptions.Parse(5000, "100", "2000", "E0", "01020304");
+        Check(custom.P2Ms == 100 && custom.P2StarMs == 2000 && custom.RoutingType == 0xE0 &&
+            custom.OemBytes!.SequenceEqual(new byte[] { 1, 2, 3, 4 }), "Custom session settings preserve exact OEM bytes.");
+        foreach (var values in new[] { new[] {"0", "2000", "00", ""}, new[] {"2000", "100", "00", ""},
+            new[] {"100", "6000", "00", ""}, new[] {"100", "2000", "000", ""},
+            new[] {"100", "2000", "00", "0102"} })
+        {
+            var rejected = false;
+            try { _ = DoIpDiagnosticTransport.SessionOptions.Parse(5000, values[0], values[1], values[2], values[3]); }
+            catch (ArgumentException) { rejected = true; }
+            Check(rejected, "Invalid settings cannot open a diagnostic session.");
+        }
+
         var observed = new DoIpVehicleDiscovery.Identity(
             "1G1FA1RXXR0123456", 0x1234, [1, 2, 3, 4, 5, 6],
             [7, 8, 9, 10, 11, 12], 0x10, 0x00, IPAddress.Loopback, 3);
+        var target = DoIpConsolePresentation.EvaluateTarget(observed, "127.0.0.1",
+            observed.Vin!, "0E80", "1234", "1234,1235");
+        Check(target.Gateway && target.SingleEcu && target.ExplicitVinEcu && target.Inventory,
+            "Gateway and valid explicit target allow applicable operations.");
+        target = DoIpConsolePresentation.EvaluateTarget(observed, "127.0.0.1",
+            "", "0E80", "1234", "1234");
+        Check(target.Gateway && target.SingleEcu && !target.ExplicitVinEcu && !target.Inventory,
+            "Discovery without explicit VIN cannot authorize VIN-bound routes.");
+        target = DoIpConsolePresentation.EvaluateTarget(observed, "127.0.0.1",
+            observed.Vin!, "0E80", "", "1234,1235");
+        Check(target.Gateway && !target.SingleEcu && target.Inventory,
+            "Inventory does not require a single ECU address.");
+        target = DoIpConsolePresentation.EvaluateTarget(observed, "127.0.0.1",
+            observed.Vin!, "1234", "1235", "1235");
+        Check(target.Gateway && !target.SingleEcu && !target.Inventory,
+            "Tester address cannot equal gateway address.");
+        target = DoIpConsolePresentation.EvaluateTarget(observed, "127.0.0.1",
+            observed.Vin!, "0E80", "0E80", "1234,0E80");
+        Check(target.Gateway && !target.SingleEcu && !target.Inventory,
+            "Tester address cannot be an ECU target.");
+        target = DoIpConsolePresentation.EvaluateTarget(observed, "127.0.0.2",
+            observed.Vin!, "0E80", "1234", "1234");
+        Check(!target.Gateway && !target.SingleEcu && !target.Inventory,
+            "A different IP invalidates the entire selection.");
+        target = DoIpConsolePresentation.EvaluateTarget(observed with { Vin = null }, "127.0.0.1",
+            observed.Vin!, "0E80", "1234", "1234");
+        Check(target.SingleEcu && !target.ExplicitVinEcu && !target.Inventory,
+            "An unobserved gateway VIN is not proof of selected identity.");
         foreach (var language in new[] { "fr-FR", "en-US" })
         {
+            var wwh = new ObdOnUdsServices.WwhDtcReport(0x33, 1, 0x40, 4, []);
+            var filtered = DoIpConsolePresentation.FormatWwh(wwh, 0x42, null,
+                CultureInfo.GetCultureInfo(language), requestedStatusMask: 8, requestedSeverityMask: 0x80);
+            Check(filtered.Contains(DoIpConsolePresentation.Text("WwhFilterUnavailable",
+                CultureInfo.GetCultureInfo(language))), "Unavailable WWH filter is explicit.");
+            var supported = DoIpConsolePresentation.FormatWwh(wwh, 0x42, null,
+                CultureInfo.GetCultureInfo(language), requestedStatusMask: 1, requestedSeverityMask: 0x40);
+            Check(supported.Count == 3 && supported[2].Contains("0x40"), "Effective WWH masks preserved.");
+            var permanent = DoIpConsolePresentation.FormatWwh(
+                new ObdOnUdsServices.WwhDtcReport(0x33, 1, null, 4, []), 0x55, null,
+                CultureInfo.GetCultureInfo(language));
+            Check(permanent.Count == 2, "Permanent WWH read has no synthetic filters.");
             var culture = CultureInfo.GetCultureInfo(language);
             var text = DoIpConsolePresentation.FormatIdentity(observed, culture);
             Check(text.Contains("127.0.0.1") && text.Contains("0x03") &&
@@ -51,15 +235,96 @@ internal static class DoIpConsolePresentationSelfTests
                     .Contains(DoIpConsolePresentation.Text(key, culture)),
                     "Power mode decoded in " + language);
             }
+            var dtcs = ObdOnUdsServices.DecodeDtcByStatusMask(
+                0x05, [0x59, 0x02, 0x0F, 0x12, 0x34, 0x56, 0x01]);
+            var dtcLines = DoIpConsolePresentation.FormatDtcs(dtcs, 0x05, culture);
+            Check(dtcLines.Count == 3 && dtcLines[0].Contains("0x05") &&
+                dtcLines[0].Contains("0x0F") && dtcLines[1].Contains("0x123456") &&
+                dtcLines[1].Contains("0x01"),
+                "DTC report preserves code and requested/available masks in " + language);
+            var flags = DoIpConsolePresentation.FormatDtcStatus(0xFF, 0xFF, culture);
+            foreach (var key in new[] { "DtcBitFailed", "DtcBitFailedCycle", "DtcBitPending", "DtcBitConfirmed",
+                "DtcBitIncompleteSinceClear", "DtcBitFailedSinceClear", "DtcBitIncompleteCycle", "DtcBitWarningRequested" })
+                Check(flags.Contains(DoIpConsolePresentation.Text(key, culture)), "Status bit " + key + " in " + language);
+            Check(DoIpConsolePresentation.FormatDtcStatus(0xFF, 0x04, culture) ==
+                DoIpConsolePresentation.Text("DtcBitPending", culture), "Unavailable bits are not interpreted.");
+            Check(DoIpConsolePresentation.FormatDtcStatus(0, 0, culture) ==
+                DoIpConsolePresentation.Text("DtcStatusUnavailable", culture), "No available status is not a healthy ECU.");
+            Check(DoIpConsolePresentation.FormatDtcStatus(0, 0xFF, culture) ==
+                DoIpConsolePresentation.Text("DtcNoAssertedAvailableBits", culture), "Zero status does not imply no DTC.");
+            var detail = DoIpConsolePresentation.ParseDetail("123456", "01");
+            Check(detail.Dtc == 0x123456 && detail.Record == 1 &&
+                DoIpConsolePresentation.FormatDetail(detail.Dtc, 8, [1, 0xAB], culture).Contains("01AB"),
+                "DTC detail raw bytes in " + language);
+            foreach (var key in new[] { "Snapshot", "Extended", "DetailDtc", "DetailRecord", "InvalidDetail", "DetailResult" })
+                Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text(key, culture)), "Detail resource " + key);
+            var count = ObdOnUdsServices.DecodeDtcCountByStatusMask([0x59, 1, 0xF0, 4, 0x12, 0x34]);
+            var countText = DoIpConsolePresentation.FormatDtcCount(count, 0xF0, culture);
+            Check(countText.Contains("4660") && countText.Contains("0xF0") && countText.Contains("0x04"),
+                "DTC count preserves unsigned value, availability and format in " + language);
+            var noFilter = DoIpConsolePresentation.FormatDtcCount(
+                ObdOnUdsServices.DecodeDtcCountByStatusMask([0x59, 1, 1, 4, 0, 0]), 0x80, culture);
+            Check(noFilter.Contains("0x00") && noFilter.Contains(
+                DoIpConsolePresentation.Text("DtcNoAvailableFilter", culture)),
+                "DTC count cannot imply no faults when the filter is unavailable in " + language);
+            Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text("CountDtcs", culture)),
+                "Localized DTC count button in " + language);
+            var emptyDtcs = ObdOnUdsServices.DecodeDtcByStatusMask(
+                0x80, [0x59, 0x02, 0x01]);
+            var emptyLines = DoIpConsolePresentation.FormatDtcs(emptyDtcs, 0x80, culture);
+            Check(emptyLines.Count == 2 && emptyLines[0].Contains("0x80") &&
+                emptyLines[0].Contains("0x01") &&
+                emptyLines[0].Contains("0x00") &&
+                emptyLines[1] == DoIpConsolePresentation.Text("DtcNoAvailableFilter", culture),
+                "Empty DTC report retains availability limits in " + language);
+            foreach (var dtcKey in new[] { "ReadDtcs", "DtcMask", "InvalidDtcMask",
+                "DtcStarted", "DtcResult", "DtcEntry", "DtcNotice", "ReadDid", "DidLabel",
+                "InvalidDid", "DidStarted", "DidResult", "MonitorDid", "MonitorInterval", "MonitorCount",
+                "MonitorSample", "MonitorComplete", "MonitorPartial", "Backup", "BackupProfile", "BackupMismatch",
+                "BackupExists", "BackupConfirm", "BackupStarted", "BackupProgress", "BackupSaved",
+                "BackupVerify", "BackupVerified" })
+                Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text(dtcKey, culture)),
+                    "DTC resource " + dtcKey + " in " + language);
             var rejected = false;
             try { _ = DoIpConsolePresentation.FormatStatus(status, true, culture); }
             catch (InvalidDataException) { rejected = true; }
             Check(rejected, "Wrong response type rejected in " + language);
             foreach (var key in new[] { "Host", "Discover", "Cancel", "Notice",
                 "Started", "Canceled", "Busy", "InvalidHost", "Status", "Power",
-                "StatusNotice", "StatusStarted", "IdentifyFirst" })
+                "StatusNotice", "StatusStarted", "IdentifyFirst", "ExpectedVin",
+                "InvalidExpectedVin", "VinDiscoveryStarted", "TraceIncomplete",
+                "Exchange", "Payload", "InvalidPayload", "ExpectedVinRequired", "ExchangeTarget", "ExchangeWarning", "ExchangeWarningTitle", "ExchangeConfirm", "ExchangeStarted", "ExchangeResult" })
                 Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text(key, culture)),
                     "Resource " + key + " in " + language);
+        }
+        Check(DoIpConsolePresentation.ParseDtcMask("fF") == 0xFF &&
+            DoIpConsolePresentation.ParseDtcMask("00") == 0,
+            "DTC mask accepts exactly two hexadecimal digits.");
+        foreach (var invalid in new[] { "", "F", "0xFF", "GG", " F" })
+        {
+            var invalidMask = false;
+            try { _ = DoIpConsolePresentation.ParseDtcMask(invalid); }
+            catch (ArgumentException) { invalidMask = true; }
+            Check(invalidMask, "Malformed DTC mask rejected: " + invalid);
+        }
+        Check(DoIpConsolePresentation.ParsePayload("22 f1 90").SequenceEqual(new byte[] { 0x22, 0xf1, 0x90 }),
+            "Console accepts exact command bytes.");
+        foreach (var invalid in new[] { "", "0x22", "ABC", "GG", new string('A', 8184) })
+        {
+            var rejected = false;
+            try { _ = DoIpConsolePresentation.ParsePayload(invalid); }
+            catch (ArgumentException) { rejected = true; }
+            Check(rejected, "Malformed or oversized UDS command rejected.");
+        }
+        var commands = DoIpConsolePresentation.ParseCommands("22 F1 90;19 01 FF");
+        Check(commands.Length == 2 && commands[0].SequenceEqual(new byte[] {0x22, 0xf1, 0x90}) &&
+            commands[1].SequenceEqual(new byte[] {0x19, 0x01, 0xff}), "Ordered sequence parsing.");
+        foreach (var invalid in new[] {"22;", ";22", "22;;19", string.Join(";", Enumerable.Repeat("22", 17))})
+        {
+            var rejected = false;
+            try { _ = DoIpConsolePresentation.ParseCommands(invalid); }
+            catch (ArgumentException) { rejected = true; }
+            Check(rejected, "Invalid sequence rejected.");
         }
         return checks;
     }

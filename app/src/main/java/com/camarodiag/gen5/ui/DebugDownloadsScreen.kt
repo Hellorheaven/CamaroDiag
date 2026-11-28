@@ -80,10 +80,10 @@ internal fun DebugDownloadsScreen() {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.debug_builds_title),
                     style = MaterialTheme.typography.titleLarge)
-                Text(
-                    stringResource(R.string.debug_builds_intro),
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                // Text(
+                    // stringResource(R.string.debug_builds_intro),
+                    // style = MaterialTheme.typography.bodyMedium
+                // )
                 OutlinedButton(onClick = { scope.launch { refresh() } }, enabled = !loading) {
                     Text(stringResource(R.string.debug_builds_refresh))
                 }

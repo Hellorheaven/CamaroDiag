@@ -39,12 +39,12 @@ internal sealed partial class BridgeDesktopForm
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         var fields = Grid();
-        WideRow(fields, new Label
-        {
-            Text = "Les tests J2534 ouvrent brièvement l'interface pour vérifier le pilote " +
-                "et lire les versions de firmware, DLL et API. Aucun trafic ECU ni écriture.",
-            Dock = DockStyle.Fill, ForeColor = Color.DarkSlateGray, AutoSize = true
-        }, 65);
+        // WideRow(fields, new Label
+        // {
+            // Text = "Les tests J2534 ouvrent brièvement l'interface pour vérifier le pilote " +
+                // "et lire les versions de firmware, DLL et API. Aucun trafic ECU ni écriture.",
+            // Dock = DockStyle.Fill, ForeColor = Color.DarkSlateGray, AutoSize = true
+        // }, 65);
         hardwareProbe.Click += async (_, _) => await DiagnoseHardwareAsync(all: false);
         allDrivers.Click += async (_, _) => await DiagnoseHardwareAsync(all: true);
         testSoftware.Click += async (_, _) => await DiagnoseSoftwareAsync();
@@ -140,16 +140,16 @@ internal sealed partial class BridgeDesktopForm
         installUpdate.Enabled = false;
         WideRow(fields, checkUpdate, 44);
         WideRow(fields, installUpdate, 44);
-        WideRow(fields, new Label
-        {
-            Text = "Les mises à jour sont recherchées uniquement dans les releases " +
-                "officielles Hellorheaven/CamaroDiag de GitHub. " +
-                "L'installateur de l'architecture x86 ou x64 est téléchargé et lancé " +
-                "automatiquement après fermeture du pont. " +
-                "Aucun logiciel de programmation ECU tiers n'est requis.",
-            Dock = DockStyle.Fill, AutoSize = true,
-            ForeColor = Color.DarkSlateGray
-        }, 100);
+        // WideRow(fields, new Label
+        // {
+            // Text = "Les mises à jour sont recherchées uniquement dans les releases " +
+                // "officielles Hellorheaven/CamaroDiag de GitHub. " +
+                // "L'installateur de l'architecture x86 ou x64 est téléchargé et lancé " +
+                // "automatiquement après fermeture du pont. " +
+                // "Aucun logiciel de programmation ECU tiers n'est requis.",
+            // Dock = DockStyle.Fill, AutoSize = true,
+            // ForeColor = Color.DarkSlateGray
+        // }, 100);
         var showUpdateLog = Button("Voir le dernier résultat d'installation");
         showUpdateLog.Click += (_, _) =>
         {

@@ -17,6 +17,25 @@ internal static class DoIpVehicleDiscovery
         byte[] Eid, byte[] Gid, byte FurtherAction, byte? VinGidStatus,
         IPAddress Source, byte ProtocolVersion);
 
+    internal delegate void DatagramTrace(string direction, IPEndPoint endpoint, byte[] data);
+
+    internal static bool IsVehicleVin(string vin) =>
+        vin.Length == 17 && vin.All(c => c is >= '0' and <= '9' ||
+            c is >= 'A' and <= 'Z' && c is not ('I' or 'O' or 'Q'));
+
+    internal static async Task<Identity> DiscoverUniqueVinAsync(string vin, TimeSpan timeout,
+        CancellationToken cancellationToken, DatagramTrace? trace = null,
+        string broadcastIp = "255.255.255.255", int? portOverride = null)
+    {
+        if (!IsVehicleVin(vin))
+            throw new ArgumentException("Expected a valid vehicle VIN.", nameof(vin));
+        var candidates = await DiscoverBroadcastAsync(broadcastIp, timeout, cancellationToken,
+            vin: vin, portOverride: portOverride, trace: trace);
+        if (candidates.Count != 1)
+            throw new InvalidOperationException("DoIP gateway not found or ambiguous for selected VIN.");
+        return candidates[0];
+    }
+
     internal static byte[] BuildRequest() =>
         DoIpCodec.Encode(DoIpCodec.VehicleIdentificationRequest, [],
             DoIpCodec.VehicleIdentificationDefaultVersion);
@@ -64,6 +83,37 @@ internal static class DoIpVehicleDiscovery
             source, decoded.Version);
     }
 
+    internal static bool IsExplicitUnicast(IPAddress address) =>
+        !address.Equals(IPAddress.Any) && !address.Equals(IPAddress.IPv6Any) &&
+        !address.Equals(IPAddress.Broadcast) && !address.IsIPv6Multicast &&
+        (address.AddressFamily != AddressFamily.InterNetwork ||
+            address.GetAddressBytes()[0] is not (>= 224 and <= 239)) &&
+        (!address.IsIPv6LinkLocal || address.ScopeId > 0);
+
+    internal static string TlsServerName(string host) =>
+        IPAddress.TryParse(host, out var address) && address.AddressFamily == AddressFamily.InterNetworkV6
+            ? address.ToString().Split('%')[0] : host;
+
+    internal static bool SameGatewayIdentity(Identity selected, Identity observed) =>
+        selected.Source.Equals(observed.Source) &&
+        string.Equals(selected.Vin, observed.Vin, StringComparison.Ordinal) &&
+        selected.LogicalAddress == observed.LogicalAddress &&
+        selected.ProtocolVersion == observed.ProtocolVersion &&
+        selected.Eid.AsSpan().SequenceEqual(observed.Eid) &&
+        selected.Gid.AsSpan().SequenceEqual(observed.Gid);
+
+    internal static async Task RequireCurrentIdentityAsync(Identity selected,
+        TimeSpan timeout, CancellationToken token, DatagramTrace? trace = null)
+    {
+        // A fresh unicast announcement correlates the target selected earlier;
+        // UDP identity is not authenticated and never substitutes for TLS/ECU VIN.
+        var current = await DiscoverAsync(selected.Source.ToString(), timeout, token,
+            vin: selected.Vin, trace: trace);
+        if (!SameGatewayIdentity(selected, current))
+            throw new InvalidDataException("DoIP gateway identity changed; rediscover before routing.");
+        token.ThrowIfCancellationRequested();
+    }
+
     internal static bool MatchesRequestedIdentity(Identity found,
         string? expectedVin, byte[]? expectedEid)
     {
@@ -83,7 +133,8 @@ internal static class DoIpVehicleDiscovery
     /// </summary>
     internal static async Task<IReadOnlyList<Identity>> DiscoverBroadcastAsync(
         string broadcastIp, TimeSpan timeout, CancellationToken cancellationToken,
-        string? vin = null, byte[]? eid = null, int? portOverride = null)
+        string? vin = null, byte[]? eid = null, int? portOverride = null,
+        DatagramTrace? trace = null)
     {
         if (!IPAddress.TryParse(broadcastIp, out var address) ||
             address.AddressFamily != AddressFamily.InterNetwork ||
@@ -108,8 +159,9 @@ internal static class DoIpVehicleDiscovery
             EnableBroadcast = true
         };
         var port = portOverride ?? 13400;
-        await socket.SendAsync(request.AsMemory(),
-            new IPEndPoint(address, port), deadline.Token);
+        var destination = new IPEndPoint(address, port);
+        await socket.SendAsync(request.AsMemory(), destination, deadline.Token);
+        trace?.Invoke("TX", destination, request.ToArray());
         var identified = new Dictionary<string, Identity>(StringComparer.Ordinal);
         while (identified.Count < 32)
         {
@@ -128,11 +180,14 @@ internal static class DoIpVehicleDiscovery
                 // A response from an arbitrary UDP source port is not an
                 // announcement from the requested DoIP endpoint.
                 if (received.RemoteEndPoint.Port != port) continue;
+                trace?.Invoke("RX", received.RemoteEndPoint, received.Buffer.ToArray());
                 var found = ParseAnnouncement(received.Buffer,
                     received.RemoteEndPoint.Address);
                 if (!MatchesRequestedIdentity(found, vin, fixedEid))
                     continue;
-                var key = found.Source + ":" + found.LogicalAddress.ToString("X4");
+                var key = found.Source + ":" + found.LogicalAddress.ToString("X4") +
+                    ":" + Convert.ToHexString(found.Eid) + ":" + Convert.ToHexString(found.Gid) +
+                    ":" + found.ProtocolVersion.ToString("X2") + ":" + found.Vin;
                 identified[key] = found;
             }
             catch (InvalidDataException)
@@ -151,7 +206,7 @@ internal static class DoIpVehicleDiscovery
     internal static async Task<DoIpCodec.Message> QueryStatusAsync(
         string host, bool powerMode, TimeSpan timeout,
         CancellationToken cancellationToken, int? portOverride = null,
-        byte protocolVersion = DoIpCodec.Version)
+        byte protocolVersion = DoIpCodec.Version, DatagramTrace? trace = null)
     {
         if (protocolVersion is not (0x02 or 0x03 or 0x04))
             throw new ArgumentOutOfRangeException(nameof(protocolVersion),
@@ -159,10 +214,7 @@ internal static class DoIpVehicleDiscovery
         if (!IPAddress.TryParse(host, out var address) ||
             address.AddressFamily is not (AddressFamily.InterNetwork or
                 AddressFamily.InterNetworkV6) ||
-            address.Equals(IPAddress.Any) ||
-            address.Equals(IPAddress.Broadcast) ||
-            address.Equals(IPAddress.IPv6Any) ||
-            address.IsIPv6Multicast ||
+            !IsExplicitUnicast(address) ||
             timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30) ||
             (portOverride.HasValue && portOverride.Value is < 1 or > 65535))
             throw new ArgumentException("Provide a valid unicast DoIP IPv4/IPv6 gateway, port and timeout.");
@@ -173,8 +225,9 @@ internal static class DoIpVehicleDiscovery
             DoIpCodec.PowerModeRequest : DoIpCodec.EntityStatusRequest, [],
             protocolVersion);
         var port = portOverride ?? 13400;
-        await socket.SendAsync(request.AsMemory(),
-            new IPEndPoint(address, port), deadline.Token);
+        var destination = new IPEndPoint(address, port);
+        await socket.SendAsync(request.AsMemory(), destination, deadline.Token);
+        trace?.Invoke("TX", destination, request.ToArray());
         var expectedType = powerMode ?
             DoIpCodec.PowerModeResponse : DoIpCodec.EntityStatusResponse;
         while (true)
@@ -184,6 +237,7 @@ internal static class DoIpVehicleDiscovery
             if (!response.RemoteEndPoint.Address.Equals(address) ||
                 response.RemoteEndPoint.Port != port)
                 continue;
+            trace?.Invoke("RX", response.RemoteEndPoint, response.Buffer.ToArray());
             var decoded = DoIpCodec.Decode(response.Buffer);
             if (decoded.Version != protocolVersion)
                 throw new InvalidDataException(
@@ -206,7 +260,7 @@ internal static class DoIpVehicleDiscovery
     /// </summary>
     internal static async Task<IReadOnlyList<Identity>> ListenAsync(
         TimeSpan duration, CancellationToken cancellationToken,
-        int? localPortOverride = null, int? sourcePortOverride = null)
+        int? localPortOverride = null, int? sourcePortOverride = null, DatagramTrace? trace = null)
     {
         if (duration <= TimeSpan.Zero || duration > TimeSpan.FromSeconds(30) ||
             (localPortOverride.HasValue &&
@@ -218,14 +272,14 @@ internal static class DoIpVehicleDiscovery
         using var receiver = new UdpClient(
             new IPEndPoint(IPAddress.Any, localPortOverride ?? 13400));
         return await ListenOnBoundSocketAsync(receiver, duration,
-            cancellationToken, sourcePortOverride ?? 13400);
+            cancellationToken, sourcePortOverride ?? 13400, trace);
     }
 
     // The caller owns the already-bound socket. Keeping it open avoids a
     // reserve/rebind race and permits OS-assigned UDP ports in offline tests.
     internal static async Task<IReadOnlyList<Identity>> ListenOnBoundSocketAsync(
         UdpClient receiver, TimeSpan duration, CancellationToken cancellationToken,
-        int sourcePort)
+        int sourcePort, DatagramTrace? trace = null)
     {
         ArgumentNullException.ThrowIfNull(receiver);
         if (duration <= TimeSpan.Zero || duration > TimeSpan.FromSeconds(30))
@@ -256,6 +310,7 @@ internal static class DoIpVehicleDiscovery
                 // gateway's standardized UDP discovery port, not an
                 // arbitrary sender on the same host or LAN.
                 if (received.RemoteEndPoint.Port != sourcePort) continue;
+                trace?.Invoke("RX", received.RemoteEndPoint, received.Buffer.ToArray());
                 var found = ParseAnnouncement(received.Buffer,
                     received.RemoteEndPoint.Address);
                 var key = found.Source + ":" + found.LogicalAddress.ToString("X4");
@@ -278,7 +333,7 @@ internal static class DoIpVehicleDiscovery
     /// </summary>
     internal static async Task<IReadOnlyList<Identity>> ListenIpv6MulticastAsync(
         int interfaceIndex, TimeSpan duration, CancellationToken cancellationToken,
-        int? localPortOverride = null, int? sourcePortOverride = null)
+        int? localPortOverride = null, int? sourcePortOverride = null, DatagramTrace? trace = null)
     {
         ValidateIpv6MulticastOptions(interfaceIndex, duration,
             localPortOverride, sourcePortOverride);
@@ -304,6 +359,7 @@ internal static class DoIpVehicleDiscovery
             if (!IsIpv6MulticastAnnouncementSource(received.RemoteEndPoint,
                     sourcePortOverride ?? 13400, interfaceIndex))
                 continue;
+            trace?.Invoke("RX", received.RemoteEndPoint, received.Buffer.ToArray());
             try
             {
                 var found = ParseAnnouncement(received.Buffer,
@@ -348,7 +404,7 @@ internal static class DoIpVehicleDiscovery
     /// </summary>
     internal static async Task<IReadOnlyList<Identity>> DiscoverIpv6MulticastAsync(
         int interfaceIndex, TimeSpan timeout, CancellationToken cancellationToken,
-        string? vin = null, byte[]? eid = null, int? portOverride = null)
+        string? vin = null, byte[]? eid = null, int? portOverride = null, DatagramTrace? trace = null)
     {
         ValidateIpv6MulticastOptions(interfaceIndex, timeout, null, portOverride);
         if (vin is not null && eid is not null)
@@ -364,8 +420,9 @@ internal static class DoIpVehicleDiscovery
         // interface without guessing a default IPv6 route.
         var address = Ipv6MulticastDestination(interfaceIndex);
         var port = portOverride ?? 13400;
-        await socket.SendAsync(request.AsMemory(),
-            new IPEndPoint(address, port), deadline.Token);
+        var destination = new IPEndPoint(address, port);
+        await socket.SendAsync(request.AsMemory(), destination, deadline.Token);
+        trace?.Invoke("TX", destination, request.ToArray());
         var identified = new Dictionary<string, Identity>(StringComparer.Ordinal);
         while (identified.Count < 32)
         {
@@ -382,6 +439,7 @@ internal static class DoIpVehicleDiscovery
             if (!IsIpv6MulticastAnnouncementSource(received.RemoteEndPoint,
                     port, interfaceIndex))
                 continue;
+            trace?.Invoke("RX", received.RemoteEndPoint, received.Buffer.ToArray());
             try
             {
                 var found = ParseAnnouncement(received.Buffer,
@@ -410,15 +468,12 @@ internal static class DoIpVehicleDiscovery
 
     internal static async Task<Identity> DiscoverAsync(string host,
         TimeSpan timeout, CancellationToken cancellationToken,
-        string? vin = null, byte[]? eid = null, int? portOverride = null)
+        string? vin = null, byte[]? eid = null, int? portOverride = null, DatagramTrace? trace = null)
     {
         if (!IPAddress.TryParse(host, out var address) ||
             address.AddressFamily is not (AddressFamily.InterNetwork or
                 AddressFamily.InterNetworkV6) ||
-            address.Equals(IPAddress.Any) ||
-            address.Equals(IPAddress.Broadcast) ||
-            address.Equals(IPAddress.IPv6Any) ||
-            address.IsIPv6Multicast ||
+            !IsExplicitUnicast(address) ||
             timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30) ||
             (portOverride.HasValue && portOverride.Value is < 1 or > 65535))
             throw new ArgumentException(
@@ -434,6 +489,7 @@ internal static class DoIpVehicleDiscovery
         var request = vin is not null ? BuildVinRequest(vin) :
             fixedEid is not null ? BuildEidRequest(fixedEid) : BuildRequest();
         await socket.SendAsync(request.AsMemory(), destination, deadline.Token);
+        trace?.Invoke("TX", destination, request.ToArray());
         while (true)
         {
             var received = await socket.ReceiveAsync(deadline.Token);
@@ -443,6 +499,7 @@ internal static class DoIpVehicleDiscovery
                 continue;
             // An explicit generic NACK from the selected gateway is a
             // transport rejection, not an absent/malformed vehicle identity.
+            trace?.Invoke("RX", received.RemoteEndPoint, received.Buffer.ToArray());
             var decoded = DoIpCodec.Decode(received.Buffer);
             DoIpCodec.RequireNoGenericNack(decoded);
             if (decoded.Type != DoIpCodec.VehicleIdentificationResponse)

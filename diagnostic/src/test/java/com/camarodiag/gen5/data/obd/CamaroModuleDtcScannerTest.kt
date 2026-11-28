@@ -118,7 +118,7 @@ class CamaroModuleDtcScannerTest {
                 vin[7], vin[8], vin[9])),
             CanFrame(0x7A8, byteArrayOf(0x22, vin[10], vin[11], vin[12],
                 vin[13], vin[14], vin[15], vin[16])),
-            CanFrame(0x7A8, byteArrayOf(0x04, 0x59, 0x02, 0xFF.toByte(), 0x00))
+            CanFrame(0x7A8, byteArrayOf(0x03, 0x59, 0x02, 0xFF.toByte()))
         ))
         val sent = mutableListOf<CanFrame>()
         val channel = object : RawCanFrameTransport {

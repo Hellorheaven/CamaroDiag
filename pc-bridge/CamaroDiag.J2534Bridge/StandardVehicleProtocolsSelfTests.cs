@@ -334,6 +334,29 @@ internal static class StandardVehicleProtocolsSelfTests
             DoIpCodec.Encode(DoIpCodec.EntityStatusResponse, [0, 1, 1])));
         Check(true, "DoIP generic NACK classifier leaves ordinary messages untouched.");
 
+        void CheckRefusal(Action operation, string layer, byte code)
+        {
+            DoIpTransportRefusal? refusal = null;
+            try { operation(); }
+            catch (DoIpTransportRefusal error) { refusal = error; }
+            Check(refusal is not null && refusal.Layer == layer && refusal.Code == code,
+                "Preserve correlated DoIP refusal layer and code.");
+        }
+        CheckRefusal(() => DoIpCodec.RequireNoGenericNack(nackReason), "header_nack", 2);
+        CheckRefusal(() => DoIpCodec.RequireRoutingActive(DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.RoutingActivationResponse, [0x0E, 0x80, 0x12, 0x34, 0x06, 0, 0, 0, 0])),
+            0x0E80), "routing_denied", 6);
+        var correlatedRefusal = DoIpCodec.Decode(DoIpCodec.Encode(DoIpCodec.DiagnosticNegativeAck,
+            [0x12, 0x34, 0x0E, 0x80, 0x06, 0x22, 0xF1]));
+        CheckRefusal(() => DoIpCodec.IsCorrelatedDiagnosticAck(correlatedRefusal, 0x0E80, 0x1234,
+            [0x22, 0xF1, 0x90]), "diagnostic_nack", 6);
+        Check(!DoIpCodec.IsCorrelatedDiagnosticAck(correlatedRefusal, 0x0E80, 0x1235,
+            [0x22, 0xF1, 0x90]), "Wrong-address refusal must not be attributed to selected ECU.");
+        Check(!DoIpCodec.IsCorrelatedDiagnosticAck(correlatedRefusal, 0x0E80, 0x1234,
+            [0x19, 0x02, 0xFF]), "Wrong echoed request cannot establish a refusal for current operation.");
+        Reject<InvalidDataException>(() => DoIpCodec.ParseEntityStatus(DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.EntityStatusResponse, [0, 1, 2]))), "Impossible gateway socket count rejected.");
+
         var statusRequest = DoIpCodec.Decode(DoIpCodec.Encode(
             DoIpCodec.EntityStatusRequest, []));
         Check(statusRequest.Type == 0x4001 &&
@@ -510,12 +533,162 @@ internal static class StandardVehicleProtocolsSelfTests
               J2534StandardChannel.IsKnownProtocol(J2534StandardChannel.FdIso15765) &&
               !J2534StandardChannel.IsKnownProtocol(0xFFFF),
             "SAE J2534 standard and FD extended protocols recognized.");
+        var verifiedMonitor = StandardProtocolCli.ParseDoIpMonitor([
+            StandardProtocolCli.DoIpCommand, "--host", "192.0.2.10", "--tester", "0E80",
+            "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456", "--obd-monitor-did",
+            "F40C", "--samples", "5", "--interval-ms", "250", "--timeout-ms", "3000",
+            "--uds-p2-ms", "100", "--uds-p2-star-ms", "2000"]);
+        Check(verifiedMonitor.Obd && verifiedMonitor.Target.UseTls &&
+            verifiedMonitor.Did == 0xF40C && verifiedMonitor.Count == 5 &&
+            verifiedMonitor.IntervalMs == 250 && verifiedMonitor.Target.DoIpP2Ms == 100 &&
+            verifiedMonitor.Target.DoIpP2StarMs == 2000, "Verified OBD monitoring parses a bounded TLS target and timings.");
+        var tracePath = Path.Combine(Path.GetTempPath(), $"camarodiag-doip-{Guid.NewGuid():N}.jsonl");
+        var traceTarget = StandardProtocolCli.ParseDoIp(["--host", "127.0.0.1", "--tester", "0E80",
+            "--ecu", "1234", "--payload", "22F190", "--trace-file", tracePath]);
+        Check(traceTarget.TraceFile == Path.GetFullPath(tracePath) && !File.Exists(tracePath),
+            "Trace path validation does not create a file before consent.");
+        using (var json = System.Text.Json.JsonDocument.Parse(StandardProtocolCli.FormatDoIpTrace(traceTarget,
+            new DoIpDiagnosticTransport.PduTrace("TX", DateTimeOffset.UnixEpoch, [2, 0xFD, 0x80, 1, 0, 0, 0, 7]))))
+        {
+            Check(json.RootElement.GetProperty("direction").GetString() == "TX" &&
+                json.RootElement.GetProperty("pdu").GetString() == "02FD800100000007" &&
+                json.RootElement.GetProperty("ecu").GetString() == "1234",
+                "Full PDU trace retains direction, target and bytes.");
+        }
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--payload", "22F190", "--trace-file", tracePath, "--rx-file", tracePath]),
+            "Trace and response cannot use the same file.");
+        using (var datagram = System.Text.Json.JsonDocument.Parse(StandardProtocolCli.FormatDoIpDatagramTrace(
+            "RX", new System.Net.IPEndPoint(System.Net.IPAddress.IPv6Loopback, 13400),
+            [2, 0xFD, 0, 4, 0, 0, 0, 0], DateTimeOffset.UnixEpoch)))
+        {
+            Check(datagram.RootElement.GetProperty("transport").GetString() == "UDP" &&
+                datagram.RootElement.GetProperty("port").GetInt32() == 13400 &&
+                datagram.RootElement.GetProperty("pdu").GetString() == "02FD000400000000",
+                "UDP journal preserves endpoint and complete datagram.");
+        }
+        string[] backupArgs = ["--doip-backup", "--host", "127.0.0.1", "--profile", "profile.json",
+            "--archive", Path.Combine(Path.GetTempPath(), "doip-capture.zip"), "--confirm-read", "true"];
+        var backupOptions = DoIpBackupCli.Parse([..backupArgs, "--trace-file", tracePath,
+            "--uds-p2-ms", "100", "--uds-p2-star-ms", "2000", "--routing-activation-type", "0x01",
+            "--routing-oem-data", "01020304"]);
+        Check(backupOptions.Tls && backupOptions.TraceFile == Path.GetFullPath(tracePath) &&
+            backupOptions.Session is { P2Ms: 100, P2StarMs: 2000, RoutingType: 1, OemHex: "01020304" },
+            "Scoped DoIP backup parses trace and explicit session configuration.");
+        Reject<ArgumentException>(() => DoIpBackupCli.Parse([..backupArgs, "--uds-p2-ms", "2000",
+            "--uds-p2-star-ms", "100"]), "Backup rejects reversed P2 timing.");
+        Reject<ArgumentException>(() => DoIpBackupCli.Parse([..backupArgs, "--routing-oem-data", "0102"]),
+            "Backup rejects partial OEM routing data.");
+        Reject<ArgumentException>(() => DoIpBackupCli.Parse(["--doip-verify-backup", "--profile",
+            "profile.json", "--archive", "capture.zip", "--trace-file", tracePath]),
+            "Offline archive verification does not open a network trace.");
+        var monitorArgs = new[] { StandardProtocolCli.DoIpCommand, "--host", "192.0.2.10",
+            "--tester", "0E80", "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456",
+            "--obd-monitor-did", "F40C" };
+        Check(StandardProtocolCli.ParseDoIpMonitor([..monitorArgs, "--trace-file", tracePath]).Target.TraceFile == tracePath,
+            "Monitoring forwards the trace file option.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [.. monitorArgs, "--uds-p2-ms", "1000", "--uds-p2-star-ms", "500"]),
+            "Monitoring rejects reversed P2/P2-star timing before opening a socket.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [.. monitorArgs, "--payload", "221234"]), "Monitoring rejects arbitrary command options.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [.. monitorArgs, "--monitor-did", "F190"]), "Monitoring rejects conflicting service routes.");
+        Reject<ArgumentOutOfRangeException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [.. monitorArgs, "--samples", "0"]), "Monitoring rejects invalid count before network I/O.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            monitorArgs.Select(x => x == "F40C" ? "1234" : x).ToArray()),
+            "Legislated monitoring rejects non-regulatory DID.");
+        UdsMultiDidCli.RequireIdentity(new (ushort Did, byte[] Data)[] {
+            (0xF802, System.Text.Encoding.ASCII.GetBytes("1G1FA1RXXR0123456")), (0xF810, new byte[] { 1 }) },
+            "1G1FA1RXXR0123456", true);
+        Reject<InvalidDataException>(() => UdsMultiDidCli.RequireIdentity(
+            new (ushort Did, byte[] Data)[] { (0xF810, new byte[] { 2 }) },
+            "1G1FA1RXXR0123456", true), "Contradictory sampled protocol rejected.");
+        Reject<InvalidDataException>(() => UdsMultiDidCli.RequireIdentity(
+            new (ushort Did, byte[] Data)[] { (0xF190, new byte[] { 1 }) },
+            "1G1FA1RXXR0123456", false), "Contradictory sampled VIN rejected.");
+        var multiMonitorArgs = new[] { "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RXXR0123456", "--obd-monitor-dids", "0xF40C:2,0xF40D:1" };
+        var multiMonitor = StandardProtocolCli.ParseDoIpMonitor(multiMonitorArgs);
+        Check(multiMonitor.Obd && multiMonitor.Target.UseTls && multiMonitor.Layout?.Count == 2 &&
+            multiMonitor.Target.Request.SequenceEqual(new byte[] { 0x22, 0xF4, 0x0C, 0xF4, 0x0D }),
+            "Multi-DID monitoring builds one verified UDS request.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [..multiMonitorArgs[..^1], "0xF40C:4095,0xF40D:1"]), "Oversized multi-DID monitor sample rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [..multiMonitorArgs[..^1], "0x1234:2,0xF40D:1"]), "OBDonUDS multi-monitor rejects non-legislated DID.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [..multiMonitorArgs, "--monitor-did", "F190"]), "Multi-monitor and single-monitor are exclusive.");
         var parsed = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",
             "--payload", "2EF19001"]);
         Check(parsed.Request.SequenceEqual(new byte[] { 0x2E, 0xF1, 0x90, 1 }),
             "DoIP bidirectional CLI accepts WDBI service.");
+
+        var inventoryArgs = new[] { "--host", "127.0.0.1", "--tester", "0E80",
+            "--expected-vin", "1G1FA1RXXR0123456", "--ecu-inventory", "1234,1235" };
+        var ecuInventory = StandardProtocolCli.ParseDoIpInventory(inventoryArgs);
+        Check(ecuInventory.Target.UseTls && ecuInventory.Ecus.SequenceEqual(new ushort[] {0x1234, 0x1235}) &&
+            ecuInventory.Target.Request.SequenceEqual(new byte[] {0x22, 0xF1, 0x90}),
+            "Explicit ECU inventory uses TLS and only F190.");
+        Check(!ecuInventory.Obd, "Generic inventory uses UDS identity.");
+        var obdInventoryArgs = inventoryArgs.Select(arg => arg == "--ecu-inventory" ? "--obd-ecu-inventory" : arg).ToArray();
+        var obdInventory = StandardProtocolCli.ParseDoIpInventory(obdInventoryArgs);
+        Check(obdInventory.Obd && obdInventory.Target.UseTls &&
+            obdInventory.Target.Request.SequenceEqual(new byte[] {0x22, 0xF8, 0x02}),
+            "Legislated ECU inventory selects F802 and TLS.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpInventory(
+            [..inventoryArgs, "--obd-ecu-inventory", "1234"]),
+            "Generic and legislated inventory selectors are exclusive.");
+        foreach (var invalid in new[] {"1234,1234", "1234-1235", "0E80", "123", ""})
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpInventory([..inventoryArgs[..^1], invalid]),
+                "Invalid or ambiguous ECU inventory rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpInventory([..inventoryArgs, "--ecu", "1234"]),
+            "Inventory cannot include a separate ECU selector.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpInventory([..inventoryArgs, "--payload", "22F190"]),
+            "Inventory cannot include arbitrary payload.");
+        var strictArgs = new[] { "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--payload", "22F190" };
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..strictArgs, "--host", "192.0.2.1"]),
+            "Duplicate target is not silently ignored.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..strictArgs, "--tls", "true", "--TLS", "false"]),
+            "Conflicting TLS options are rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..strictArgs, "--unknown", "x"]),
+            "Unknown diagnostic options are rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..strictArgs, "--timeout-ms"]),
+            "Missing value is rejected before network I/O.");
+        Check(StandardProtocolCli.ParseDoIp(strictArgs.Select(x => x == "1234" ? "0000" : x).ToArray()).Ecu == 0,
+            "Zero logical address parses without stripping hex digits.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp(
+            strictArgs.Select(x => x == "1234" ? "00001234" : x).ToArray()),
+            "Oversized logical address rejected.");
+        var existingReply = Path.GetTempFileName();
+        try
+        {
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..strictArgs, "--rx-file", existingReply]),
+                "An existing reply file is rejected before transmitting.");
+        }
+        finally { File.Delete(existingReply); }
+
+        var sequence = StandardProtocolCli.ParseDoIpSequence([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456",
+            "--sequence", "22F190;1901FF"]);
+        Check(sequence.Target.UseTls && sequence.Commands.Length == 2 &&
+            sequence.Commands[1].SequenceEqual(new byte[] {0x19,1,0xFF}) &&
+            !sequence.ExplicitVersion, "DoIP sequence defaults to TLS and preserves command order.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpSequence([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234", "--sequence", "22F190"]),
+            "DoIP sequence requires explicit VIN.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpSequence([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456",
+            "--sequence", "22F190;1901FF", "--payload", "22F190"]),
+            "DoIP sequence rejects competing payload option.");
 
         var customRouting = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
@@ -592,6 +765,334 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(informationDoIp.Request.SequenceEqual(new byte[] {0x22, 0xF8, 0x10}),
             "DoIP OBDonUDS protocol information F810 can be selected.");
 
+        var verifiedIdentity = StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--obd-identify"]);
+        Check(verifiedIdentity.IdentityOnly && verifiedIdentity.Obd && verifiedIdentity.Target.UseTls,
+            "Verified OBD identity is a distinct discovery operation with TLS default.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--obd-identify", "--obd-did", "F40C"]),
+            "Identity and data read are exclusive.");
+
+        var verifiedRead = StandardProtocolCli.ParseVerifiedDoIpRead([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1", "--tester", "0E80",
+            "--ecu", "1234", "--expected-vin", "1G1FA1RX0J0100001", "--obd-wwh-permanent"]);
+        Check(verifiedRead.Obd && verifiedRead.Target.UseTls && verifiedRead.Target.DoIpP2Ms == 5000,
+            "Verified OBD read defaults to TLS and bounded stage deadlines.");
+        foreach (var (selector, sid) in new[] { ("--uds-did", (byte)0x22),
+            ("--uds-scaling-did", (byte)0x24) })
+        {
+            string[] typedArgs = ["--host", "127.0.0.1", "--tester", "0E80",
+                "--ecu", "1234", "--expected-vin", "1G1FA1RX0J0100001", selector, "0xF40C"];
+            var typed = StandardProtocolCli.ParseVerifiedDoIpRead(typedArgs);
+            Check(!typed.Obd && typed.Target.UseTls && typed.Target.Request.SequenceEqual(
+                new byte[] { sid, 0xF4, 0x0C }), "Generic typed UDS DID uses F190 and TLS by default.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp(
+                ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234", selector, "F40C"]),
+                "Typed UDS DID requires VIN before networking.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead(
+                [..typedArgs, "--obd-did", "F40C"]), "Typed selectors are exclusive.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead(
+                [..typedArgs[..^1], "F4"]), "DID must contain four hex digits.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead(
+                [..typedArgs, "--obd-verified", "true"]), "Generic UDS cannot be relabelled as OBDonUDS.");
+            var responseSid = (byte)(sid + 0x40);
+            Check(StandardProtocolCli.DecodeVerifiedSingleDid(typed.Target.Request,
+                [responseSid, 0xF4, 0x0C, 0xAB]).SequenceEqual(new byte[] {0xAB}),
+                "Typed UDS returns actual raw data.");
+            Reject<InvalidDataException>(() => StandardProtocolCli.DecodeVerifiedSingleDid(
+                typed.Target.Request, [responseSid, 0xF4, 0x0D, 0xAB]), "Wrong DID rejected.");
+            Reject<InvalidDataException>(() => StandardProtocolCli.DecodeVerifiedSingleDid(
+                typed.Target.Request, [responseSid, 0xF4, 0x0C]), "Empty DID rejected.");
+        }
+
+        foreach (var (selection, expected) in new (string[], byte[])[]
+        {
+            (["--uds-dtc-mask", "0x08"], [0x19, 0x02, 0x08]),
+            (["--uds-dtc-count-mask", "0x08"], [0x19, 0x01, 0x08]),
+            (["--uds-snapshot", "0x123456", "--uds-snapshot-record", "1"], [0x19, 4, 0x12, 0x34, 0x56, 1]),
+            (["--uds-extended-dtc", "0x123456", "--uds-extended-record", "2"], [0x19, 6, 0x12, 0x34, 0x56, 2])
+        })
+        {
+            string[] target = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234"];
+            var read = StandardProtocolCli.ParseVerifiedDoIpRead(
+                [..target, "--expected-vin", "1G1FA1RX0J0100001", ..selection]);
+            Check(!read.Obd && read.Target.UseTls && read.Target.Request.SequenceEqual(expected),
+                "Generic typed UDS DTC uses F190 and preserves requested parameters.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..target, ..selection]),
+                "Generic typed DTC requires expected VIN.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead(
+                [..target, "--expected-vin", "1G1FA1RX0J0100001", ..selection, "--obd-dtc-mask", "0xFF"]),
+                "Generic and legislated DTC selectors cannot be combined.");
+        }
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--uds-snapshot", "0x123456"]),
+            "Generic snapshot requires explicit record.");
+
+        foreach (var (selector, subfunction) in new[] {
+            ("--uds-supported-dtcs", (byte)0x0A), ("--uds-permanent-dtcs", (byte)0x15), ("--uds-snapshot-index", (byte)0x03) })
+        {
+            string[] target = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234"];
+            var inventory = StandardProtocolCli.ParseVerifiedDoIpRead(
+                [..target, "--expected-vin", "1G1FA1RX0J0100001", selector]);
+            Check(!inventory.Obd && inventory.Target.Request.SequenceEqual(new byte[] { 0x19, subfunction }),
+                "DTC inventory uses generic verified UDS.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..target, selector]),
+                "DTC inventory requires VIN.");
+        }
+        Check(UdsStandardServices.RequireResponse([0x19, 3], [0x59, 3]).Length == 2,
+            "Empty snapshot index is a valid correlated response.");
+        Reject<InvalidDataException>(() => UdsStandardServices.RequireResponse(
+            [0x19, 3], [0x59, 3, 1]), "Truncated snapshot index rejected at transport.");
+        Reject<InvalidDataException>(() => UdsStandardServices.RequireResponse(
+            [0x19, 0x0A], [0x59, 0x0A]), "Supported DTC response requires availability mask.");
+        string[] legacyArgs = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001"];
+        foreach (var (option, sub) in new[] { ("--uds-mirror-mask", (byte)0x0F), ("--uds-mirror-count", (byte)0x11),
+            ("--uds-legacy-emissions-count", (byte)0x12), ("--uds-legacy-emissions-mask", (byte)0x13) })
+        {
+            var read = StandardProtocolCli.ParseVerifiedDoIpRead([..legacyArgs, option, "0x08"]);
+            Check(!read.Obd && read.Target.Request.SequenceEqual(new byte[] { 0x19, sub, 8 }), "Legacy scope uses explicit UDS.");
+            byte[] legacyReply = sub is 0x11 or 0x12 ? [0x59, sub, 8, 1, 0, 2] : [0x59, sub, 8, 1, 2, 3, 8];
+            var result = ObdOnUdsServices.DecodeLegacyDtc(read.Target.Request, legacyReply);
+            Check(result.Subfunction == sub && (sub is 0x11 or 0x12 ? result.Count?.Count == 2 :
+                result.List?.Codes.Single().Code == 0x010203), "Legacy count or list preserved.");
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeLegacyDtc(read.Target.Request,
+                [0x59, sub, 8, 1]), "Truncated legacy report rejected.");
+        }
+        var mirrorRead = StandardProtocolCli.ParseVerifiedDoIpRead([..legacyArgs, "--uds-mirror-extended", "0x010203", "--uds-mirror-record", "1"]);
+        Check(!mirrorRead.Obd && mirrorRead.Target.Request.SequenceEqual(new byte[] { 0x19, 0x10, 1, 2, 3, 1 }), "Mirror detail selector.");
+        Check(ObdOnUdsServices.DecodeLegacyDtc(mirrorRead.Target.Request, [0x59, 0x10, 1, 2, 3, 8, 1, 0xAA])
+            .Detail!.RawExtendedDataRecords.SequenceEqual(new byte[] { 1, 0xAA }), "Mirror data preserved.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeLegacyDtc(mirrorRead.Target.Request,
+            [0x59, 0x10, 1, 2, 3, 8, 2]), "Wrong mirror record rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..legacyArgs, "--uds-mirror-extended", "0x010203"]),
+            "Explicit mirror record required.");
+        string[] recordArgs = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001"];
+        var stored = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-stored-record", "0x01"]);
+        Check(!stored.Obd && stored.Target.Request.SequenceEqual(new byte[] { 0x19, 5, 1 }), "Stored record uses verified UDS.");
+        Check(!ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 1]).Dtc.HasValue, "Empty record is distinct.");
+        var storedData = ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 1, 1, 2, 3, 8, 1, 0xF1, 0x90, 0xAA]);
+        Check(storedData.Dtc == 0x010203 && storedData.RawData.SequenceEqual(new byte[] { 1, 0xF1, 0x90, 0xAA }),
+            "Stored data preserved raw.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 2]), "Wrong record rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 1, 1, 2, 3, 8, 2, 0xF1, 0x90]), "Missing DID rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-stored-record", "0xFF"]), "Wildcard requires OEM layout.");
+        var memoryDecoded = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-memory", "0x02",
+            "--uds-memory-snapshot", "0x010203", "--uds-memory-record", "0xFF", "--snapshot-did-lengths", "F40D:1"]);
+        Check(!memoryDecoded.Obd && memoryDecoded.Target.Request.SequenceEqual(new byte[] { 0x19, 0x18, 1, 2, 3, 255, 2 }),
+            "Decoded snapshot preserves explicit memory selector.");
+        var memorySnapshotBytes = Convert.FromHexString("591802010203080101F40D78");
+        var decodedMemorySnapshot = ObdOnUdsServices.DecodeUserMemorySnapshot(2, 0x010203, 255,
+            memorySnapshotBytes, ObdOnUdsServices.ParseStoredDidLengths("F40D:1"));
+        Check(decodedMemorySnapshot.RawResponse.SequenceEqual(memorySnapshotBytes) &&
+            decodedMemorySnapshot.Records.Single().Dids.Single().Data.SequenceEqual(new byte[] { 0x78 }),
+            "Memory snapshot preserves original response and historical DID.");
+        var memoryExtendedBytes = Convert.FromHexString("5919020102030801123490AA");
+        var decodedMemoryExtended = ObdOnUdsServices.DecodeUserMemoryExtended(2, 0x010203, 255,
+            memoryExtendedBytes, ObdOnUdsServices.ParseExtendedRecordLengths("01:2,90:1"));
+        Check(decodedMemoryExtended.RawResponse.SequenceEqual(memoryExtendedBytes) &&
+            decodedMemoryExtended.Records.Count == 2, "Memory extended data preserves records.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeUserMemoryExtended(3, 0x010203, 255,
+            memoryExtendedBytes, ObdOnUdsServices.ParseExtendedRecordLengths("01:2,90:1")), "Wrong memory rejected.");
+        var decodedExtended = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-dtc", "0x010203",
+            "--uds-extended-record", "0xFF", "--extended-record-lengths", "01:2,90:1,91:2"]);
+        Check(!decodedExtended.Obd && decodedExtended.Target.Request.SequenceEqual(new byte[] { 0x19, 6, 1, 2, 3, 255 }),
+            "Decoded extended data uses generic verified UDS.");
+        var extendedCatalog = ObdOnUdsServices.ParseExtendedRecordLengths("01:2,90:1,91:2");
+        var extendedResponse = Convert.FromHexString("59060102030801123490AA91BBCC");
+        var extendedReport = ObdOnUdsServices.DecodeExtendedRecords(0x010203, 255, extendedResponse, extendedCatalog);
+        Check(extendedReport.Records.Count == 3 && extendedReport.Records[2].Number == 0x91 &&
+            extendedReport.Records[2].Data.SequenceEqual(new byte[] { 0xBB, 0xCC }) &&
+            extendedReport.RawResponse.SequenceEqual(extendedResponse), "Extended data retains record boundaries.");
+        Check(ObdOnUdsServices.DecodeExtendedRecords(0x010203, 0xFE,
+            Convert.FromHexString("59060102030890AA91BBCC"), extendedCatalog).Records.Count == 2, "FE limits to regulated OBD records.");
+        foreach (var (selector, invalid) in new (byte, string)[] { (0xFE, "590601020308011234"),
+            (1, "59060102030801123490AA"), (255, "59060102030890AA90BB"),
+            (255, "5906010203080112"), (255, "59060102030802AA"), (255, "59060102040890AA") })
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeExtendedRecords(0x010203, selector,
+                Convert.FromHexString(invalid), extendedCatalog), "Malformed extended record response rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-did", "F190",
+            "--extended-record-lengths", "01:2"]), "Extended data lengths require the correct selector.");
+        var decodedSnapshot = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-snapshot", "0x010203",
+            "--uds-snapshot-record", "0xFF", "--snapshot-did-lengths", "F40C:2,F40D:1"]);
+        Check(!decodedSnapshot.Obd && decodedSnapshot.Target.Request.SequenceEqual(new byte[] { 0x19, 4, 1, 2, 3, 255 }),
+            "Decoded snapshots use generic verified UDS.");
+        var obdSnapshot = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--obd-snapshot", "0x010203",
+            "--obd-snapshot-record", "0x00", "--snapshot-did-lengths", "F40D:1"]);
+        Check(obdSnapshot.Obd && obdSnapshot.Target.Request.SequenceEqual(new byte[] { 0x19, 4, 1, 2, 3, 0 }),
+            "Decoded OBD snapshots allow explicit regulated record zero.");
+        var snapshotLengths = ObdOnUdsServices.ParseStoredDidLengths("F40C:2,F40D:1");
+        var snapshotResponse = Convert.FromHexString("5904010203080102F40C1234F40D560201F40D78");
+        var snapshots = ObdOnUdsServices.DecodeSnapshotRecords(0x010203, 255, snapshotResponse, snapshotLengths);
+        Check(snapshots.Status == 8 && snapshots.Records.Count == 2 && snapshots.Records[1].Record == 2 &&
+            snapshots.Records[0].Dids[0].Data.SequenceEqual(new byte[] { 0x12, 0x34 }) &&
+            snapshots.Records[1].Dids[0].Data.SequenceEqual(new byte[] { 0x78 }) &&
+            snapshots.RawResponse.SequenceEqual(snapshotResponse), "Snapshot records preserve historical DID bytes.");
+        Check(ObdOnUdsServices.DecodeSnapshotRecords(0x010203, 0, Convert.FromHexString("590401020308"), snapshotLengths)
+            .Records.Count == 0, "Absent snapshot data remains distinct.");
+        foreach (var invalid in new[] { "59040102030801", "5904010203080101F40C12",
+            "5904010203080101FFFFAA", "59040102030801000100", "5904010204080100" })
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSnapshotRecords(0x010203, 255,
+                Convert.FromHexString(invalid), snapshotLengths), "Malformed snapshot response rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSnapshotRecords(0x010203, 1, snapshotResponse, snapshotLengths),
+            "Individual snapshot query rejects multiple records.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-did", "F190",
+            "--snapshot-did-lengths", "F40D:1"]), "Snapshot lengths cannot be applied to other selectors.");
+        var decodedSingleStored = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs,
+            "--uds-stored-record", "0x01", "--stored-did-lengths", "F40D:1"]);
+        Check(!decodedSingleStored.Obd && decodedSingleStored.Target.Request.SequenceEqual(new byte[] { 0x19, 5, 1 }),
+            "Individual stored data retains selector.");
+        var individualLengths = ObdOnUdsServices.ParseStoredDidLengths("F40D:1");
+        var individualReply = Convert.FromHexString("5905010102030801F40D78");
+        var individualReport = ObdOnUdsServices.DecodeStoredRecords(1, individualReply, individualLengths);
+        Check(individualReport.RawResponse.SequenceEqual(individualReply) &&
+            individualReport.Records.Single().Dids.Single().Data.SequenceEqual(new byte[] { 0x78 }),
+            "Individual decoded stored data retains original response.");
+        Check(ObdOnUdsServices.DecodeStoredRecords(1, [0x59, 5, 1], individualLengths).Records.Count == 0,
+            "Absent individual record distinguished from data.");
+        foreach (var invalid in new[] { "590502", "5905010102030801F40D",
+            "5905010102030801F40D78020405060801F40D79" })
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecords(1,
+                Convert.FromHexString(invalid), individualLengths), "Wrong or incomplete individual stored data rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-did", "F190",
+            "--stored-did-lengths", "F40D:1"]), "Stored DID lengths require a stored record selector.");
+        var allStored = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-all-stored-records", "F40C:2,F40D:1"]);
+        Check(!allStored.Obd && allStored.Target.Request.SequenceEqual(new byte[] { 0x19, 5, 255 }), "All stored records use verified UDS.");
+        var catalog = ObdOnUdsServices.ParseStoredDidLengths("F40C:2,F40D:1");
+        var multiStored = ObdOnUdsServices.DecodeAllStoredRecords(Convert.FromHexString("5905010102030802F40C1234F40D56020405060001F40D78"), catalog);
+        Check(multiStored.Records.Count == 2 && multiStored.Records[1].Record == 2 &&
+            multiStored.Records[0].Dids[0].Data.SequenceEqual(new byte[] { 0x12, 0x34 }), "Multi-record stored data retained.");
+        Check(ObdOnUdsServices.DecodeAllStoredRecords([0x59, 5, 255], catalog).Records.Count == 0, "Empty wildcard response.");
+        foreach (var invalid in new[] { "590501", "5905010102030801F40C12", "5905010102030801FFFFAA",
+            "5905010102030800010405060000", "590501010203080000" })
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeAllStoredRecords(Convert.FromHexString(invalid), catalog), "Malformed all-stored response rejected.");
+        foreach (var invalid in new[] { "F40D:0", "F40D:1,F40D:2", "F40D:4097", "F40G:1" })
+            Reject<ArgumentException>(() => ObdOnUdsServices.ParseStoredDidLengths(invalid), "Invalid stored DID catalog rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-all-stored-records", "F40D:1", "--uds-stored-record", "0x01"]), "Stored selectors are exclusive.");
+        var recordSupport = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-record-support", "0x01"]);
+        Check(!recordSupport.Obd && recordSupport.Target.Request.SequenceEqual(new byte[] { 0x19, 0x1A, 1 }),
+            "Support query is verified UDS.");
+        var supportReport = ObdOnUdsServices.DecodeExtendedRecord(1, null, [0x59, 0x1A, 8, 1, 1, 2, 3, 0]);
+        Check(supportReport.Availability == 8 && supportReport.Entries.Single().Status == 0, "Inactive supported DTC retained.");
+        var recordRead = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-record-data", "0x01", "--uds-extended-record-size", "2"]);
+        Check(!recordRead.Obd && recordRead.Target.Request.SequenceEqual(new byte[] { 0x19, 0x16, 1 }), "Extended record read.");
+        var recordReport = ObdOnUdsServices.DecodeExtendedRecord(1, 2,
+            [0x59, 0x16, 1, 1, 2, 3, 8, 0xAA, 0xBB, 1, 2, 4, 0, 0xCC, 0xDD]);
+        Check(recordReport.Entries.Count == 2 && recordReport.Entries[1].Data.SequenceEqual(new byte[] { 0xCC, 0xDD }),
+            "Explicit size separates raw records.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeExtendedRecord(1, 2, [0x59, 0x16, 1, 1, 2, 3, 8, 0xAA]),
+            "Truncated extended record rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeExtendedRecord(1, null, [0x59, 0x1A, 8, 2]), "Wrong record rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeExtendedRecord(1, null,
+            [0x59, 0x1A, 8, 1, 1, 2, 3, 8, 1, 2, 3, 0]), "Duplicate DTC rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-record-data", "1"]),
+            "Data requires explicit size.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-record-support", "0xFF"]),
+            "Reserved record rejected.");
+        string[] memoryArgs = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--uds-memory", "0x02"];
+        var memoryRead = StandardProtocolCli.ParseVerifiedDoIpRead([..memoryArgs, "--uds-memory-mask", "0x08"]);
+        Check(!memoryRead.Obd && memoryRead.Target.UseTls && memoryRead.Target.Request.SequenceEqual(
+            new byte[] { 0x19, 0x17, 8, 2 }), "User memory list uses verified UDS.");
+        var memoryList = ObdOnUdsServices.DecodeUserMemory(memoryRead.Target.Request, [0x59, 0x17, 2, 8, 1, 2, 3, 8]);
+        Check(memoryList.Memory == 2 && memoryList.List!.Codes.Single().Code == 0x010203, "Explicit memory and DTC preserved.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeUserMemory(memoryRead.Target.Request,
+            [0x59, 0x17, 3, 8]), "Wrong memory rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeUserMemory(memoryRead.Target.Request,
+            [0x59, 0x17, 2, 8, 1, 2, 3, 1]), "Unmatched status rejected.");
+        foreach (var (option, sub) in new[] { ("--uds-memory-snapshot", (byte)0x18), ("--uds-memory-extended", (byte)0x19) })
+        {
+            var read = StandardProtocolCli.ParseVerifiedDoIpRead([..memoryArgs, option, "0x010203", "--uds-memory-record", "1"]);
+            Check(!read.Obd && read.Target.Request.SequenceEqual(new byte[] { 0x19, sub, 1, 2, 3, 1, 2 }),
+                "Explicit user memory detail.");
+            var report = ObdOnUdsServices.DecodeUserMemory(read.Target.Request, [0x59, sub, 2, 1, 2, 3, 8, 1, 0xAA]);
+            Check(report.Dtc == 0x010203 && report.RawRecords!.SequenceEqual(new byte[] { 1, 0xAA }), "Raw record preserved.");
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeUserMemory(read.Target.Request,
+                [0x59, sub, 2, 1, 2, 3, 8, 2]), "Wrong record rejected.");
+        }
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..memoryArgs, "--uds-memory-mask", "8", "--uds-memory-record", "1"]),
+            "List cannot specify record.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..memoryArgs, "--uds-memory-extended", "1", "--uds-memory-record", "0xF0"]),
+            "Reserved record rejected.");
+        var severityTarget = StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--uds-severity-list", "0x80", "--uds-severity-status", "0x08"]);
+        Check(!severityTarget.Obd && severityTarget.Target.Request.SequenceEqual(new byte[] { 0x19, 8, 0x80, 8 }),
+            "Severity CLI uses generic verified UDS and explicit masks.");
+        var severityReport = ObdOnUdsServices.DecodeSeverity(severityTarget.Target.Request,
+            [0x59, 8, 8, 0x80, 0x12, 0x12, 0x34, 0x56, 8]);
+        Check(severityReport.Records.Single() == new ObdOnUdsServices.SeverityRecord(0x123456, 0x80, 0x12, 8),
+            "Severity fields preserved.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSeverity(severityTarget.Target.Request,
+            [0x59, 8, 8, 0x40, 0x12, 0x12, 0x34, 0x56, 8]), "Severity mask mismatch rejected.");
+        var severityDetail = ObdOnUdsServices.ReadSeverity(9, 0, 0, 0x123456);
+        Check(ObdOnUdsServices.DecodeSeverity(severityDetail, [0x59, 9, 8]).Records.Count == 0,
+            "Missing severity record is a valid empty response.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSeverity(severityDetail,
+            [0x59, 9, 8, 0x80, 0x12, 0x12, 0x34, 0x57, 8]), "Wrong DTC severity record rejected.");
+        Check(ObdOnUdsServices.DecodeSeverity(ObdOnUdsServices.ReadSeverity(7, 0x80, 8),
+            [0x59, 7, 8, 1, 0, 2]).Count == 2, "Severity count preserved.");
+        var counters = StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--uds-fault-counters"]);
+        Check(!counters.Obd && counters.Target.Request.SequenceEqual(new byte[] { 0x19, 0x14 }),
+            "Fault counter CLI uses generic verified UDS.");
+        var fdc = ObdOnUdsServices.DecodeFaultCounters([0x59, 0x14, 1, 2, 3, 0x7F, 1, 2, 4, 0x80, 1, 2, 5, 0xFF]);
+        Check(fdc.Select(r => r.Counter).SequenceEqual(new sbyte[] { 127, -128, -1 }), "Signed counters preserved.");
+        Check(ObdOnUdsServices.DecodeFaultCounters([0x59, 0x14]).Count == 0, "Empty counter report accepted.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeFaultCounters(
+            [0x59, 0x14, 1]), "Truncated counter rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeFaultCounters(
+            [0x59, 0x14, 1, 2, 3, 1, 1, 2, 3, 2]), "Duplicate counter rejected.");
+        foreach (byte sub in new byte[] { 0x0B, 0x0C, 0x0D, 0x0E })
+        {
+            var historical = StandardProtocolCli.ParseVerifiedDoIpRead([
+                "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+                "--expected-vin", "1G1FA1RX0J0100001", "--uds-historical-dtc", $"0x{sub:X2}"]);
+            Check(!historical.Obd && historical.Target.Request.SequenceEqual(new byte[] { 0x19, sub }),
+                "Historical DTC CLI is a verified generic read.");
+            Check(ObdOnUdsServices.DecodeHistoricalDtc(sub, [0x59, sub, 8]).Codes.Count == 0,
+                "No matching DTC is not a transport failure.");
+            Check(ObdOnUdsServices.DecodeHistoricalDtc(sub, [0x59, sub, 8, 1, 2, 3, 0]).Codes[0].Code == 0x010203,
+                "Historical record can have inactive current status.");
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeHistoricalDtc(sub, [0x59, sub, 8, 1]),
+                "Truncated historical record rejected.");
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeHistoricalDtc(sub, [0x59, sub, 8, 1, 2, 3, 1]),
+                "Unavailable current status bit rejected.");
+        }
+        var supported = ObdOnUdsServices.DecodeSupportedDtcs([0x59, 0x0A, 8, 1, 2, 3, 0]);
+        Check(supported.Codes.Count == 1 && supported.Codes[0].Status == 0, "Inactive supported DTC retained.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSupportedDtcs(
+            [0x59, 0x0A, 8, 1, 2, 3, 1]), "Unavailable status rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSupportedDtcs(
+            [0x59, 0x0A, 8, 1, 2, 3, 0, 1, 2, 3, 8]), "Duplicate DTC rejected.");
+        var permanent = ObdOnUdsServices.DecodePermanentDtcs([0x59, 0x15, 8, 1, 2, 3, 0, 1, 2, 4, 8]);
+        Check(permanent.Codes.Count == 2 && permanent.Codes[0].Status == 0, "Permanent DTC with zero current status retained.");
+        Check(ObdOnUdsServices.DecodePermanentDtcs([0x59, 0x15, 8]).Codes.Count == 0, "Empty permanent DTC report retained.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodePermanentDtcs([0x59, 0x0A, 8]), "Wrong report rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodePermanentDtcs([0x59, 0x15, 8, 1, 2, 3, 1]), "Unavailable status rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodePermanentDtcs([0x59, 0x15, 8, 1, 2, 3, 0, 1, 2, 3, 8]), "Duplicate rejected.");
+        Reject<InvalidDataException>(() => UdsStandardServices.RequireResponse([0x19, 0x15], [0x59, 0x15, 8, 1]), "Truncated permanent DTC report rejected.");
+        var index = ObdOnUdsServices.DecodeSnapshotIndex([0x59, 3, 1, 2, 3, 1, 1, 2, 3, 2]);
+        Check(index.Count == 2 && index[1].Record == 2, "Distinct snapshot records retained.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSnapshotIndex([0x59, 3, 1]), "Truncated snapshot index rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSnapshotIndex(
+            [0x59, 3, 1, 2, 3, 1, 1, 2, 3, 1]), "Duplicate snapshot reference rejected.");
+
+        var verifiedMulti = StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--uds-dids", "0xF40C:2,0xF40D:1",
+            "--obd-verified", "true"]);
+        Check(verifiedMulti.Obd && verifiedMulti.Target.Request.SequenceEqual(
+            new byte[] { 0x22, 0xF4, 0x0C, 0xF4, 0x0D }), "Verified multi-DID OBD route.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--payload", "22F190"]),
+            "Raw exchanges use the separate confirmed sequence path.");
         var wwhDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",
@@ -704,7 +1205,7 @@ internal static class StandardVehicleProtocolsSelfTests
             "--doip-version", "3", "--tls", "true",
             "--rx-file", "ecu-response-new.bin", "--payload", "22F810"]);
         Check(versionedDoIp.Version == 3 && versionedDoIp.UseTls &&
-            versionedDoIp.ReceiveFile == "ecu-response-new.bin",
+            versionedDoIp.ReceiveFile == Path.GetFullPath("ecu-response-new.bin"),
             "Secure DoIP protocol version 0x03 and unique binary reply are selectable.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",

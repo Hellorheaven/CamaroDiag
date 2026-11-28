@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_native_live_title">Native USB live recording (raw PID)</string>
+    <string name="j1979_native_live_pids">PID IDs (hex, comma separated)</string>
+    <string name="j1979_native_live_cycles">Number of cycles</string>
+    <string name="j1979_native_live_interval">Cycle interval (ms)</string>
+    <string name="j1979_native_live_confirm">Confirm stationary vehicle, approved physical ECU and VIN %1$s</string>
+    <string name="j1979_native_live_run">Start native recording</string>
+    <string name="j1979_native_live_incomplete">Native recording incomplete</string>
+    <string name="j1979_native_live_samples">Correlated raw samples: %1$d</string>
+</resources>

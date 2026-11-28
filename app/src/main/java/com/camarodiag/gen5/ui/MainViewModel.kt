@@ -11,12 +11,16 @@ import androidx.lifecycle.viewModelScope
 import com.camarodiag.gen5.data.db.DiagnosticDatabase
 import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
+import com.camarodiag.gen5.data.obd.DoIpDirectRead
+import com.camarodiag.gen5.data.obd.DoIpMemoryBackup
+import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.google.firebase.auth.FirebaseAuth
 import com.camarodiag.gen5.auth.LicenseLevel
 import com.camarodiag.gen5.auth.LicenseRolloutConfig
 import com.camarodiag.gen5.auth.AccountStorageKeys
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
+import com.camarodiag.gen5.data.obd.Obd2FeatureEngine
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationFileFormat
 import com.camarodiag.gen5.data.obd.CalibrationFileInspection
@@ -37,6 +41,10 @@ import com.camarodiag.gen5.data.obd.CalibrationTableCodec
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
 import com.camarodiag.gen5.data.obd.CamaroSignalCatalog
 import com.camarodiag.gen5.data.obd.toDiagnosticDtc
+import com.camarodiag.gen5.data.obd.UdsDtcFilter
+import com.camarodiag.gen5.data.obd.UdsDtcReport
+import com.camarodiag.gen5.data.obd.UdsDtcCountReport
+import com.camarodiag.gen5.data.obd.DecodedUdsDtcRecord
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.data.obd.ObdTransportFailurePolicy
@@ -50,6 +58,9 @@ import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleRecordParser
 import com.camarodiag.gen5.data.obd.CanConsoleCapabilityPolicy
 import com.camarodiag.gen5.data.obd.EcuWriteConsentFlow
+import com.camarodiag.gen5.data.obd.DoIpClientTls
+import com.camarodiag.gen5.data.obd.DoIpClientCertificateSelection
+import com.camarodiag.gen5.data.obd.DoIpClientCertificateException
 import com.camarodiag.gen5.data.obd.CanConsoleDiagnosticStatus
 import com.camarodiag.gen5.data.obd.CanAdapterRestorationException
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
@@ -109,8 +120,27 @@ data class CanConsoleHistoryEntry(
     val succeeded: Boolean = true
 )
 
+/** Identity-verified samples; completion describes the run, not sample validity. */
+data class DoIpMonitorReport(val vin: String, val gateway: Int, val tester: Int, val ecu: Int,
+    val did: Int, val tls: Boolean, val completedAtUtcMillis: Long,
+    val samples: List<DoIpMonitorRow>, val obdOnUds: Boolean = false,
+    val complete: Boolean = true, val requestedSamples: Int = samples.size) {
+    fun appendVerified(row: DoIpMonitorRow, observedVin: String, observedGateway: Int,
+        nowMillis: Long): DoIpMonitorReport {
+        require(!complete && vin == observedVin && gateway == observedGateway)
+        require(row.index == samples.size + 1 && row.index <= requestedSamples)
+        require(samples.lastOrNull()?.let { row.elapsedMs >= it.elapsedMs } != false)
+        return copy(samples = samples + row, completedAtUtcMillis = nowMillis)
+    }
+}
+data class DoIpMonitorValue(val did: Int, val payloadHex: String)
+data class DoIpMonitorRow(val index: Int, val elapsedMs: Long, val payloadHex: String,
+    val values: List<DoIpMonitorValue> = emptyList())
+
 data class LiveCanMonitorState(
     val isCapturing: Boolean = false,
+    val isDoIpActive: Boolean = false,
+    val bitrate: Int = 500_000,
     val rawText: String = "",
     val report: CanTraceAnalysisReport? = null,
     val isSendingRequest: Boolean = false,
@@ -144,6 +174,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             accountUid != null && level != LicenseLevel.OWNER
         ) LicenseLevel.PREMIUM else level
         if (LicenseRolloutConfig.ENABLED && level == LicenseLevel.FREE) {
+            invalidateEnhancedUdsReads()
             gmlanIdentityGeneration++
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isGmlanReading = false, gmlanIdentity = null, gmlanIdentityFailed = false
@@ -162,6 +193,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun requirePremiumLicense(): Boolean {
         if (hasPremiumLicense()) return true
         _connectionMessage.value = localizedContext.getString(R.string.license_required_for_feature)
+        return false
+    }
+
+    private fun hasMatchingPhysicalCamaro(): Boolean =
+        !obdManager.isDemoMode && !obdManager.isSimulationActive &&
+            VehicleVinMatcher.admitsCamaroSpecificRead(_vehicle.value.vin, _observedStandardVin.value)
+
+    private fun requireMatchingPhysicalCamaro(): Boolean {
+        if (hasMatchingPhysicalCamaro()) return true
+        _connectionMessage.value = localizedContext.getString(R.string.msg_gm_identity_required)
         return false
     }
 
@@ -216,6 +257,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Retain the cancelled job until the next connection can join its
         // transport cleanup; clearing it would allow overlapping handshakes.
         connectionAttemptJob?.cancel()
+        bluetoothDiscoveryJob?.cancel()
         _savedSessions.value = emptyList()
         _activeAccountUid.value = accountUid
         discardCanMonitor()
@@ -504,7 +546,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _functionalTestState = MutableStateFlow(FunctionalTestState())
     val functionalTestState: StateFlow<FunctionalTestState> = _functionalTestState.asStateFlow()
     private var functionalTestJob: Job? = null
-    private var functionalTestGeneration: Long = 0L
+    @Volatile private var functionalTestGeneration: Long = 0L
+    private var nativeFunctionalCleanup: Job? = null
 
     private val _modules = MutableStateFlow<List<EcuModule>>(emptyList())
     val modules: StateFlow<List<EcuModule>> = _modules.asStateFlow()
@@ -514,6 +557,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _livePids = MutableStateFlow<List<LivePidValue>>(emptyList())
     val livePids: StateFlow<List<LivePidValue>> = _livePids.asStateFlow()
+    private val _detectedLiveSensors = MutableStateFlow<List<LiveSensorDefinition>>(emptyList())
+    val detectedLiveSensors: StateFlow<List<LiveSensorDefinition>> = _detectedLiveSensors.asStateFlow()
+    // null = no complete scan, empty = all requested modes positively answered.
+    private val _dtcScanNotice = MutableStateFlow<String?>(null)
+    val dtcScanNotice: StateFlow<String?> = _dtcScanNotice.asStateFlow()
+    private var liveEvidenceGeneration = 0L
+    private val _observedStandardVin = MutableStateFlow<String?>(null)
+    val observedStandardVin: StateFlow<String?> = _observedStandardVin.asStateFlow()
+    private val _observedObdResponders = MutableStateFlow<List<String>>(emptyList())
+    val observedObdResponders: StateFlow<List<String>> = _observedObdResponders.asStateFlow()
+
+    private fun resetLiveAndDtcEvidence() {
+        _observedStandardVin.value = null
+        _observedObdResponders.value = emptyList()
+        liveEvidenceGeneration++
+        _livePids.value = emptyList()
+        _detectedLiveSensors.value = emptyList()
+        _dtcScanNotice.value = null
+    }
 
     private val _isStreamingLive = MutableStateFlow(true)
     val isStreamingLive: StateFlow<Boolean> = _isStreamingLive.asStateFlow()
@@ -521,6 +583,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val liveTelemetryMessage: StateFlow<String?> = _liveTelemetryMessage.asStateFlow()
 
     private val recordedLiveSamples = mutableListOf<RecordedLiveSample>()
+    private var recordingObservedVin: String? = null
+    private var recordingEvidenceGeneration: Long = -1L
     private val maxLiveRecordingSamples = 10_000
     private val _liveRecordingState = MutableStateFlow(LiveRecordingState())
     val liveRecordingState: StateFlow<LiveRecordingState> = _liveRecordingState.asStateFlow()
@@ -759,6 +823,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_ecu_vin_invalid)
             return
         }
+        if (!VehicleVinMatcher.isCamaroCandidate(normalizedVin)) {
+            _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_non_camaro_vin)
+            return
+        }
         val selectedId = _selectedSavedVehicleId.value
         updateVin(normalizedVin)
         if (selectedId != null) {
@@ -776,6 +844,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val normalizedVin = VehicleVinMatcher.normalize(ecuVin)
         if (normalizedVin == null) {
             _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_ecu_vin_invalid)
+            return
+        }
+        if (!VehicleVinMatcher.isCamaroCandidate(normalizedVin)) {
+            _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_non_camaro_vin)
             return
         }
         val vehicleFromEcu = _vehicle.value.copy(vin = normalizedVin)
@@ -933,6 +1005,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
 
     private fun clearVehicleEvidence(preserveCanConsole: Boolean = false) {
+        resetLiveAndDtcEvidence()
+        invalidateEnhancedUdsReads()
         calibrationIdentityGeneration++
         gmlanIdentityGeneration++
         fuelSnapshotGeneration++
@@ -1098,16 +1172,798 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    private var enhancedUdsJob: Job? = null
+    @Volatile private var enhancedUdsGeneration = 0L
+
+    private fun invalidateEnhancedUdsReads() {
+        synchronized(consoleEventJournal) {
+            enhancedUdsGeneration++
+            _liveCanMonitorState.update { it.copy(isDoIpActive = false) }
+        }
+        enhancedUdsJob?.cancel()
+        enhancedUdsJob = null
+        _calibrationWorkspace.update {
+            it.copy(isUdsReading = false, isObdbSignalReading = false,
+                udsDidResponse = "", udsDtcResponse = "", udsMessage = "",
+                obdbSignalValue = "", obdbSignalMessage = "",
+                doIpReading = false, doIpResult = "", doIpTrace = emptyList(),
+                doIpBackupScope = null, doIpBackupBytes = 0, doIpMonitorReport = null, doIpLiveSamples = emptyList(),
+                doIpGatewayReading = false, doIpDiscoveredVin = "", doIpGatewayHost = "", doIpGatewayIdentity = null, doIpGatewayResult = "")
+        }
+    }
+
+    // The three read-only entrypoints share one context-bound operation slot.
+    // Cancellation propagates through the adapter session and prevents queued
+    // work or returned bytes from being attached to a replacement vehicle.
+    private fun launchEnhancedUdsRead(journalDoIp: Boolean = false, block: suspend (() -> Boolean) -> Unit) {
+        if (enhancedUdsJob?.isActive == true || functionalTestJob?.isCompleted == false) return
+        if (journalDoIp && (_liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest ||
+                canMonitorJob?.isCompleted == false || canRequestJob?.isCompleted == false ||
+                detachedCanMonitorJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false)) return
+        val generation = ++enhancedUdsGeneration
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val vehicle = _vehicle.value
+        fun current() = generation == enhancedUdsGeneration &&
+            isCurrentAccountGeneration(account) && connection == connectionAttemptGeneration &&
+            vehicle == _vehicle.value && hasPremiumLicense()
+        if (journalDoIp) _liveCanMonitorState.update {
+            it.copy(isDoIpActive = true, consoleContextGeneration = ++canConsoleContextGeneration)
+        }
+        enhancedUdsJob = viewModelScope.launch {
+            try {
+                if (current()) block(::current)
+            } finally {
+                if (journalDoIp && generation == enhancedUdsGeneration)
+                    _liveCanMonitorState.update { it.copy(isDoIpActive = false) }
+            }
+        }
+    }
+
+    fun cancelDirectDoIp() {
+        if (!_calibrationWorkspace.value.doIpReading) return
+        // A user cancellation is not a vehicle/account change: keep already
+        // received trace and samples visible, but invalidate every late callback.
+        synchronized(consoleEventJournal) {
+            enhancedUdsGeneration++
+            if (_liveCanMonitorState.value.isDoIpActive) {
+                appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_cancel), succeeded = false)
+                _liveCanMonitorState.update { it.copy(isDoIpActive = false) }
+            }
+        }
+        enhancedUdsJob?.cancel()
+        enhancedUdsJob = null
+        _calibrationWorkspace.update {
+            val message = localizedContext.getString(R.string.cal_doip_cancel)
+            if (it.doIpGatewayReading) it.copy(doIpReading = false, doIpGatewayReading = false,
+                doIpGatewayResult = message)
+            else it.copy(doIpReading = false,
+                doIpBackupBytes = 0, doIpResult = message)
+        }
+    }
+
+    fun inspectDirectDoIpGateway(host: String, operation: DoIpDirectRead.GatewayOperation, eid: String?) {
+        if (!requirePremiumLicense()) return
+        launchEnhancedUdsRead(journalDoIp = true) { current ->
+            val snapshot = _calibrationWorkspace.value
+            val selected = snapshot.doIpGatewayIdentity?.takeIf {
+                operation in setOf(DoIpDirectRead.GatewayOperation.STATUS, DoIpDirectRead.GatewayOperation.POWER) &&
+                    runCatching { DoIpDirectRead.sameHost(host, snapshot.doIpGatewayHost) }.getOrDefault(false)
+            }
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpGatewayReading = true,
+                doIpGatewayResult = "", doIpDiscoveredVin = "", doIpGatewayHost = host, doIpGatewayIdentity = selected) }
+            try {
+                val multicast = operation in setOf(DoIpDirectRead.GatewayOperation.DISCOVER_IPV6,
+                    DoIpDirectRead.GatewayOperation.LISTEN_IPV6, DoIpDirectRead.GatewayOperation.LISTEN_IPV4)
+                val lock = if (multicast) {
+                    val wifi = getApplication<Application>().applicationContext
+                        .getSystemService(android.content.Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+                    wifi?.createMulticastLock("CamaroDiag-DoIP")?.apply { setReferenceCounted(false); acquire() }
+                } else null
+                val result = try {
+                    DoIpDirectRead.inspectGateway(host, _vehicle.value.vin, operation, eid = eid,
+                        selectedGateway = selected,
+                        onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
+                } finally { lock?.release() }
+                if (!current()) return@launchEnhancedUdsRead
+                val unavailable = localizedContext.getString(R.string.cal_status_unresolved)
+                val identity = localizedContext.getString(R.string.cal_doip_gateway_identity,
+                    "%04X".format(result.gateway.logicalAddress), "%02X".format(result.gateway.version),
+                    result.gateway.vin ?: unavailable)
+                val status = result.status?.let { observed ->
+                    localizedContext.getString(R.string.cal_doip_gateway_status,
+                        observed.nodeType, observed.currentSockets, observed.maxSockets,
+                        observed.maxDataSize?.toString() ?: unavailable)
+                }
+                val power = result.power?.let { observed ->
+                    localizedContext.getString(when (observed) {
+                        0 -> R.string.cal_doip_power_not_ready
+                        1 -> R.string.cal_doip_power_ready
+                        else -> R.string.cal_doip_power_unsupported
+                    })
+                }
+                _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false,
+                    doIpGatewayHost = result.host ?: host,
+                    doIpGatewayIdentity = result.gateway,
+                    doIpDiscoveredVin = if (result.host != null) result.gateway.vin.orEmpty() else "",
+                    doIpGatewayResult = listOfNotNull(identity,
+                        localizedContext.getString(R.string.cal_doip_gateway_eid_gid, result.gateway.eid, result.gateway.gid),
+                        localizedContext.getString(R.string.cal_doip_gateway_announcement_state,
+                            "%02X".format(result.gateway.furtherAction), result.gateway.syncStatus?.let { "%02X".format(it) } ?: unavailable),
+                        status, power).joinToString("\n")) }
+                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
+            } catch (cancelled: CancellationException) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false) }
+                throw cancelled
+            } catch (error: Exception) {
+                val message = doIpFailureMessage(error, R.string.cal_doip_failed)
+                if (current()) appendCanConsoleSystemEvent(message, succeeded = false)
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false,
+                    doIpGatewayResult = message) }
+            }
+        }
+    }
+
+    fun importDoIpBackupProfile(uri: Uri) {
+        if (!requirePremiumLicense()) return
+        launchEnhancedUdsRead { current ->
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpBackupScope = null,
+                doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0) }
+            try {
+                val scope = withContext(Dispatchers.IO) {
+                    val resolver = getApplication<Application>().contentResolver
+                    requireNotNull(resolver.openInputStream(uri)).use(DoIpMemoryBackup::load)
+                }
+                if (!current()) return@launchEnhancedUdsRead
+                require(scope.vin == _vehicle.value.vin.uppercase())
+                _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupScope = scope) }
+            } catch (cancelled: CancellationException) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false,
+                    doIpResult = localizedContext.getString(R.string.cal_doip_profile_failed)) }
+            }
+        }
+    }
+
+    fun verifyDirectDoIpBackup(uri: Uri, scope: DoIpMemoryBackup.Scope) {
+        if (!requirePremiumLicense() || _calibrationWorkspace.value.doIpBackupScope != scope) return
+        launchEnhancedUdsRead { current ->
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "",
+                doIpBackupBytes = 0, doIpTrace = emptyList()) }
+            try {
+                require(scope.vin == _vehicle.value.vin.uppercase())
+                val result = withContext(Dispatchers.IO) {
+                    val resolver = getApplication<Application>().contentResolver
+                    requireNotNull(resolver.openInputStream(uri)).use {
+                        DoIpMemoryBackup.verify(it, scope)
+                    }
+                }
+                if (!current() || _calibrationWorkspace.value.doIpBackupScope != scope)
+                    return@launchEnhancedUdsRead
+                _calibrationWorkspace.update { it.copy(doIpReading = false,
+                    doIpResult = localizedContext.getString(R.string.cal_doip_backup_verified,
+                        result.scope.length, result.sha256)) }
+            } catch (cancelled: CancellationException) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false,
+                    doIpResult = localizedContext.getString(R.string.cal_doip_verify_failed)) }
+            }
+        }
+    }
+
+    /** An observed endpoint is bound to the selected vehicle and numeric IP.
+     * Explicit new endpoints remain available, but a prior selection cannot
+     * silently be replaced on the same endpoint before routing activation. */
+    private suspend fun resolveSelectedDoIpTarget(host: String, tester: String, ecu: String, vin: String,
+        tls: Boolean, expectedGateway: Int? = null, onTrace: (DoIpDirectRead.ControlTrace) -> Unit): DoIpDirectRead.Target {
+        val snapshot = _calibrationWorkspace.value
+        val selected = snapshot.doIpGatewayIdentity?.takeIf {
+            (it.vin == null || it.vin == vin.uppercase(java.util.Locale.ROOT)) &&
+                host.isNotBlank() && snapshot.doIpGatewayHost.isNotBlank() &&
+                runCatching { DoIpDirectRead.sameHost(host, snapshot.doIpGatewayHost) }.getOrDefault(false)
+        }
+        return if (selected != null)
+            DoIpDirectRead.Target.parse(host, tester, ecu, vin, tls, expectedGateway, selected)
+        else DoIpDirectRead.resolveTarget(host, tester, ecu, vin, tls, expectedGateway, onTrace)
+    }
+
+    fun captureDirectDoIpBackup(host: String, tester: String, ecu: String, tls: Boolean,
+        scope: DoIpMemoryBackup.Scope, certificate: DoIpClientCertificateSelection? = null,
+        options: DoIpDirectRead.SessionOptions = DoIpDirectRead.SessionOptions()) {
+        if (!requirePremiumLicense() || _calibrationWorkspace.value.doIpBackupScope != scope) return
+        launchEnhancedUdsRead(journalDoIp = true) { current ->
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "",
+                doIpTrace = emptyList(), doIpBackupBytes = 0) }
+            try {
+                require(current() && _calibrationWorkspace.value.doIpBackupScope == scope)
+                scope.validateCapture()
+                val target = resolveSelectedDoIpTarget(host, tester, ecu, _vehicle.value.vin, tls,
+                    expectedGateway = scope.gateway, onTrace = { trace -> journalDoIpControlTrace(trace, current) })
+                check(current())
+                require(scope.vin == target.expectedVin && scope.tester == target.tester && scope.ecu == target.ecu)
+                val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
+                check(current())
+                val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.BACKUP,
+                    timeoutMs = options.timeoutMs, sessionOptions = options,
+                    clientTls = clientTls, backupScope = scope,
+                    isReadContextCurrent = { current() && _calibrationWorkspace.value.doIpBackupScope == scope },
+                    onBackupProgress = { pass, offset ->
+                        check(current())
+                        _calibrationWorkspace.update { if (current()) it.copy(doIpBackupBytes = (pass - 1) * scope.length + offset) else it }
+                    }, onTrace = { trace ->
+                        journalDoIpTrace(target, trace, current)
+                        check(current())
+                        _calibrationWorkspace.update {
+                            if (current()) it.copy(doIpTrace = (it.doIpTrace + doIpTraceLine(trace)).takeLast(128)) else it
+                        }
+                    }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
+                if (!current()) return@launchEnhancedUdsRead
+                val capture = checkNotNull(result.capture)
+                val path = CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_DoIP_${scope.vin}_${System.currentTimeMillis()}.zip", "application/zip",
+                    category = CamaroDiagExportStorage.Category.ECU_BACKUPS,
+                    beforePublish = { check(current() && _calibrationWorkspace.value.doIpBackupScope == scope) },
+                    verifyStaged = { input ->
+                        check(current())
+                        DoIpMemoryBackup.verifyStaged(input, capture)
+                    }) { output ->
+                    check(current())
+                    DoIpMemoryBackup.write(output, capture)
+                }
+                if (!current()) return@launchEnhancedUdsRead
+                _calibrationWorkspace.update { it.copy(doIpReading = false,
+                    doIpResult = localizedContext.getString(R.string.cal_doip_backup_saved,
+                        scope.length, capture.sha256, path),
+                    doIpTrace = result.trace.map(::doIpTraceLine)) }
+                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
+            } catch (cancelled: CancellationException) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0) }
+                throw cancelled
+            } catch (error: Exception) {
+                val message = doIpFailureMessage(error, R.string.cal_doip_backup_failed)
+                if (current()) appendCanConsoleSystemEvent(message, succeeded = false)
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0,
+                    doIpResult = message) }
+            }
+        }
+    }
+
+    private fun doIpFailureMessage(error: Exception, fallback: Int): String {
+        val base = localizedContext.getString(when (error) {
+            is DoIpClientCertificateException, is javax.net.ssl.SSLException -> R.string.cal_doip_tls_error
+            is DoIpDirectRead.Refusal -> when (error.layer) {
+                DoIpDirectRead.RefusalLayer.HEADER -> R.string.cal_doip_inventory_reason_header
+                DoIpDirectRead.RefusalLayer.ROUTING -> R.string.cal_doip_inventory_reason_routing
+                DoIpDirectRead.RefusalLayer.DIAGNOSTIC_ACK -> R.string.cal_doip_inventory_reason_ack
+            }
+            is com.camarodiag.gen5.data.obd.UdsNegativeResponseException -> R.string.cal_doip_inventory_reason_nrc
+            is java.net.SocketTimeoutException -> R.string.cal_doip_inventory_reason_timeout
+            else -> fallback
+        })
+        val code = when (error) {
+            is DoIpDirectRead.Refusal -> error.code
+            is com.camarodiag.gen5.data.obd.UdsNegativeResponseException -> error.negativeResponseCode
+            else -> null
+        }
+        return base + (code?.let { " (0x%02X)".format(java.util.Locale.ROOT, it) } ?: "")
+    }
+
+    /** Logical DoIP addresses are deliberately not formatted as CAN IDs.
+     * Every observed diagnostic PDU is persisted before the UI ring trims it.
+     * The shared lock prevents a cancelled context appending to a cleared journal.
+     */
+    private fun journalDoIpTrace(target: DoIpDirectRead.Target, trace: DoIpDirectRead.Trace,
+        current: () -> Boolean) {
+        synchronized(consoleEventJournal) {
+            check(current() && _liveCanMonitorState.value.isDoIpActive)
+            val source = if (trace.direction == "TX") target.tester else target.ecu
+            val destination = if (trace.direction == "TX") target.ecu else target.tester
+            val content = "DoIP " + (if (target.tls) "TLS" else "TCP") +
+                " ${target.address.hostAddress} %04X>%04X ".format(source, destination) + trace.payloadHex
+            val event = CanConsoleHistoryEntry(System.nanoTime(), trace.direction,
+                trace.observedAtUtcMillis, content)
+            recordConsoleEvents(listOf(event))
+            _liveCanMonitorState.update { it.copy(consoleHistory = (it.consoleHistory + event).takeLast(300)) }
+        }
+    }
+
+    /** DoIP transport control PDUs are not CAN frames or UDS service data. */
+    private fun journalDoIpControlTrace(trace: DoIpDirectRead.ControlTrace, current: () -> Boolean) {
+        synchronized(consoleEventJournal) {
+            check(current() && _liveCanMonitorState.value.isDoIpActive)
+            val content = "DoIP " + trace.transport + " " + trace.host + " PDU " + trace.payloadHex
+            val event = CanConsoleHistoryEntry(System.nanoTime(), trace.direction,
+                trace.observedAtUtcMillis, content)
+            recordConsoleEvents(listOf(event))
+            _liveCanMonitorState.update { it.copy(consoleHistory = (it.consoleHistory + event).takeLast(300)) }
+        }
+    }
+
+    private fun doIpTraceLine(trace: DoIpDirectRead.Trace): String =
+        "${trace.observedAtUtcMillis} ${if (trace.direction == "TX") "TX_REQUEST" else "RX"} ${trace.payloadHex}"
+
+    private fun doIpSampleRow(sample: DoIpDirectRead.Sample) = DoIpMonitorRow(sample.index,
+        sample.elapsedMs, sample.data.joinToString("") { "%02X".format(it.toInt() and 255) },
+        sample.values.map { value -> DoIpMonitorValue(value.did,
+            value.data.joinToString("") { "%02X".format(it.toInt() and 255) }) })
+
+    fun exportDoIpMonitoring(report: DoIpMonitorReport) {
+        if (!requirePremiumLicense() || _calibrationWorkspace.value.doIpMonitorReport !== report) return
+        val owner = authenticatedAccountUid ?: return
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val vehicle = _vehicle.value
+        fun current() = canResumeExport(account, owner) && hasPremiumLicense() &&
+            connection == connectionAttemptGeneration && _vehicle.value == vehicle &&
+            report.vin == vehicle.vin.uppercase() && !_calibrationWorkspace.value.doIpReading &&
+            _calibrationWorkspace.value.doIpMonitorReport === report
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                check(current() && report.samples.isNotEmpty())
+                val path = CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_DoIP_monitor_${report.completedAtUtcMillis}.csv", "text/csv",
+                    category = CamaroDiagExportStorage.Category.REPORTS,
+                    beforePublish = { check(current()) }) { output ->
+                    val writer = output.bufferedWriter(Charsets.UTF_8)
+                    writer.appendLine("vin,gateway_logical,tester_logical,ecu_logical,did,transport,completed_utc_ms,sample,elapsed_ms,payload_hex,service_protocol,capture_complete,requested_samples,verified_samples")
+                    for (sample in report.samples) {
+                        check(current())
+                        val values = sample.values.ifEmpty { listOf(DoIpMonitorValue(report.did, sample.payloadHex)) }
+                        for (value in values) {
+                            check(current())
+                            writer.appendLine(listOf(report.vin, "%04X".format(report.gateway),
+                                "%04X".format(report.tester), "%04X".format(report.ecu),
+                                "%04X".format(value.did), if (report.tls) "TLS" else "TCP",
+                                report.completedAtUtcMillis, sample.index, sample.elapsedMs, value.payloadHex,
+                                if (report.obdOnUds) "OBDonUDS" else "UDS", report.complete,
+                                report.requestedSamples, report.samples.size).joinToString(","))
+                        }
+                    }
+                    writer.flush()
+                }
+                _calibrationWorkspace.update { if (current()) it.copy(doIpResult =
+                    localizedContext.getString(R.string.cal_doip_monitor_exported, path)) else it }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _calibrationWorkspace.update { if (current()) it.copy(doIpResult =
+                    localizedContext.getString(R.string.cal_doip_monitor_export_failed)) else it }
+            }
+        }
+    }
+
+    fun confirmDirectDoIpCommand(command: DoIpConsoleCommand, approval: EcuWriteConsentFlow.Approval) {
+        if (!requirePremiumLicense() || command.vehicle != _vehicle.value ||
+            command.generation != _liveCanMonitorState.value.consoleContextGeneration) return
+        val payload = runCatching { DoIpDirectRead.parseCommands(command.payload) }.getOrNull() ?: return
+        readDirectDoIp(command.host, command.tester, command.ecu, "", command.tls,
+            DoIpDirectRead.Operation.EXCHANGE, commands = payload, approval = approval,
+            certificate = command.certificate, options = command.options)
+    }
+
+    fun readDirectDoIp(host: String, tester: String, ecu: String, didHex: String,
+        tls: Boolean, operation: DoIpDirectRead.Operation, sampleCount: Int = 10, intervalMs: Int = 1000,
+        commands: List<ByteArray>? = null, approval: EcuWriteConsentFlow.Approval? = null,
+        certificate: DoIpClientCertificateSelection? = null,
+        options: DoIpDirectRead.SessionOptions = DoIpDirectRead.SessionOptions()) {
+        if (!requirePremiumLicense() || (operation == DoIpDirectRead.Operation.EXCHANGE &&
+                (commands == null || approval == null))) return
+        val fixedCommands = commands?.map { it.copyOf() }
+        launchEnhancedUdsRead(journalDoIp = true) { current ->
+            // Callback replies are provisional until the socket and the
+            // entire command sequence have completed cleanly.
+            val sequenceProgress = if (operation == DoIpDirectRead.Operation.EXCHANGE)
+                DoIpCommandProgress(requireNotNull(fixedCommands).size) else null
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0,
+                doIpMonitorReport = null, doIpLiveSamples = emptyList()) }
+            try {
+                val multiMonitor = operation in setOf(DoIpDirectRead.Operation.MULTI_MONITOR, DoIpDirectRead.Operation.OBD_MULTI_MONITOR)
+                val multi = multiMonitor || operation in setOf(DoIpDirectRead.Operation.MULTI_DID, DoIpDirectRead.Operation.OBD_MULTI_DID)
+                val layout = if (multi) com.camarodiag.gen5.data.obd.DoIpMultiDid.parse(didHex) else null
+                if (multiMonitor) com.camarodiag.gen5.data.obd.DoIpMultiDid.validateMonitor(requireNotNull(layout))
+                require(operation !in setOf(DoIpDirectRead.Operation.OBD_MULTI_DID, DoIpDirectRead.Operation.OBD_MULTI_MONITOR) ||
+                    requireNotNull(layout).all { DoIpDirectRead.isObdDid(it.did) })
+                val legacyFilter = operation in setOf(DoIpDirectRead.Operation.MIRROR_DTCS, DoIpDirectRead.Operation.MIRROR_COUNT,
+                    DoIpDirectRead.Operation.LEGACY_EMISSIONS_COUNT, DoIpDirectRead.Operation.LEGACY_EMISSIONS_DTCS)
+                val legacyDetail = operation == DoIpDirectRead.Operation.MIRROR_EXTENDED
+                if (legacyFilter) require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
+                if (legacyDetail) {
+                    require(didHex.matches(Regex("[0-9A-Fa-f]{8}")))
+                    val selected = didHex.takeLast(2).toInt(16)
+                    require(selected != 0 && selected !in 0xF0..0xFD)
+                }
+                val decodedStored = operation == DoIpDirectRead.Operation.DECODED_STORED_RECORD
+                val storedParts = if (decodedStored) didHex.split('|').also { require(it.size == 2) } else emptyList()
+                val storedRecord = if (decodedStored) {
+                    require(storedParts[0].matches(Regex("[0-9A-Fa-f]{2}")))
+                    storedParts[0].toInt(16).also { require(it in 0..254) }
+                } else if (operation == DoIpDirectRead.Operation.STORED_RECORD) {
+                    require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
+                    didHex.toInt(16).also { require(it in 0..254) }
+                } else null
+                val decodedMemory = operation in setOf(DoIpDirectRead.Operation.MEMORY_DECODED_SNAPSHOT, DoIpDirectRead.Operation.MEMORY_DECODED_EXTENDED)
+                val decodedSnapshot = operation in setOf(DoIpDirectRead.Operation.DECODED_SNAPSHOT, DoIpDirectRead.Operation.OBD_DECODED_SNAPSHOT, DoIpDirectRead.Operation.MEMORY_DECODED_SNAPSHOT)
+                val decodedExtended = operation in setOf(DoIpDirectRead.Operation.DECODED_EXTENDED, DoIpDirectRead.Operation.OBD_DECODED_EXTENDED, DoIpDirectRead.Operation.MEMORY_DECODED_EXTENDED)
+                val snapshotParts = if (decodedSnapshot || decodedExtended) didHex.split('|').also {
+                    require(it.size == 2 && it[0].matches(Regex(if (decodedMemory) "[0-9A-Fa-f]{10}" else "[0-9A-Fa-f]{8}")))
+                } else emptyList()
+                val extendedCatalog = if (decodedExtended)
+                    com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseExtendedRecordLengths(snapshotParts[1]).also {
+                        com.camarodiag.gen5.data.obd.UdsDtcDecoder.extendedRecordsRequest(
+                            snapshotParts[0].take(6).toInt(16), snapshotParts[0].substring(6, 8).toInt(16), it)
+                    } else null
+                val storedCatalog = when {
+                    decodedStored -> com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseStoredDidLengths(storedParts[1])
+                    decodedSnapshot -> com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseStoredDidLengths(snapshotParts[1])
+                    operation == DoIpDirectRead.Operation.ALL_STORED_RECORDS ->
+                        com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseStoredDidLengths(didHex)
+                    else -> null
+                }
+                val extendedSupport = operation == DoIpDirectRead.Operation.EXTENDED_RECORD_SUPPORT
+                val extendedData = operation == DoIpDirectRead.Operation.EXTENDED_RECORD_DATA
+                val extendedParts = if (extendedData) didHex.split(':') else listOf(didHex)
+                val extendedRecordSize = if (extendedData) {
+                    require(extendedParts.size == 2 && extendedParts[1].matches(Regex("[0-9]{1,4}")))
+                    extendedParts[1].toInt().also { require(it in 1..4090) }
+                } else null
+                val extendedRecord = if (extendedSupport || extendedData) {
+                    require(extendedParts[0].matches(Regex("[0-9A-Fa-f]{2}")))
+                    extendedParts[0].toInt(16).also { require(it in 1..0xEF) }
+                } else null
+                val memoryList = operation == DoIpDirectRead.Operation.MEMORY_DTCS
+                val memoryDetail = operation in setOf(DoIpDirectRead.Operation.MEMORY_SNAPSHOT, DoIpDirectRead.Operation.MEMORY_EXTENDED)
+                if (memoryList || memoryDetail) require(didHex.matches(Regex(if (memoryList) "[0-9A-Fa-f]{4}" else "[0-9A-Fa-f]{10}")))
+                val memory = if (decodedMemory) snapshotParts[0].takeLast(2).toInt(16) else if (memoryList || memoryDetail) didHex.takeLast(2).toInt(16) else null
+                if (memoryDetail) {
+                    val record = didHex.substring(6, 8).toInt(16)
+                    require(record != 0 && (operation != DoIpDirectRead.Operation.MEMORY_EXTENDED || record !in 0xF0..0xFD))
+                }
+                val target = resolveSelectedDoIpTarget(host, tester, ecu, _vehicle.value.vin, tls,
+                    onTrace = { trace -> journalDoIpControlTrace(trace, current) })
+                check(current())
+                val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.SCALING_DID, DoIpDirectRead.Operation.MONITOR, DoIpDirectRead.Operation.OBD_DID, DoIpDirectRead.Operation.OBD_MONITOR)) {
+                    require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
+                    didHex.toInt(16)
+                } else 0xF190
+                val mask = if (legacyFilter || operation in setOf(DoIpDirectRead.Operation.DTC, DoIpDirectRead.Operation.DTC_COUNT, DoIpDirectRead.Operation.OBD_DTC, DoIpDirectRead.Operation.OBD_DTC_COUNT)) {
+                    require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
+                    didHex.toInt(16)
+                } else 255
+                val severityFilter = operation in setOf(DoIpDirectRead.Operation.SEVERITY_COUNT, DoIpDirectRead.Operation.SEVERITY_LIST)
+                val severityInfo = operation == DoIpDirectRead.Operation.SEVERITY_INFO
+                if (severityFilter) require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
+                if (severityInfo) require(didHex.matches(Regex("[0-9A-Fa-f]{6}")))
+                val wwhMask = operation == DoIpDirectRead.Operation.OBD_WWH_MASK
+                val wwhReadiness = operation == DoIpDirectRead.Operation.OBD_WWH_READINESS
+                if (wwhMask) require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
+                if (wwhReadiness) require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
+                val isDetail = operation in setOf(DoIpDirectRead.Operation.DTC_SNAPSHOT, DoIpDirectRead.Operation.DTC_EXTENDED, DoIpDirectRead.Operation.OBD_DTC_SNAPSHOT, DoIpDirectRead.Operation.OBD_DTC_EXTENDED)
+                if (isDetail) require(didHex.matches(Regex("[0-9A-Fa-f]{8}")))
+                val detailDtc = if (decodedSnapshot || decodedExtended) snapshotParts[0].take(6).toInt(16) else if (isDetail || severityInfo || memoryDetail || legacyDetail) didHex.take(6).toInt(16) else 0
+                val detailRecord = if (decodedSnapshot || decodedExtended) snapshotParts[0].substring(6, 8).toInt(16) else if (memoryDetail) didHex.substring(6, 8).toInt(16) else if (isDetail || legacyDetail) didHex.takeLast(2).toInt(16) else 1
+                val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
+                check(current())
+                if (operation in setOf(DoIpDirectRead.Operation.INVENTORY, DoIpDirectRead.Operation.OBD_INVENTORY)) {
+                    val addresses = DoIpDirectRead.parseInventoryAddresses(didHex)
+                    fun renderInventory(rows: List<DoIpDirectRead.InventoryEntry>, total: Int, complete: Boolean): String {
+                        val title = localizedContext.getString(
+                            if (complete) R.string.cal_doip_inventory_result else R.string.cal_doip_inventory_progress,
+                            rows.count { it.vin != null }, total)
+                        return title + rows.joinToString("\n", prefix = "\n") { row ->
+                            if (row.vin == null) {
+                                val reason = when (row.failure) {
+                                    DoIpDirectRead.InventoryFailure.VIN_MISMATCH -> R.string.cal_doip_inventory_reason_vin
+                                    DoIpDirectRead.InventoryFailure.PROTOCOL_IDENTITY -> R.string.cal_doip_inventory_reason_protocol
+                                    DoIpDirectRead.InventoryFailure.NEGATIVE_RESPONSE -> R.string.cal_doip_inventory_reason_nrc
+                                    DoIpDirectRead.InventoryFailure.TIMEOUT -> R.string.cal_doip_inventory_reason_timeout
+                                    DoIpDirectRead.InventoryFailure.HEADER_NACK -> R.string.cal_doip_inventory_reason_header
+                                    DoIpDirectRead.InventoryFailure.ROUTING_DENIED -> R.string.cal_doip_inventory_reason_routing
+                                    DoIpDirectRead.InventoryFailure.DIAGNOSTIC_NACK -> R.string.cal_doip_inventory_reason_ack
+                                    DoIpDirectRead.InventoryFailure.COMMUNICATION, null -> R.string.cal_doip_inventory_reason_io
+                                }
+                                localizedContext.getString(R.string.cal_doip_inventory_unverified, row.ecu) +
+                                    " — " + localizedContext.getString(reason) +
+                                    (row.failureCode?.let { " (0x%02X)".format(java.util.Locale.ROOT, it) } ?: "")
+                            } else localizedContext.getString(R.string.cal_doip_inventory_verified, row.ecu, row.vin) +
+                                (row.protocolValue?.let { protocol -> "\n" + localizedContext.getString(
+                                    if (protocol == 1) R.string.cal_doip_inventory_obd_supported else R.string.cal_doip_inventory_obd_unknown,
+                                    row.ecu, protocol) } ?: "")
+                        }
+                    }
+                    val rows = DoIpDirectRead.inventory(target, addresses, options, clientTls,
+                        onTrace = { selected, trace ->
+                            journalDoIpTrace(selected, trace, current)
+                            check(current())
+                            _calibrationWorkspace.update { state ->
+                                if (current()) state.copy(doIpTrace = (state.doIpTrace +
+                                    ("%04X ".format(selected.ecu) + doIpTraceLine(trace))).takeLast(128)) else state
+                            }
+                        }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) }, current = current,
+                        obd = operation == DoIpDirectRead.Operation.OBD_INVENTORY,
+                        onProgress = { observed, total ->
+                            check(current())
+                            val partial = renderInventory(observed, total, false)
+                            _calibrationWorkspace.update { state ->
+                                if (current()) state.copy(doIpResult = partial) else state
+                            }
+                        })
+                    if (!current()) return@launchEnhancedUdsRead
+                    val rendered = renderInventory(rows, addresses.size, true)
+                    _calibrationWorkspace.update { state -> if (current())
+                        state.copy(doIpReading = false, doIpResult = rendered) else state }
+                    if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
+                    return@launchEnhancedUdsRead
+                }
+                val result = DoIpDirectRead.read(target, operation, did, mask = if (memoryList) didHex.take(2).toInt(16) else if (wwhMask || severityFilter) didHex.takeLast(2).toInt(16) else mask,
+                    memory = memory, extendedRecordSize = extendedRecordSize, storedDidLengths = storedCatalog, extendedRecordLengths = extendedCatalog,
+                    severityMask = if (severityFilter) didHex.take(2).toInt(16) else 255,
+                    wwhSeverity = if (wwhMask) didHex.take(2).toInt(16) else 255,
+                    wwhReadinessGroup = if (wwhReadiness) didHex.toInt(16) else null, multiLayout = layout,
+                    sampleCount = sampleCount, intervalMs = intervalMs,
+                    timeoutMs = options.timeoutMs, sessionOptions = options, clientTls = clientTls,
+                    onTrace = { trace ->
+                        journalDoIpTrace(target, trace, current)
+                        check(current())
+                        _calibrationWorkspace.update {
+                            if (current()) it.copy(doIpTrace = (it.doIpTrace + doIpTraceLine(trace)).takeLast(128))
+                            else it
+                        }
+                    }, onSample = { sample ->
+                        check(current())
+                        _calibrationWorkspace.update {
+                            if (!current()) it else {
+                                val row = doIpSampleRow(sample)
+                                val observedVin = requireNotNull(sample.verifiedVin)
+                                val observedGateway = requireNotNull(sample.gatewayLogicalAddress)
+                                require(observedVin == target.expectedVin)
+                                val previous = it.doIpMonitorReport ?: DoIpMonitorReport(
+                                    observedVin, observedGateway, target.tester, target.ecu, did, tls,
+                                    System.currentTimeMillis(), emptyList(),
+                                    obdOnUds = operation in setOf(DoIpDirectRead.Operation.OBD_MONITOR,
+                                        DoIpDirectRead.Operation.OBD_MULTI_MONITOR),
+                                    complete = false, requestedSamples = sampleCount)
+                                val report = previous.appendVerified(row, observedVin, observedGateway,
+                                    System.currentTimeMillis())
+                                it.copy(doIpLiveSamples = report.samples, doIpMonitorReport = report)
+                            }
+                        }
+                    }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) },
+                    commands = fixedCommands, approval = approval, isContextCurrent = current,
+                    isReadContextCurrent = current,
+                    dtc = detailDtc, record = storedRecord ?: extendedRecord ?: detailRecord, onCommandReply = { index, reply ->
+                        check(current())
+                        requireNotNull(sequenceProgress).record(index, reply)
+                        val line = localizedContext.getString(R.string.cal_doip_sequence_reply, index,
+                            reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                        _calibrationWorkspace.update { if (current()) it.copy(doIpResult =
+                            (it.doIpResult + "\n" + line).trimStart()) else it }
+                    })
+                if (!current()) return@launchEnhancedUdsRead
+                if (operation == DoIpDirectRead.Operation.EXCHANGE) {
+                    requireNotNull(sequenceProgress).requireComplete(result.commandReplies.size)
+                }
+                val module = "DoIP 0x" + ecu.uppercase()
+                val report = result.dtcs
+                // A filtered report is not a complete replacement of the ECU's DTC list.
+                if (report != null && operation == DoIpDirectRead.Operation.DTC &&
+                    UdsDtcFilter(mask, report.statusAvailabilityMask).canReplaceInventory) {
+                    val mapped = report.records.map { it.toDiagnosticDtc(module) }
+                    _dtcs.update { old -> if (current()) old.filterNot { it.module == module } + mapped else old }
+                }
+                val count = result.dtcCount
+                val detail = result.dtcDetail
+                val rendered = when {
+                    operation == DoIpDirectRead.Operation.OBD_IDENTIFY -> localizedContext.getString(
+                        if (result.obdProtocolValue == 1) R.string.cal_doip_obd_verified else R.string.cal_doip_obd_unknown,
+                        result.obdProtocolValue ?: 0, result.vin.orEmpty())
+                    operation == DoIpDirectRead.Operation.OBD_DID -> localizedContext.getString(R.string.cal_doip_obd_data,
+                        did, result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty())
+                    operation == DoIpDirectRead.Operation.SCALING_DID -> localizedContext.getString(
+                        R.string.cal_doip_scaling_result, did,
+                        result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty())
+                    result.multiValues.isNotEmpty() -> result.multiValues.joinToString("\n") { row ->
+                        localizedContext.getString(R.string.cal_doip_multi_result, row.did, row.data.size,
+                            row.data.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                    }
+                    result.wwhReport != null -> requireNotNull(result.wwhReport).let { wwh ->
+                        val unavailable = localizedContext.getString(R.string.cal_status_unresolved)
+                        localizedContext.getString(R.string.cal_doip_wwh_result, wwh.kind.subfunction, wwh.records.size,
+                            wwh.statusAvailability, wwh.format) + "\n" +
+                            localizedContext.getString(R.string.cal_doip_wwh_metadata,
+                                wwh.severityAvailability?.let { "%02X".format(it) } ?: unavailable,
+                                wwh.readinessGroup?.let { "%02X".format(it) } ?: unavailable) +
+                            (wwh.effectiveStatusMask?.let { effective ->
+                                "\n" + localizedContext.getString(R.string.cal_doip_wwh_filters,
+                                    requireNotNull(wwh.requestedStatusMask), effective,
+                                    requireNotNull(wwh.requestedSeverityMask), requireNotNull(wwh.effectiveSeverityMask)) +
+                                    (if (wwh.filterAvailable == false) "\n" +
+                                        localizedContext.getString(R.string.cal_doip_wwh_filter_unavailable) else "")
+                            } ?: "") +
+                            wwh.records.joinToString(separator = "") { row ->
+                                "\n" + localizedContext.getString(R.string.cal_doip_wwh_record, row.dtc, row.status,
+                                    row.severity?.let { "%02X".format(it) } ?: unavailable) +
+                                    " — " + renderUdsDtcStatus(row.status, wwh.statusAvailability)
+                            }
+                    }
+                    result.commandReplies.isNotEmpty() ->
+                        localizedContext.getString(R.string.cal_doip_sequence_complete,
+                            requireNotNull(sequenceProgress).verified, requireNotNull(fixedCommands).size) + "\n" +
+                            result.commandReplies.mapIndexed { index, reply ->
+                                localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
+                                    reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                            }.joinToString("\n")
+                    result.decodedExtended != null -> requireNotNull(result.decodedExtended).let { report ->
+                        val heading = (result.decodedMemory?.let { localizedContext.getString(R.string.cal_doip_decoded_memory, it) + "\n" } ?: "") +
+                            localizedContext.getString(R.string.cal_doip_decoded_extended_result, report.dtc, report.status, report.records.size)
+                        (listOf(heading) + report.records.map { row ->
+                            localizedContext.getString(R.string.cal_doip_decoded_extended_record_row, row.number,
+                                row.data.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                        }).joinToString("\n")
+                    }
+                    result.decodedSnapshot != null -> requireNotNull(result.decodedSnapshot).let { report ->
+                        val heading = (result.decodedMemory?.let { localizedContext.getString(R.string.cal_doip_decoded_memory, it) + "\n" } ?: "") +
+                            localizedContext.getString(R.string.cal_doip_decoded_snapshot_result, report.dtc, report.status, report.records.size)
+                        (listOf(heading) + report.records.flatMap { row ->
+                            listOf(localizedContext.getString(R.string.cal_doip_snapshot_record_result, row.record)) +
+                                row.dids.map { item -> localizedContext.getString(R.string.cal_doip_multi_result,
+                                    item.did, item.data.size, item.data.joinToString(" ") { "%02X".format(it.toInt() and 255) }) }
+                        }).joinToString("\n")
+                    }
+                    result.allStoredReport != null -> requireNotNull(result.allStoredReport).let { report ->
+                        val heading = (result.requestedStoredRecord?.takeIf { it != 255 }?.let {
+                            localizedContext.getString(R.string.cal_doip_stored_record_result, it) + "\n"
+                        } ?: "") + localizedContext.getString(R.string.cal_doip_all_stored_result, report.records.size)
+                        (listOf(heading) + report.records.flatMap { row ->
+                            listOf(localizedContext.getString(R.string.cal_doip_stored_record_result, row.record),
+                                localizedContext.getString(R.string.cal_doip_detail_result, row.dtc, row.status,
+                                    row.rawRecord.joinToString(" ") { "%02X".format(it.toInt() and 255) })) +
+                                row.dids.map { item ->
+                                    localizedContext.getString(R.string.cal_doip_multi_result, item.did, item.data.size,
+                                        item.data.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                                }
+                        }).joinToString("\n")
+                    }
+                    result.storedReport != null -> requireNotNull(result.storedReport).let { stored ->
+                        val heading = localizedContext.getString(R.string.cal_doip_stored_record_result, stored.record)
+                        val detail = stored.detail
+                        heading + "\n" + if (detail == null) localizedContext.getString(R.string.cal_doip_stored_record_empty)
+                        else localizedContext.getString(R.string.cal_doip_stored_record_count,
+                            detail.records.first().toInt() and 255) + "\n" +
+                            localizedContext.getString(R.string.cal_doip_detail_result, detail.dtc, detail.status,
+                                detail.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                    }
+                    result.legacyReport != null -> requireNotNull(result.legacyReport).let { legacy ->
+                        val heading = localizedContext.getString(if (legacy.subfunction in 0x0F..0x11)
+                            R.string.cal_doip_legacy_mirror_result else R.string.cal_doip_legacy_emissions_result)
+                        val list = legacy.list
+                        val count = legacy.count
+                        val detail = legacy.detail
+                        heading + "\n" + when {
+                            list != null -> renderUdsDtcList(list, mask)
+                            count != null -> renderUdsDtcCount(count, mask)
+                            detail != null -> localizedContext.getString(R.string.cal_doip_detail_result, detail.dtc, detail.status,
+                                detail.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                            else -> error("Missing legacy DTC result")
+                        }
+                    }
+                    result.extendedRecordReport != null -> requireNotNull(result.extendedRecordReport).let { report ->
+                        val heading = localizedContext.getString(R.string.cal_doip_extended_record_result, report.record, report.entries.size)
+                        heading + (report.availability?.let { "\n" + localizedContext.getString(R.string.cal_doip_extended_record_mask, it) } ?: "") +
+                            report.entries.joinToString("\n", prefix = "\n") { entry ->
+                                if (report.availability != null) "0x%06X — 0x%02X".format(entry.dtc, entry.status)
+                                else localizedContext.getString(R.string.cal_doip_detail_result, entry.dtc, entry.status,
+                                    entry.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                            }
+                    }
+                    result.memoryReport != null -> requireNotNull(result.memoryReport).let { memoryReport ->
+                        val heading = localizedContext.getString(R.string.cal_doip_memory_result, memoryReport.memory)
+                        val list = memoryReport.list
+                        val memoryDetailResult = memoryReport.detail
+                        heading + "\n" + when {
+                            list != null -> renderUdsDtcList(list, didHex.take(2).toInt(16))
+                            memoryDetailResult != null -> localizedContext.getString(R.string.cal_doip_detail_result,
+                                memoryDetailResult.dtc, memoryDetailResult.status,
+                                memoryDetailResult.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                            else -> error("Missing memory DTC result")
+                        }
+                    }
+                    detail != null -> localizedContext.getString(R.string.cal_doip_detail_result,
+                        detail.dtc, detail.status, detail.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                    count != null -> renderUdsDtcCount(count, mask)
+                    result.samples.isNotEmpty() -> localizedContext.getString(R.string.cal_doip_monitor_complete, result.samples.size)
+                    operation in setOf(DoIpDirectRead.Operation.FIRST_FAILED_DTC, DoIpDirectRead.Operation.FIRST_CONFIRMED_DTC,
+                        DoIpDirectRead.Operation.RECENT_FAILED_DTC, DoIpDirectRead.Operation.RECENT_CONFIRMED_DTC) && report != null -> {
+                        val title = localizedContext.getString(when (operation) {
+                            DoIpDirectRead.Operation.FIRST_FAILED_DTC -> R.string.cal_doip_first_failed
+                            DoIpDirectRead.Operation.FIRST_CONFIRMED_DTC -> R.string.cal_doip_first_confirmed
+                            DoIpDirectRead.Operation.RECENT_FAILED_DTC -> R.string.cal_doip_recent_failed
+                            else -> R.string.cal_doip_recent_confirmed
+                        })
+                        title + ": " + (report.records.singleOrNull()?.let {
+                            renderUdsDtcRecord(it, report.statusAvailabilityMask)
+                        } ?: localizedContext.getString(R.string.cal_doip_no_historical_dtc))
+                    }
+                    operation in setOf(DoIpDirectRead.Operation.SUPPORTED_DTCS, DoIpDirectRead.Operation.PERMANENT_DTCS) && report != null ->
+                        localizedContext.getString(if (operation == DoIpDirectRead.Operation.PERMANENT_DTCS)
+                            R.string.cal_doip_permanent_result else R.string.cal_doip_supported_result,
+                            report.records.size, report.statusAvailabilityMask) +
+                            report.records.joinToString(separator = "\n", prefix = "\n") {
+                                renderUdsDtcRecord(it, report.statusAvailabilityMask)
+                            }
+                    result.severityReport != null -> requireNotNull(result.severityReport).let { report ->
+                        if (report.count != null)
+                            localizedContext.getString(R.string.cal_doip_severity_count_result, report.count,
+                                report.availabilityMask, report.formatIdentifier ?: 0)
+                        else localizedContext.getString(R.string.cal_doip_severity_list_result, report.records.size, report.availabilityMask) +
+                            report.records.joinToString(separator = "\n", prefix = "\n") { row ->
+                                localizedContext.getString(R.string.cal_doip_severity_record, row.dtc, row.severity, row.functionalUnit, row.status)
+                            }
+                    }
+                    result.faultCounters != null -> requireNotNull(result.faultCounters).let { rows ->
+                        localizedContext.getString(R.string.cal_doip_fault_counters_result, rows.size) +
+                            rows.joinToString(separator = "\n", prefix = "\n") {
+                                "0x%06X — %d".format(it.dtc, it.counter)
+                            }
+                    }
+                    result.snapshotIndex != null -> requireNotNull(result.snapshotIndex).let { rows ->
+                        localizedContext.getString(R.string.cal_doip_snapshot_index_result, rows.size) +
+                            rows.joinToString(separator = "\n", prefix = "\n") { "0x%06X — 0x%02X".format(it.dtc, it.record) }
+                    }
+                    report != null -> renderUdsDtcList(report, mask)
+                    operation == DoIpDirectRead.Operation.VIN -> result.vin.orEmpty()
+                    else -> result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty()
+                }
+                val monitorReport = if (multiMonitor || operation in setOf(DoIpDirectRead.Operation.MONITOR, DoIpDirectRead.Operation.OBD_MONITOR))
+                    DoIpMonitorReport(checkNotNull(result.vin), result.gateway.logicalAddress,
+                        target.tester, target.ecu, did, tls, System.currentTimeMillis(),
+                        result.samples.map(::doIpSampleRow), obdOnUds = operation in setOf(
+                            DoIpDirectRead.Operation.OBD_MONITOR, DoIpDirectRead.Operation.OBD_MULTI_MONITOR),
+                        complete = result.samples.size == sampleCount, requestedSamples = sampleCount) else null
+                _calibrationWorkspace.update { if (current()) it.copy(doIpReading = false, doIpResult = rendered,
+                    doIpTrace = result.trace.map(::doIpTraceLine), doIpMonitorReport = monitorReport) else it }
+                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
+            } catch (cancelled: CancellationException) {
+                if (current()) _calibrationWorkspace.update {
+                    val summary = if (operation == DoIpDirectRead.Operation.EXCHANGE && fixedCommands != null)
+                        localizedContext.getString(R.string.cal_doip_sequence_incomplete,
+                            requireNotNull(sequenceProgress).verified, fixedCommands.size) else ""
+                    it.copy(doIpReading = false, doIpResult =
+                        (it.doIpResult + "\n" + summary).trim())
+                }
+                throw cancelled
+            } catch (error: Exception) {
+                val baseMessage = doIpFailureMessage(error, R.string.cal_doip_failed)
+                val message = if (operation == DoIpDirectRead.Operation.EXCHANGE && fixedCommands != null)
+                    localizedContext.getString(R.string.cal_doip_sequence_incomplete,
+                        requireNotNull(sequenceProgress).verified, fixedCommands.size) + "\n" + baseMessage else baseMessage
+                if (current()) appendCanConsoleSystemEvent(message, succeeded = false)
+                if (current()) _calibrationWorkspace.update {
+                    val error = message
+                    it.copy(doIpReading = false, doIpResult =
+                        if (operation in setOf(DoIpDirectRead.Operation.EXCHANGE,
+                            DoIpDirectRead.Operation.INVENTORY, DoIpDirectRead.Operation.OBD_INVENTORY) &&
+                            it.doIpResult.isNotBlank())
+                            it.doIpResult + "\n" + error else error)
+                }
+            }
+        }
+    }
+
     /** Reads and decodes one read-only Camaro signal from the imported OBDb signalset. */
     fun readObdbSignal(signalId: String, protocolNumberText: String) {
-        if (!requirePremiumLicense()) return
-        viewModelScope.launch {
+        if (!requirePremiumLicense() || !requireMatchingPhysicalCamaro()) return
+        launchEnhancedUdsRead { current ->
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isObdbSignalReading = true,
                 obdbSignalValue = "",
                 obdbSignalMessage = ""
             )
             try {
+                check(current() && hasMatchingPhysicalCamaro()) { "Physical Camaro identity required." }
                 val catalog = obdbCamaroSignalSet ?: ObdbCamaroSignalSet.load(getApplication<Application>()).also {
                     obdbCamaroSignalSet = it
                 }
@@ -1124,24 +1980,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val did = signal.identifierHex.toInt(16)
                 val protocolNumber = protocolNumberText.toIntOrNull()
                     ?: error("Profil CAN invalide.")
-                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
-                val raw = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.withJ2534BridgeUdsSession(
-                        requestCanId = requestId,
-                        responseCanId = responseId,
-                        protocolNumber = protocolNumber,
-                        timeoutMs = 5000L,
-                        readDids = setOf(did)
-                    ) { client -> client.readDataByIdentifier(did) }
-                } else {
-                    obdManager.withStnUdsSession(
-                        requestCanId = requestId,
-                        responseCanId = responseId,
-                        protocolNumber = protocolNumber,
-                        timeoutMs = 5000L,
-                        readDids = setOf(did)
-                    ) { client -> client.readDataByIdentifier(did) }
+                // Imported OBDb headers currently describe normal 11-bit ISO 15765.
+                // A different physical bus/format must not be inferred from the UI.
+                require(protocolNumber in setOf(33, 35) &&
+                    protocolNumber in obdManager.availableUdsReadProfiles(requestId, responseId)) {
+                    "The selected profile is incompatible with this OBDb signal."
                 }
+                val raw = obdManager.withSelectedUdsReadSession(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        protocolNumber = protocolNumber,
+                        timeoutMs = 5000L,
+                        readDids = setOf(did)
+                    ) { client ->
+                        check(current() && hasMatchingPhysicalCamaro()) { "Physical Camaro identity changed." }
+                        client.readDataByIdentifier(did)
+                    }
+                if (!current() || !hasMatchingPhysicalCamaro()) return@launchEnhancedUdsRead
                 val decoded = signal.decode(raw)
                 val rendered = when {
                     decoded.unavailable -> localizedContext.getString(R.string.vm_sentinel_unavailable)
@@ -1162,10 +2017,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
             } catch (cancelled: CancellationException) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isObdbSignalReading = false)
+                if (current()) _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isObdbSignalReading = false)
                 throw cancelled
             } catch (error: Exception) {
+                if (!current()) return@launchEnhancedUdsRead
                 reportConnectionLoss(error)
+                if (!current()) return@launchEnhancedUdsRead
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isObdbSignalReading = false,
                     obdbSignalValue = "",
@@ -1249,6 +2106,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isJ2534MemoryReadAvailable = obdManager.isJ2534MemoryReadAvailable(),
                         j2534BridgeMessage = localizedContext.getString(R.string.vm_j2534_connected, result)
                     )
+                    _isStreamingLive.value = obdManager.isStandardObdReadAvailable()
                 } catch (cancelled: CancellationException) {
                     if (attempt == connectionAttemptGeneration) {
                         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isJ2534BridgeConnecting = false)
@@ -1279,6 +2137,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * before the manager socket/USB handle can be closed.
      */
     fun disconnectSelectedAdapter() {
+        val nativeCleanup = nativeFunctionalCleanup
+        nativeCleanup?.cancel()
         val attempt = nextConnectionGeneration()
         invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
@@ -1289,6 +2149,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             beginBusyOperation()
             try {
                 previousAttempt?.join()
+                nativeCleanup?.join()
                 if (attempt != connectionAttemptGeneration) return@launch
                 val activeMonitor = canMonitorJob
                 val activeRequest = detachCanRequest()
@@ -1424,10 +2285,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Reads one UDS DID over the verified STPX CAN transport; CAN IDs must be supplied from service data. */
+    /** Reads one UDS DID using the selected physical transport and service-data CAN IDs. */
     fun readUdsDid(requestCanIdHex: String, responseCanIdHex: String, didHex: String, protocolNumberText: String) {
         if (!requirePremiumLicense()) return
-        viewModelScope.launch {
+        launchEnhancedUdsRead { current ->
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isUdsReading = true,
                 udsDidResponse = "",
@@ -1447,23 +2308,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val protocolNumber = protocolNumberText.toIntOrNull()
                     ?: error("Profil CAN invalide.")
                 require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
-                val data = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.withJ2534BridgeUdsSession(
+                val data = obdManager.withSelectedUdsReadSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
                         timeoutMs = 5000L,
                         readDids = setOf(did)
                     ) { client -> client.readDataByIdentifier(did) }
-                } else {
-                    obdManager.withStnUdsSession(
-                        requestCanId = requestId,
-                        responseCanId = responseId,
-                        protocolNumber = protocolNumber,
-                        timeoutMs = 5000L,
-                        readDids = setOf(did)
-                    ) { client -> client.readDataByIdentifier(did) }
-                }
+                if (!current()) return@launchEnhancedUdsRead
                 val hex = data.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
                 val isVinDid = did == 0xF190
                 val rendered = if (isVinDid) {
@@ -1478,10 +2330,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
             } catch (cancelled: CancellationException) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
+                if (current()) _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
                 throw cancelled
             } catch (error: Exception) {
+                if (!current()) return@launchEnhancedUdsRead
                 reportConnectionLoss(error)
+                if (!current()) return@launchEnhancedUdsRead
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDidResponse = "",
@@ -1491,10 +2345,46 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun renderUdsDtcStatus(status: Int, availability: Int): String {
+        val keys = listOf(R.string.cal_uds_bit_failed, R.string.cal_uds_bit_failed_cycle,
+            R.string.cal_uds_bit_pending, R.string.cal_uds_bit_confirmed,
+            R.string.cal_uds_bit_incomplete_since_clear, R.string.cal_uds_bit_failed_since_clear,
+            R.string.cal_uds_bit_incomplete_cycle, R.string.cal_uds_bit_warning)
+        val labels = keys.mapIndexedNotNull { bit, key ->
+            if ((status and availability and (1 shl bit)) != 0) localizedContext.getString(key) else null
+        }
+        return when {
+            availability == 0 -> localizedContext.getString(R.string.cal_uds_status_unavailable)
+            labels.isEmpty() -> localizedContext.getString(R.string.cal_uds_status_none_asserted)
+            else -> labels.joinToString(", ")
+        }
+    }
+
+    private fun renderUdsDtcRecord(record: DecodedUdsDtcRecord, availability: Int): String =
+        "0x%06X — 0x%02X — %s".format(record.rawDtc, record.statusByte,
+            renderUdsDtcStatus(record.statusByte, availability))
+
+    private fun renderUdsDtcFilter(filter: UdsDtcFilter): String =
+        "\n" + localizedContext.getString(R.string.cal_uds_effective_mask, filter.effectiveMask) +
+            (if (filter.available) "" else "\n" + localizedContext.getString(R.string.cal_uds_filter_unavailable))
+
+    private fun renderUdsDtcList(report: UdsDtcReport, requestedMask: Int): String =
+        localizedContext.getString(R.string.cal_doip_filtered_dtc_result,
+            report.records.size, requestedMask, report.statusAvailabilityMask) +
+            renderUdsDtcFilter(UdsDtcFilter(requestedMask, report.statusAvailabilityMask)) +
+            report.records.joinToString(separator = "", prefix = "") {
+                "\n" + renderUdsDtcRecord(it, report.statusAvailabilityMask)
+            }
+
+    private fun renderUdsDtcCount(report: UdsDtcCountReport, requestedMask: Int): String =
+        localizedContext.getString(R.string.cal_doip_count_result,
+            report.count, requestedMask, report.availabilityMask, report.formatIdentifier) +
+            renderUdsDtcFilter(UdsDtcFilter(requestedMask, report.availabilityMask))
+
     /** Reads UDS ReadDTCInformation (0x19/0x02) from the selected physical ECU. */
     fun readUdsDtcs(requestCanIdHex: String, responseCanIdHex: String, protocolNumberText: String) {
         if (!requirePremiumLicense()) return
-        viewModelScope.launch {
+        launchEnhancedUdsRead { current ->
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isUdsReading = true,
                 udsDtcResponse = "",
@@ -1513,21 +2403,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val protocolNumber = protocolNumberText.toIntOrNull()
                     ?: error("Profil CAN invalide.")
                 require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
-                val report = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.withJ2534BridgeUdsSession(
+                val report = obdManager.withSelectedUdsReadSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
                         timeoutMs = 5000L
                     ) { client -> client.readDtcReport() }
-                } else {
-                    obdManager.withStnUdsSession(
-                        requestCanId = requestId,
-                        responseCanId = responseId,
-                        protocolNumber = protocolNumber,
-                        timeoutMs = 5000L
-                    ) { client -> client.readDtcReport() }
-                }
+                if (!current()) return@launchEnhancedUdsRead
                 val moduleId = "ECU ${responseCanIdHex.uppercase()}"
                 val mappedDtcs = report.records.map { record ->
                     val baseCode = record.code.substringBefore('-')
@@ -1547,24 +2429,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             ?: "DTC constructeur brut $rawCode ; aucune définition vérifiée n'est chargée pour ce calculateur."
                     )
                 }
-                _dtcs.value = _dtcs.value.filterNot { it.module == moduleId } + mappedDtcs
-                val rendered = if (report.records.isEmpty()) {
-                    localizedContext.getString(R.string.vm_no_dtcs_returned, responseCanIdHex.uppercase())
-                } else {
-                    report.records.joinToString("\n") { record ->
-                        "${record.code}  status=0x${record.statusByte.toString(16).uppercase().padStart(2, '0')}"
-                    }
-                }
+                if (UdsDtcFilter(255, report.statusAvailabilityMask).canReplaceInventory)
+                    _dtcs.update { old -> if (current()) old.filterNot { it.module == moduleId } + mappedDtcs else old }
+                val rendered = renderUdsDtcList(report, 255)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDtcResponse = rendered,
                     udsMessage = localizedContext.getString(R.string.vm_uds_read_complete)
                 )
             } catch (cancelled: CancellationException) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
+                if (current()) _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
                 throw cancelled
             } catch (error: Exception) {
+                if (!current()) return@launchEnhancedUdsRead
                 reportConnectionLoss(error)
+                if (!current()) return@launchEnhancedUdsRead
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDtcResponse = "",
@@ -1676,7 +2555,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * The UI never promotes this reading to proof of an installed sensor.
      */
     fun readLfx2012FuelSnapshot() {
-        if (!requirePremiumLicense()) return
+        if (!requirePremiumLicense() || !requireMatchingPhysicalCamaro()) return
         val vehicle = _vehicle.value
         if (vehicle.modelYear != 2012 ||
             !vehicle.engine.rpo.equals("LFX", ignoreCase = true)) return
@@ -1699,6 +2578,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     obdManager.isStandardObdReadAvailable()) {
                     "A connected physical, read-only OBD channel is required."
                 }
+                check(hasMatchingPhysicalCamaro()) { "Physical Camaro identity required." }
                 val survey = obdManager.readPhysicalFuelSurvey()
                 if (!current()) return@launch
                 val raw = Lfx2012FuelReadOnly.PIDS.associateWith { pid ->
@@ -1721,7 +2601,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // connection changes on the UI dispatcher. Otherwise the VIN
                 // could change between the IO-thread guard and history append.
                 withContext(Dispatchers.Main) {
-                    if (current()) {
+                    if (current() && hasMatchingPhysicalCamaro()) {
                         val validVin = vehicle.vin.trim().uppercase(java.util.Locale.ROOT)
                             .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                         val historySummary = if (validVin != null) {
@@ -1820,7 +2700,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Keep the legacy GM observation separate from generic OBD Mode 09. */
     fun readGmlanIdentification() {
-        if (!requirePremiumLicense()) return
+        if (!requirePremiumLicense() || !requireMatchingPhysicalCamaro()) return
         if (_calibrationWorkspace.value.isGmlanReading) return
         val account = accountSessionGeneration
         val connection = connectionAttemptGeneration
@@ -1838,9 +2718,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 if (!current()) return@launch
-                check(obdManager.isJ2534BridgeConnected())
+                check(obdManager.isJ2534BridgeConnected() && hasMatchingPhysicalCamaro())
                 val identity = obdManager.readGmlanIdentification()
-                if (current() && obdManager.isJ2534BridgeConnected()) {
+                if (current() && obdManager.isJ2534BridgeConnected() && hasMatchingPhysicalCamaro()) {
+                    check(VehicleVinMatcher.admitsCamaroSpecificRead(vehicle.vin, identity.vin)) {
+                        "GMLAN identity differs from selected physical Camaro."
+                    }
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         isGmlanReading = false, gmlanIdentity = identity
                     )
@@ -1903,6 +2786,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration ||
                 requestId != calibrationIdentityGeneration) return@launch
                 val ecuVin = identity.vin
+                if (!sourceWasSimulated && !obdManager.isSimulationActive && !obdManager.isDemoMode) {
+                    _observedStandardVin.value = VehicleVinMatcher.normalize(ecuVin)
+                    if (ecuVin != null && !VehicleVinMatcher.admitsCamaroSpecificRead(_vehicle.value.vin, ecuVin))
+                        _modules.value = emptyList()
+                }
                 val validCal = identity.calibrationIds.isNotEmpty()
                 val validCvn = identity.calibrationVerificationNumbers.isNotEmpty()
                 val vinComparison = VehicleVinMatcher.compare(_vehicle.value.vin, ecuVin)
@@ -2003,12 +2891,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun canMonitorAvailable(): Boolean =
-        obdManager.isObdCommandChannelAvailable && _adapter.value.supportsCanHeaders
+    fun availableRawCanProfiles(): Set<Int> = obdManager.availableRawCanProfiles()
 
-    /** Enhanced read-only UDS needs a verified STN adapter or a connected J2534 bridge. */
+    fun canMonitorAvailable(): Boolean = availableRawCanProfiles().isNotEmpty()
+
+    /** Read-only UDS transport candidates; physical target responses remain authoritative. */
     fun canReadEnhancedUds(): Boolean =
-        obdManager.isStnUdsReadAvailable || obdManager.isJ2534BridgeConnected()
+        obdManager.isEnhancedUdsReadAvailable
+
+    fun availableUdsReadProfiles(requestHex: String, responseHex: String): Set<Int> {
+        val request = requestHex.trim().toIntOrNull(16)
+        val response = responseHex.trim().toIntOrNull(16)
+        if ((requestHex.isNotBlank() && request == null) ||
+            (responseHex.isNotBlank() && response == null)) return emptySet()
+        return obdManager.availableUdsReadProfiles(request, response)
+    }
 
     private fun appendCanConsoleSystemEvent(message: String, succeeded: Boolean = true) {
         val current = _liveCanMonitorState.value
@@ -2049,13 +2946,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         events.map { ParsedCanConsoleRecord(it.direction, it.content, it.succeeded) }
     )
 
+    /** Changing the physical network invalidates outstanding raw TX consent and
+     * observed-ID attribution, while preserving the global event history.
+     */
+    fun setCanConsoleBitrate(bitrate: Int) {
+        if (bitrate !in setOf(250_000, 500_000, DiagnosticRouteSelector.SW_CAN_BITRATE) ||
+            listOf(false, true).none { DiagnosticRouteSelector.rawCanProfile(it, bitrate) in availableRawCanProfiles() }) return
+        val state = _liveCanMonitorState.value
+        if (state.isDoIpActive || state.isCapturing || state.isSendingRequest || state.bitrate == bitrate ||
+            canMonitorJob?.isActive == true || canRequestJob?.isActive == true ||
+            detachedCanMonitorJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false) return
+        _liveCanMonitorState.value = state.copy(bitrate = bitrate,
+            consoleContextGeneration = ++canConsoleContextGeneration,
+            observedCanIds = emptySet(), report = null)
+        appendCanConsoleSystemEvent(if (bitrate == DiagnosticRouteSelector.SW_CAN_BITRATE)
+            localizedContext.getString(R.string.can_console_swcan_changed)
+            else localizedContext.getString(R.string.can_console_bitrate_changed, bitrate / 1000))
+    }
+
     /** Starts passive monitoring until Stop, disconnect, adapter exit or an explicit timeout. */
     fun startCanMonitor(durationMs: Long = Long.MAX_VALUE, can29Bit: Boolean = false) {
-        if (!requirePremiumLicense()) return
+        if (!requirePremiumLicense() || _liveCanMonitorState.value.isDoIpActive) return
         if (canMonitorJob != null || detachedCanMonitorJob?.isCompleted == false ||
             canRequestJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false
         ) return
-        if (!obdManager.isObdCommandChannelAvailable || !_adapter.value.supportsCanHeaders) {
+        if (DiagnosticRouteSelector.rawCanProfile(can29Bit, _liveCanMonitorState.value.bitrate) !in availableRawCanProfiles()) {
             val unavailable = localizedContext.getString(R.string.can_sniffer_unavailable)
             appendCanConsoleSystemEvent(unavailable, succeeded = false)
             _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = unavailable)
@@ -2071,7 +2986,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             id = System.nanoTime(),
             direction = "SYSTEM",
             timestampMillis = System.currentTimeMillis(),
-            content = localizedContext.getString(R.string.can_sniffer_start)
+            content = if (previousState.bitrate == DiagnosticRouteSelector.SW_CAN_BITRATE)
+                localizedContext.getString(R.string.can_console_swcan_profile, if (can29Bit) 29 else 11)
+                else localizedContext.getString(R.string.can_console_capture_profile, previousState.bitrate / 1000, if (can29Bit) 29 else 11)
         )
         _liveCanMonitorState.value = previousState.copy(
             consoleContextGeneration = ++canConsoleContextGeneration,
@@ -2123,7 +3040,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 captureArchive = archiveStream
                 val captured = archiveStream.use { writer ->
-                    obdManager.captureCanMonitor(durationMs, can29Bit) { chunk ->
+                    obdManager.captureCanMonitor(durationMs, can29Bit, previousState.bitrate) { chunk ->
                     if (canMonitorJob === monitorJob) {
                         writer.append(chunk)
                         // Keep the raw stream unchanged, but decode only complete lines:
@@ -2291,7 +3208,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val current = _liveCanMonitorState.value
         // Keep an in-flight TX paired with its eventual RX/SYSTEM result.
         // The UI disables Clear while sending; this guard protects other callers too.
-        if (current.isSendingRequest || current.isCapturing) return
+        if (current.isDoIpActive || current.isSendingRequest || current.isCapturing) return
         activeCanCaptureFile?.delete()
         activeCanCaptureFile = null
         resetConsoleEventJournal()
@@ -2352,7 +3269,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * confirmation entry point, even if another UI caller invokes this method.
      */
     fun sendCanConsoleInput(input: String) {
-        if (!requirePremiumLicense()) return
+        if (!requirePremiumLicense() || _liveCanMonitorState.value.isDoIpActive) return
         if (RawCanFrameParser.parse(input) != null) {
             val message = localizedContext.getString(R.string.can_console_raw_tx_confirm_title)
             appendCanConsoleSystemEvent(message, succeeded = false)
@@ -2378,10 +3295,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 frame = frame,
                 pendingContextGeneration = expectedContextGeneration,
                 currentContextGeneration = state.consoleContextGeneration,
-                monitorAvailable = obdManager.isObdCommandChannelAvailable &&
-                    _adapter.value.supportsCanHeaders,
+                monitorAvailable = frame != null && state.bitrate in setOf(250_000, 500_000) &&
+                    DiagnosticRouteSelector.rawCanProfile(frame.isExtended, state.bitrate) in availableRawCanProfiles(),
                 canTransmit = _adapter.value.supportsCanTransmit,
-                busy = state.isCapturing || state.isSendingRequest
+                busy = state.isDoIpActive || state.isCapturing || state.isSendingRequest
             )) return
         sendRawCanConsoleFrame(input, requireNotNull(frame), expectedContextGeneration, approval)
     }
@@ -2474,6 +3391,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val transmission = obdManager.sendRawCanFrameWithStatus(
                     frame, approval,
+                    bitrate = currentState.bitrate,
                     onPhysicalResponseChunk = { chunk, receivedAtMillis ->
                         persistResponseBatch(rawRxStream.append(chunk, receivedAtMillis))
                     }
@@ -2481,7 +3399,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isCurrentAccountGeneration(confirmedAccountGeneration) &&
                         confirmedAdapterGeneration == connectionAttemptGeneration &&
                         confirmedVehicle == _vehicle.value &&
-                        confirmedConsoleGeneration == _liveCanMonitorState.value.consoleContextGeneration
+                        confirmedConsoleGeneration == _liveCanMonitorState.value.consoleContextGeneration &&
+                        currentState.bitrate == _liveCanMonitorState.value.bitrate
                 }
                 drainResponseStream()
                 val response = transmission.adapterOutput
@@ -2613,6 +3532,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Sends only a whitelisted, read-only SAE J1979 request; arbitrary CAN/UDS payloads are rejected. */
     fun sendSafeObdRequest(input: String) {
+        if (_liveCanMonitorState.value.isDoIpActive) return
         val request = SafeObdRequestPolicy.parse(input)
         if (request == null) {
             val message = localizedContext.getString(R.string.can_sniffer_invalid_request)
@@ -2725,7 +3645,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun canExportCanCapture(): Boolean {
         val state = _liveCanMonitorState.value
         val archive = activeCanCaptureFile?.takeIf { it.isFile }
-        return !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
+        return !state.isDoIpActive && !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
             (state.consoleHistory.isEmpty() || consoleEventJournal.isAvailable()) &&
             CanConsoleExportPolicy.canExport(
             isCapturing = state.isCapturing,
@@ -2764,6 +3684,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
             consoleEventJournal.revision() == journalRevisionAtClick &&
             (expectedJournalSnapshot?.let { consoleEventJournal.isCurrent(it) } != false) &&
+            !_liveCanMonitorState.value.isDoIpActive &&
             !_liveCanMonitorState.value.isCapturing &&
             !_liveCanMonitorState.value.isSendingRequest &&
             !_liveCanMonitorState.value.rawArchiveFailed &&
@@ -2951,6 +3872,210 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             CalibrationFileFormat.EXTERNAL_DEFINITION -> listOf(context.getString(R.string.cal_warning_external_definition))
             CalibrationFileFormat.INTEL_HEX -> if (inspection.warnings.isNotEmpty()) listOf(context.getString(R.string.cal_warning_address_span_large)) else emptyList()
             CalibrationFileFormat.MOTOROLA_S_RECORD -> emptyList()
+        }
+    }
+
+    fun inspectPhysicalRecoveryFolder(uri: Uri, identity: PhysicalRecoveryIdentity) {
+        if (!requirePremiumLicense() || !identity.valid) return
+        val owner = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        if (_calibrationWorkspace.value.physicalRecoveryReading || _calibrationWorkspace.value.physicalRecoveryExporting) return
+        fun current() = canResumeExport(generation, owner) && hasPremiumLicense()
+        _calibrationWorkspace.update { it.copy(physicalRecoveryReading = true, physicalRecoveryResult = null,
+            physicalRecoveryFolderUri = null, physicalRecoveryIdentity = identity,
+            physicalRecoveryFailed = false, physicalRecoveryExportMessage = null,
+            physicalRecoveryHistory = null, physicalRecoveryHistoryUris = emptyList(),
+            physicalRecoveryHistoryMessage = null) }
+        viewModelScope.launch {
+            try {
+                val report = withContext(Dispatchers.IO) {
+                    val app = getApplication<Application>()
+                    PhysicalRecoveryFolder.inspect(app.contentResolver, uri, app.cacheDir, identity, ::current)
+                }
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(physicalRecoveryResult = report,physicalRecoveryFolderUri = uri)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update { it.copy(physicalRecoveryFailed = true) }
+            } finally {
+                if (isCurrentAccountGeneration(generation))
+                    _calibrationWorkspace.update { it.copy(physicalRecoveryReading = false) }
+            }
+        }
+    }
+
+    fun exportPhysicalRecoveryInspection(identity: PhysicalRecoveryIdentity,
+        report: com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report) {
+        if (!requirePremiumLicense() || !report.verified || report.snapshotSha256 == null ||
+            report.journalSha256 == null) return
+        val owner = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        val source = _calibrationWorkspace.value.physicalRecoveryFolderUri ?: return
+        fun current(): Boolean {
+            val state = _calibrationWorkspace.value
+            return canResumeExport(generation, owner) && hasPremiumLicense() &&
+                !state.physicalRecoveryReading && state.physicalRecoveryIdentity == identity &&
+                state.physicalRecoveryResult === report && state.physicalRecoveryFolderUri == source
+        }
+        if (!current() || _calibrationWorkspace.value.physicalRecoveryExporting) return
+        _calibrationWorkspace.update { it.copy(physicalRecoveryExporting = true,physicalRecoveryExportMessage = null) }
+        viewModelScope.launch(Dispatchers.IO) {
+            var evidenceChanged=false
+            suspend fun requireSourceUnchanged() {
+                check(current())
+                try {
+                    val app=getApplication<Application>()
+                    val fresh=PhysicalRecoveryFolder.inspect(app.contentResolver,source,app.cacheDir,identity,::current)
+                    com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.requireSameVerifiedEvidence(report,fresh)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) { evidenceChanged=true;throw error }
+                check(current())
+            }
+            try {
+                requireSourceUnchanged()
+                val now=System.currentTimeMillis()
+                val bytes=PhysicalRecoveryEvidenceJson.encode(identity,report,now,
+                    com.camarodiag.gen5.BuildConfig.VERSION_NAME).toByteArray(Charsets.UTF_8)
+                val path=CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_ECU_recovery_inspection_${now}.json","application/json",
+                    category=CamaroDiagExportStorage.Category.REPORTS,
+                    beforePublish={check(current())},
+                    verifyStaged={ input ->
+                        PhysicalRecoveryEvidenceJson.requireExactJson(input,bytes)
+                        // Source may have changed while the report was staged.
+                        requireSourceUnchanged()
+                    }) { it.write(bytes) }
+                _calibrationWorkspace.update { state ->
+                    if(current() && state.physicalRecoveryResult === report)
+                        state.copy(physicalRecoveryExportMessage=localizedContext.getString(R.string.cal_recovery_export_success,path))
+                    else state
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                _calibrationWorkspace.update { state ->
+                    if(current() && state.physicalRecoveryResult === report) {
+                        if(evidenceChanged) state.copy(physicalRecoveryResult=null,physicalRecoveryFolderUri=null,
+                            physicalRecoveryFailed=true,physicalRecoveryExportMessage=localizedContext.getString(R.string.recovery_source_changed))
+                        else state.copy(physicalRecoveryExportMessage=localizedContext.getString(R.string.cal_recovery_export_failed))
+                    } else state
+                }
+            } finally {
+                if(isCurrentAccountGeneration(generation))
+                    _calibrationWorkspace.update { it.copy(physicalRecoveryExporting=false) }
+            }
+        }
+    }
+
+    fun inspectPhysicalRecoveryHistory(identity: PhysicalRecoveryIdentity, trees: List<Uri>) {
+        if (!requirePremiumLicense() || !identity.valid ||
+            trees.size !in 2..PhysicalRecoveryHistory.MAX_SNAPSHOTS) return
+        val sources = trees.toList()
+        val owner = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        val profile = _vehicle.value
+        if (_calibrationWorkspace.value.physicalRecoveryReading ||
+            _calibrationWorkspace.value.physicalRecoveryExporting) return
+        fun current() = canResumeExport(generation, owner) && hasPremiumLicense() &&
+            _vehicle.value == profile && _calibrationWorkspace.value.physicalRecoveryHistoryUris == sources
+        _calibrationWorkspace.update { it.copy(
+            physicalRecoveryReading = true,
+            physicalRecoveryHistory = null,
+            physicalRecoveryHistoryUris = sources,
+            physicalRecoveryHistoryMessage = null,
+            physicalRecoveryResult = null,
+            physicalRecoveryFolderUri = null,
+            physicalRecoveryIdentity = null,
+            physicalRecoveryFailed = false,
+            physicalRecoveryExportMessage = null) }
+        viewModelScope.launch {
+            try {
+                val report = withContext(Dispatchers.IO) {
+                    val app = getApplication<Application>()
+                    PhysicalRecoveryHistory.inspect(app.contentResolver, sources, app.cacheDir,
+                        identity, ::current)
+                }
+                if (current()) _calibrationWorkspace.update { it.copy(physicalRecoveryHistory = report) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update { it.copy(
+                    physicalRecoveryHistoryMessage = localizedContext.getString(R.string.cal_recovery_folder_failed)) }
+            } finally {
+                if (isCurrentAccountGeneration(generation)) _calibrationWorkspace.update {
+                    it.copy(physicalRecoveryReading = false)
+                }
+            }
+        }
+    }
+
+    fun exportPhysicalRecoveryHistory(report: PhysicalRecoveryHistory.Report) {
+        if (!requirePremiumLicense() || !report.verified) return
+        val owner = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        val profile = _vehicle.value
+        val sources = _calibrationWorkspace.value.physicalRecoveryHistoryUris.toList()
+        fun current(): Boolean {
+            val state = _calibrationWorkspace.value
+            return canResumeExport(generation, owner) && hasPremiumLicense() &&
+                _vehicle.value == profile && !state.physicalRecoveryReading &&
+                state.physicalRecoveryHistory === report &&
+                state.physicalRecoveryHistoryUris == sources
+        }
+        if (!current() || sources.size !in 2..PhysicalRecoveryHistory.MAX_SNAPSHOTS ||
+            _calibrationWorkspace.value.physicalRecoveryExporting) return
+        _calibrationWorkspace.update { it.copy(physicalRecoveryExporting = true,
+            physicalRecoveryHistoryMessage = null) }
+        viewModelScope.launch(Dispatchers.IO) {
+            var evidenceChanged = false
+            suspend fun requireSourceUnchanged() {
+                check(current())
+                try {
+                    val app = getApplication<Application>()
+                    val fresh = PhysicalRecoveryHistory.inspect(app.contentResolver, sources,
+                        app.cacheDir, report.identity, ::current)
+                    PhysicalRecoveryHistory.requireSameVerifiedEvidence(report, fresh)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    evidenceChanged = true
+                    throw error
+                }
+                check(current())
+            }
+            try {
+                requireSourceUnchanged()
+                val bytes = PhysicalRecoveryHistoryJson.encode(report).toByteArray(Charsets.UTF_8)
+                val now = System.currentTimeMillis()
+                val path = CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_ECU_recovery_history_${now}.json", "application/json",
+                    category = CamaroDiagExportStorage.Category.REPORTS,
+                    beforePublish = { check(current()) },
+                    verifyStaged = { input ->
+                        PhysicalRecoveryEvidenceJson.requireExactJson(input, bytes)
+                        requireSourceUnchanged()
+                    }) { it.write(bytes) }
+                _calibrationWorkspace.update { state ->
+                    if (current()) state.copy(physicalRecoveryHistoryMessage =
+                        localizedContext.getString(R.string.cal_recovery_export_success, path))
+                    else state
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _calibrationWorkspace.update { state ->
+                    if (!current()) state
+                    else if (evidenceChanged) state.copy(physicalRecoveryHistory = null,
+                        physicalRecoveryHistoryMessage = localizedContext.getString(R.string.recovery_source_changed))
+                    else state.copy(physicalRecoveryHistoryMessage =
+                        localizedContext.getString(R.string.cal_recovery_export_failed))
+                }
+            } finally {
+                if (isCurrentAccountGeneration(generation)) _calibrationWorkspace.update {
+                    it.copy(physicalRecoveryExporting = false)
+                }
+            }
         }
     }
 
@@ -3635,12 +4760,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * A consent dialog from an older revision can never authorize a write.
      */
     private fun nextConnectionGeneration(): Long {
+        if(_obdScanReport.value?.nativeUsbEvidence!=null) {
+            _obdScanReport.value=null
+            _obdScanMessage.value=null
+        }
+        resetLiveAndDtcEvidence()
+        invalidateEnhancedUdsReads()
         val next = ++connectionAttemptGeneration
         pendingUsbPermissionRetry = null
         _connectionGeneration.value = next
         return next
     }
     private var connectionAttemptJob: Job? = null
+    private var bluetoothDiscoveryJob: Job? = null
 
     private fun connectWithResult(
         connect: suspend () -> Result<AdapterCapabilities>,
@@ -3649,16 +4781,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         endpoint: String,
         discoveryOnly: Boolean = false
     ) {
+        val nativeCleanup = nativeFunctionalCleanup
+        nativeCleanup?.cancel()
         val attempt = nextConnectionGeneration()
         pendingUsbPermissionRetry = UsbPermissionReconnectPolicy.forSelection(
             transport, endpoint, attempt
         )
         invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
+        val previousDiscovery = bluetoothDiscoveryJob
+        previousDiscovery?.cancel()
         previousAttempt?.cancel()
         connectionAttemptJob = viewModelScope.launch {
             beginBusyOperation()
             try {
+                // Stop any previously requested BLE scan before opening the socket.
+                previousDiscovery?.join()
+                nativeCleanup?.join()
                 // A cancelled transport handshake may still be closing its
                 // socket. Wait for that cleanup before opening the replacement.
                 previousAttempt?.join()
@@ -3680,6 +4819,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             pendingUsbPermissionRetry = null
                             _adapter.value = capabilities
                             if (!discoveryOnly) {
+                                // A new explicitly selected connection begins
+                                // a new read-only live session, even after
+                                // account change or previous link loss.
+                                _isStreamingLive.value = obdManager.isStandardObdReadAvailable()
                                 rememberConnectionProfile(transport, capabilities, endpoint)
                                 refreshTopologyAndDefaults(runInitialScans = true)
                             }
@@ -3725,12 +4868,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshPairedDevices() {
-        viewModelScope.launch {
+        if (bluetoothDiscoveryJob?.isActive == true || connectionAttemptJob?.isActive == true) return
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        fun current() = account == accountSessionGeneration && connection == connectionAttemptGeneration
+        // Use LAZY so the handle is installed before a fast completion.
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
-                _pairedDevices.value = obdManager.getPairedDevices()
-                _usbDevices.value = obdManager.getUsbDevices()
+                val paired = withContext(Dispatchers.IO) { obdManager.getPairedDevices() }
+                val usb = withContext(Dispatchers.IO) { obdManager.getUsbDevices() }
+                if (!current()) return@launch
+                _pairedDevices.value = paired
+                _usbDevices.value = usb
                 val nearbyBle = obdManager.scanNearbyBleDevices()
-                _pairedDevices.value = (_pairedDevices.value + nearbyBle)
+                if (!current()) return@launch
+                _pairedDevices.value = (paired + nearbyBle)
                     .distinctBy { it.second }
                     .sortedByDescending {
                         it.first.contains("OBD", true) ||
@@ -3740,9 +4892,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = localizedContext.getString(R.string.msg_refresh_adapters_failed)
+                if (current()) _connectionMessage.value =
+                    localizedContext.getString(R.string.msg_refresh_adapters_failed)
             }
         }
+        bluetoothDiscoveryJob = job
+        job.start()
     }
 
     fun connectWifi(host: String, port: Int) {
@@ -3845,6 +5000,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val caps = obdManager.activateSimulatedAdapter(preset)
                 if (attempt != connectionAttemptGeneration) return@launch
                 _adapter.value = caps
+                _isStreamingLive.value = true
                 _connectionMessage.value = null
                 refreshTopologyAndDefaults()
             } catch (cancelled: CancellationException) {
@@ -3901,6 +5057,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         recordedLiveSamples.clear()
+        recordingObservedVin = _observedStandardVin.value
+        recordingEvidenceGeneration = liveEvidenceGeneration
         _isStreamingLive.value = true
         val now = System.currentTimeMillis()
         _liveRecordingState.value = LiveRecordingState(
@@ -3933,11 +5091,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (_liveRecordingState.value.isRecording) stopLiveRecording()
                 val snapshot = recordedLiveSamples.toList()
                 check(snapshot.isNotEmpty()) { "Aucune donnée enregistrée à exporter." }
+                val observed = recordingObservedVin
                 val v = profile
+                val matched = observed != null && VehicleVinMatcher.admitsCamaroSpecificRead(v.vin, observed)
                 val csv = LiveTelemetryCsv.encode(
                     samples = snapshot,
-                    vin = v.vin,
-                    vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} • ${v.generation.label} • ${v.transmission.name}"
+                    vin = observed.orEmpty(),
+                    vehicleLabel = if (matched) "${v.modelYear} Camaro ${v.engine.rpo} • ${v.generation.label} • ${v.transmission.name}"
+                        else localizedContext.getString(R.string.live_recording_observed_vehicle)
                 )
                 val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/csv",
                     category = CamaroDiagExportStorage.Category.TELEMETRY, beforePublish = { check(current()) }
@@ -3962,6 +5123,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _liveRecordingState.value = _liveRecordingState.value.copy(
                 message = localizedContext.getString(R.string.msg_live_recording_channel_lost)
             )
+            return
+        }
+        // The identity may arrive asynchronously just before the first sample.
+        // Once samples exist, never relabel them with a later VIN.
+        if (recordingObservedVin == null && recordedLiveSamples.isEmpty())
+            recordingObservedVin = _observedStandardVin.value
+        if (recordingEvidenceGeneration != liveEvidenceGeneration || _observedStandardVin.value != recordingObservedVin) {
+            stopLiveRecording()
+            _liveRecordingState.update { it.copy(message = localizedContext.getString(R.string.live_recording_identity_changed)) }
             return
         }
         if (values.isEmpty()) return
@@ -3991,42 +5161,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun scanDtcs() {
         val startedGeneration = accountSessionGeneration
+        val evidenceGeneration = liveEvidenceGeneration
+        fun current() = isCurrentAccountGeneration(startedGeneration) && evidenceGeneration == liveEvidenceGeneration
         viewModelScope.launch {
-            if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+            if (!current()) return@launch
+            _dtcScanNotice.value = null
             beginBusyOperation()
             try {
                 if (obdManager.isSimulationActive) {
                     val (confirmed, pending, permanent) =
                         obdManager.createSimulatedObd2FeatureEngine().readDtcs()
+                    if (!current()) return@launch
                     _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
                     _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_simulated_lfx)
+                    _dtcScanNotice.value = _connectionMessage.value
                 } else if (!obdManager.isStandardObdReadAvailable()) {
                     // No SAE OBD channel is available; keep independently read UDS ECU records.
-                    _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) }
+                    _dtcs.value = _dtcs.value.filterNot { it.standardObd }
                     _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
                         localizedContext.getString(R.string.msg_dtc_j2534_unavailable)
                     else localizedContext.getString(R.string.msg_dtc_adapter_required)
+                    _dtcScanNotice.value = _connectionMessage.value
                 } else {
                     if (obdManager.isJ2534StandardObdAvailable()) {
                         val snapshot = obdManager.readJ2534StandardDtcs()
-                        if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                        if (!current()) return@launch
                         replaceStandardDtcRecords(snapshot.records, snapshot.unavailableModes)
                         _connectionMessage.value = unavailableDtcNotice(snapshot.unavailableModes)
+                        _dtcScanNotice.value = _connectionMessage.value.orEmpty()
                     } else {
-                        val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
-                            engine.readDtcs()
-                        }
-                        if (!isCurrentAccountGeneration(startedGeneration)) return@launch
-                        replaceStandardDtcRecords(confirmed + pending + permanent, emptySet())
-                        _connectionMessage.value = null
+                        val modes = obdManager.withObdCommandSession { engine -> engine.readDtcModeEvidence() }
+                        if (!current()) return@launch
+                        val unavailable = modes.filterValues { it == null }.keys
+                        replaceStandardDtcRecords(modes.values.filterNotNull().flatten(), unavailable)
+                        _connectionMessage.value = unavailableDtcNotice(unavailable)
+                        _dtcScanNotice.value = _connectionMessage.value.orEmpty()
                     }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (isCurrentAccountGeneration(startedGeneration)) {
+                if (current()) {
                     reportConnectionLoss(error)
                     _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_scan_failed)
+                    if (current()) _dtcScanNotice.value = _connectionMessage.value
                 }
             } finally {
                 endBusyOperation()
@@ -4036,11 +5214,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Keep the prior records for an explicitly unavailable optional read mode. */
     private fun replaceStandardDtcRecords(records: List<ObdDtc>, unavailableModes: Set<Int>) {
-        _dtcs.value = _dtcs.value.filter { previous ->
-            !previous.module.equals("ECM", ignoreCase = true) ||
-                (7 in unavailableModes && previous.statusEn.equals("Pending", ignoreCase = true)) ||
-                (10 in unavailableModes && previous.statusEn.equals("Permanent", ignoreCase = true))
-        } + mapObdDtcs(records)
+        val module = obdManager.standardObdDtcModule()
+        _dtcs.value = StandardObdDtcInventory.replace(_dtcs.value, mapObdDtcs(records), module, unavailableModes)
     }
 
     private fun unavailableDtcNotice(modes: Set<Int>): String? =
@@ -4054,7 +5229,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         records.distinctBy { it.code to it.status }.map { dtc ->
             DiagnosticDtc(
                 code = dtc.code,
-                module = "ECM",
+                module = obdManager.standardObdDtcModule(),
                 statusEn = when (dtc.status) {
                     "pending" -> "Pending"
                     "permanent" -> "Permanent"
@@ -4067,16 +5242,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 },
                 descEn = standardDtcDescription(dtc.code, false),
                 descFr = standardDtcDescription(dtc.code, true),
-                isPending = dtc.status == "pending"
+                isPending = dtc.status == "pending",
+                standardObd = true
             )
         }
 
     private fun standardDtcDescription(code: String, isFr: Boolean): String {
         val entry = DtcCatalogRegistry.genericDescription(code)
             ?: return if (isFr) {
-                "Description normalisée indisponible ; vérifier la documentation GM correspondant au VIN et au calculateur."
+                "Description normalisée indisponible ; vérifier la documentation du constructeur correspondant au VIN et au calculateur."
             } else {
-                "Generic description unavailable; check GM service information for this VIN and reporting ECU."
+                "Generic description unavailable; check manufacturer service information for this VIN and reporting ECU."
             }
         return if (isFr) entry.second else entry.first
     }
@@ -4106,17 +5282,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = emptyList()
                     _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_demo_cleared)
                 } else if (obdManager.isJ2534StandardObdClearAvailable()) {
-                    obdManager.clearJ2534StandardDtcs(approval) {
+                    val snapshot = obdManager.clearJ2534StandardDtcs(approval) {
                         EcuWriteConsentFlow.requireCurrentForTransmit(approval) { current() }
                     }
                     if (!current()) return@launch
-                    // Mode 04 does not erase permanent emissions DTCs. Preserve
-                    // all other module records and require a new scan to refresh.
-                    _dtcs.value = _dtcs.value.filterNot {
-                        it.module.equals("ECM", ignoreCase = true) &&
-                            !it.statusEn.equals("Permanent", ignoreCase = true)
-                    }
-                    _connectionMessage.value = null
+                    publishClearReadback(snapshot)
                 } else if (!obdManager.isObdCommandChannelAvailable) {
                     _connectionMessage.value = when {
                         obdManager.isJ2534StandardObdAvailable() ->
@@ -4126,20 +5296,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         else -> localizedContext.getString(R.string.msg_dtc_clear_adapter_required)
                     }
                 } else {
-                    val response = obdManager.sendAtCommand("04", 2500L) {
+                    val result = obdManager.clearElmStandardDtcs(approval) {
                         EcuWriteConsentFlow.requireCurrentForTransmit(approval) { current() }
                     }
                     if (!current()) return@launch
-                    if (com.camarodiag.gen5.data.obd.StandardObdClearEvidence.acknowledged(response)) {
-                        // SAE Mode 04 clears standardized emissions DTCs only.
-                        // Preserve enhanced UDS records from other ECUs: no GM UDS clear is issued here.
-                        _dtcs.value = _dtcs.value.filterNot {
-                            it.module.equals("ECM", ignoreCase = true) &&
-                                !it.statusEn.equals("Permanent", ignoreCase = true)
-                        }
-                        _connectionMessage.value = null
+                    val snapshot = result.snapshot
+                    if (snapshot != null) {
+                        publishClearReadback(snapshot)
                     } else {
-                        _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_clear_not_confirmed, response)
+                        _connectionMessage.value = localizedContext.getString(
+                            R.string.msg_dtc_clear_not_confirmed, result.rawResponse)
+                        _dtcScanNotice.value = _connectionMessage.value
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -4147,12 +5314,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 if (current()) {
                     reportConnectionLoss(error)
-                    _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_clear_failed)
+                    _connectionMessage.value = localizedContext.getString(
+                        if (error is com.camarodiag.gen5.data.obd.ObdStationaryEvidenceRequiredException)
+                            R.string.msg_dtc_clear_stationary_required else R.string.msg_dtc_clear_failed)
+                    _dtcScanNotice.value = _connectionMessage.value
                 }
             } finally {
                 endBusyOperation()
             }
         }
+    }
+
+    /** Replace only modes positively reread after an ACK; permanent records
+     * are never inferred erased, and unrelated enhanced ECU rows survive. */
+    private fun publishClearReadback(snapshot: com.camarodiag.gen5.data.obd.PhysicalObdDtcSnapshot) {
+        replaceStandardDtcRecords(snapshot.records, snapshot.unavailableModes)
+        val message = localizedContext.getString(
+            R.string.msg_dtc_clear_readback,
+            snapshot.confirmed?.size?.toString() ?: localizedContext.getString(R.string.obd_not_available),
+            snapshot.pending?.size?.toString() ?: localizedContext.getString(R.string.obd_not_available),
+            snapshot.permanent?.size?.toString() ?: localizedContext.getString(R.string.obd_not_available)
+        )
+        _connectionMessage.value = message
+        _dtcScanNotice.value = message
     }
 
     fun runMileageAudit() {
@@ -4167,6 +5351,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             beginBusyOperation()
             _mileageReport.value = null
             val readings = mutableListOf<MileageSourceReading>()
+            var auditVin: String? = null
             try {
                 if (!obdManager.isStandardObdReadAvailable()) {
                     if (obdManager.isJ2534BridgeConnected()) {
@@ -4186,11 +5371,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } else {
                     val (a6Response, d3Response) = if (obdManager.isJ2534StandardObdAvailable()) {
-                        obdManager.readJ2534OdometerPids()
+                        val observation = obdManager.readJ2534OdometerObservation()
+                        auditVin = observation.verifiedVin
+                        observation.a6 to observation.d3
                     } else obdManager.withObdCommandSession { engine ->
+                        val before = engine.readVinForVerification()
                         val supportedPids = engine.discoverSupportedPids()
-                        engine.readMode01PidIfSupported(0xA6, supportedPids) to
-                            engine.readMode01PidIfSupported(0xD3, supportedPids)
+                        val a6 = engine.readMode01PidIfSupported(0xA6, supportedPids)
+                        val d3 = engine.readMode01PidIfSupported(0xD3, supportedPids)
+                        val after = engine.readVin()
+                        check(before == null || after == null || before == after) {
+                            "Vehicle VIN changed during odometer read."
+                        }
+                        auditVin = before?.takeIf { it == after }
+                        a6 to d3
                     }
                     val a6Km = a6Response?.let { CamaroUdsProtocol.parseOdometerPidA6(it) }
                     readings += MileageSourceReading(
@@ -4223,14 +5417,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 if (!current()) return@launch
-                _mileageReport.value = MileageAuditEngine.evaluate(selectedVin, readings)
+                _mileageReport.value = MileageAuditEngine.evaluate(auditVin.orEmpty(), readings)
+                auditVin?.let { vin ->
+                    _observedStandardVin.value = vin
+                    if (!VehicleVinMatcher.isCamaroCandidate(vin)) {
+                        _modules.value = emptyList()
+                        _calibrationWorkspace.update { it.copy(ecuVinResponse = vin,
+                            ecuIdentityFromSimulation = false,
+                            vinComparison = VehicleVinMatcher.compare(selectedVin, vin),
+                            vinModelYear = VehicleVinMatcher.modelYearFromVin(vin)) }
+                    }
+                }
                 _connectionMessage.value = null
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 if (current()) {
                     reportConnectionLoss(error)
-                    _mileageReport.value = MileageAuditEngine.evaluate(selectedVin, readings)
+                    _mileageReport.value = MileageAuditEngine.evaluate(auditVin.orEmpty(), readings)
                     _connectionMessage.value = localizedContext.getString(R.string.msg_mileage_audit_failed)
                 }
             } finally {
@@ -4267,12 +5471,406 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-    fun runFunctionalTests() {
-        if (functionalTestJob?.isActive == true) return
+    fun runNativeFreezeFunctionalTest(
+        device: android.hardware.usb.UsbDevice,
+        requested: com.camarodiag.gen5.data.obd.CamaroDiagConnectorFreezeCampaign.Target,
+        keyUri: Uri, confirmedConnection: Long, confirmedVehicle: VehicleProfile
+    ) {
+        if (!requested.valid) return
+        val target = requested.pinned()
+        val channel = target.channel
+        if (channel.connectionGeneration != maxOf(1L,confirmedConnection) ||
+            confirmedConnection != connectionAttemptGeneration || confirmedVehicle != _vehicle.value ||
+            channel.vehicle != confirmedVehicle.vin || channel.connector != device.deviceName) return
+        if (_adapter.value.tier != AdapterTier.DISCONNECTED || _isBusy.value || _isObdScanning.value ||
+            _calibrationWorkspace.value.isJ2534BridgeConnected ||
+            functionalTestJob?.isCompleted == false || nativeFunctionalCleanup?.isCompleted == false ||
+            connectionAttemptJob?.isCompleted == false || enhancedUdsJob?.isCompleted == false ||
+            canMonitorJob?.isCompleted == false || canRequestJob?.isCompleted == false ||
+            detachedCanMonitorJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false) {
+            _connectionMessage.value = localizedContext.getString(R.string.functional_native_usb_disconnected)
+            return
+        }
+        val owner = authenticatedAccountUid ?: return
+        val account = accountSessionGeneration
+        val connection = nextConnectionGeneration()
+        val approved = target.copy(channel=channel.copy(connectionGeneration=connection))
+        val execution = ++functionalTestGeneration
+        fun current() = isCurrentAccountGeneration(account) && execution == functionalTestGeneration &&
+            connection == connectionAttemptGeneration && confirmedVehicle == _vehicle.value &&
+            FirebaseAuth.getInstance().currentUser?.uid == owner && currentLicenseLevel == LicenseLevel.OWNER
+        val job = viewModelScope.launch(start=CoroutineStart.LAZY) {
+            if (!confirmFunctionalTestOwner(owner) || !current()) return@launch
+            val context=getApplication<Application>()
+            val usb=context.getSystemService(android.hardware.usb.UsbManager::class.java) ?: return@launch
+            _functionalTestState.value=FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
+                protocol=FunctionalProtocol.J1979,checks=FunctionalTestPlanner.j1979Checks(),
+                context=FunctionalTestContext(confirmedVehicle.vin,device.deviceName,"NATIVE_USB_CU2",connection),
+                nativeFreezeTarget=approved)
+            beginBusyOperation()
+            try {
+                val evidence=withContext(Dispatchers.IO) {
+                    check(current() && usb.hasPermission(device))
+                    val key=ByteArray(32)
+                    try {
+                        val input=context.contentResolver.openInputStream(keyUri) ?: error("Credential unavailable")
+                        java.io.DataInputStream(input).use { it.readFully(key); check(it.read()==-1) }
+                        check(current())
+                        val accountKey=MessageDigest.getInstance("SHA-256").digest(owner.toByteArray(Charsets.UTF_8))
+                            .joinToString("") { "%02x".format(it) }
+                        val folder=File(context.filesDir,"native-usb-evidence-"+accountKey)
+                        check(folder.isDirectory || folder.mkdirs())
+                        com.camarodiag.gen5.data.obd.CamaroDiagConnectorFreezeCampaign.run(
+                            usb,device,approved,key,folder
+                        ) { generation -> generation==connection && current() }
+                    } finally { key.fill(0) }
+                }
+                if(current()) {
+                    val report=evidence.report
+                    val checks=report?.frames?.map { frame ->
+                        val label="%02X".format(java.util.Locale.ROOT,frame.frame)
+                        val outcome=when {
+                            frame.status=="CHANGED" -> FunctionalTestOutcome.FAILED
+                            evidence.executionCompleted && frame.status in setOf("COMPLETE","ABSENT") ->
+                                FunctionalTestOutcome.PASSED
+                            else -> FunctionalTestOutcome.NOT_TESTED
+                        }
+                        FunctionalTestCheck("freeze:$label","j1979_freeze",label,label,outcome,
+                            frame.detail ?: frame.status,frame.detail ?: frame.status)
+                    }
+                    _functionalTestState.update { state -> state.copy(
+                        nativeFreezeEvidence=evidence,checks=checks?.takeIf { it.isNotEmpty() } ?: state.checks,
+                        context=state.context?.copy(observedVin=report?.initialVin),
+                        error=if(evidence.executionCompleted && report?.allFramesStable==true) null else
+                            localizedContext.getString(R.string.j1979_freeze_incomplete)) }
+                }
+            } catch(cancelled:CancellationException) { throw cancelled }
+            catch(_:Exception) {
+                if(current())_functionalTestState.update { it.copy(
+                    error=localizedContext.getString(R.string.j1979_freeze_incomplete)) }
+            } finally {
+                endBusyOperation()
+                if(execution==functionalTestGeneration && isCurrentAccountGeneration(account))
+                    _functionalTestState.update { it.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        error=if(current()) it.error else localizedContext.getString(R.string.functional_tests_cancelled)) }
+            }
+        }
+        functionalTestJob=job
+        nativeFunctionalCleanup=job
+        job.start()
+    }
+
+    fun runNativeMaintenanceFunctionalTest(
+        device: android.hardware.usb.UsbDevice,
+        requested: com.camarodiag.gen5.data.obd.CamaroDiagConnectorMaintenanceCampaign.Target,
+        keyUri: Uri, confirmedConnection: Long, confirmedVehicle: VehicleProfile
+    ) {
+        if(!requested.valid||keyUri.scheme!="content")return
+        val channel=requested.channel
+        if(channel.connectionGeneration!=maxOf(1L,confirmedConnection) ||
+            confirmedConnection!=connectionAttemptGeneration||confirmedVehicle!=_vehicle.value||
+            channel.vehicle!=confirmedVehicle.vin||channel.connector!=device.deviceName)return
+        if(_adapter.value.tier!=AdapterTier.DISCONNECTED||_isBusy.value||_isObdScanning.value||
+            _calibrationWorkspace.value.isJ2534BridgeConnected||
+            functionalCatalogueJob?.isActive==true||functionalTestJob?.isCompleted==false||
+            nativeFunctionalCleanup?.isCompleted==false||connectionAttemptJob?.isCompleted==false||
+            enhancedUdsJob?.isCompleted==false||canMonitorJob?.isCompleted==false||canRequestJob?.isCompleted==false||
+            detachedCanMonitorJob?.isCompleted==false||detachedCanRequestJob?.isCompleted==false){
+            _connectionMessage.value=localizedContext.getString(R.string.functional_native_usb_disconnected)
+            return
+        }
+        val owner=authenticatedAccountUid?:return
+        val account=accountSessionGeneration
+        val connection=nextConnectionGeneration()
+        val approved=requested.copy(channel=channel.copy(connectionGeneration=connection))
+        val execution=++functionalTestGeneration
+        fun current()=isCurrentAccountGeneration(account)&&execution==functionalTestGeneration&&
+            connection==connectionAttemptGeneration&&confirmedVehicle==_vehicle.value&&
+            FirebaseAuth.getInstance().currentUser?.uid==owner&&currentLicenseLevel==LicenseLevel.OWNER
+        val job=viewModelScope.launch(start=CoroutineStart.LAZY){
+            if(!confirmFunctionalTestOwner(owner)||!current())return@launch
+            val context=getApplication<Application>()
+            val usb=context.getSystemService(android.hardware.usb.UsbManager::class.java)?:return@launch
+            val labelEn=if(approved.archive)"Native maintenance archive (read-only)" else if(approved.operation==1)"Native Mode 04" else "Native Mode 08 EVAP"
+            val labelFr=if(approved.archive)"Archive de maintenance native (lecture seule)" else if(approved.operation==1)"Mode 04 natif" else "Mode 08 EVAP natif"
+            fun row(outcome:FunctionalTestOutcome,detail:String)=FunctionalTestCheck(
+                "j1979-native-maintenance","j1979",labelEn,labelFr,outcome,detail,detail)
+            _functionalTestState.value=FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
+                protocol=FunctionalProtocol.J1979,checks=listOf(row(FunctionalTestOutcome.NOT_TESTED,"")),
+                context=FunctionalTestContext(confirmedVehicle.vin,device.deviceName,if(approved.archive)"READ_ONLY_USB_CU5" else "NATIVE_USB_CU4",connection),
+                nativeMaintenanceTarget=approved)
+            beginBusyOperation()
+            try{
+                val evidence=withContext(Dispatchers.IO){
+                    check(current()&&usb.hasPermission(device))
+                    val key=ByteArray(32)
+                    try{
+                        val input=context.contentResolver.openInputStream(keyUri)?:error("Credential unavailable")
+                        java.io.DataInputStream(input).use { it.readFully(key);check(it.read()==-1) }
+                        check(current())
+                        val accountKey=MessageDigest.getInstance("SHA-256").digest(owner.toByteArray(Charsets.UTF_8))
+                            .joinToString(""){"%02x".format(it)}
+                        val folder=File(context.filesDir,"native-usb-evidence-"+accountKey)
+                        check(folder.isDirectory||folder.mkdirs())
+                        com.camarodiag.gen5.data.obd.CamaroDiagConnectorMaintenanceCampaign.run(
+                            usb,device,approved,key,folder,com.camarodiag.gen5.BuildConfig.VERSION_NAME
+                        ){generation -> generation==connection&&current()}
+                    }finally{key.fill(0)}
+                }
+                if(current()){
+                    val terminal=evidence.terminal
+                    // PASSED means the exact functional acknowledgment/readback
+                    // was recorded, not an actual leak test or repair.
+                    val outcome=when{
+                        !evidence.verified||approved.archive||evidence.recoveryRequired->FunctionalTestOutcome.NOT_TESTED
+                        terminal?.get("outcome")=="REFUSED"->FunctionalTestOutcome.FAILED
+                        terminal?.get("outcome") in setOf("ACKNOWLEDGED_READBACK","ACKNOWLEDGED_EVAP")->FunctionalTestOutcome.PASSED
+                        else->FunctionalTestOutcome.NOT_TESTED
+                    }
+                    val detail=localizedContext.getString(when{
+                        evidence.recoveryRequired->R.string.j1979_native_maintenance_recovery
+                        evidence.verified->R.string.j1979_native_maintenance_journal_checked
+                        else->R.string.j1979_native_maintenance_unverified
+                    })
+                    _functionalTestState.update { state -> state.copy(nativeMaintenanceEvidence=evidence,
+                        checks=listOf(row(outcome,detail)),
+                        context=state.context?.copy(observedVin=confirmedVehicle.vin.takeIf{!approved.archive&&terminal?.get("initial_vin")==true}),
+                        error=detail.takeIf{!evidence.verified||evidence.recoveryRequired||(!approved.archive&&outcome!=FunctionalTestOutcome.PASSED)}) }
+                }
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){
+                if(current())_functionalTestState.update{it.copy(error=localizedContext.getString(
+                    R.string.j1979_native_maintenance_recovery))}
+            }finally{
+                endBusyOperation()
+                if(execution==functionalTestGeneration&&isCurrentAccountGeneration(account))
+                    _functionalTestState.update{it.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        error=if(current())it.error else localizedContext.getString(R.string.j1979_native_maintenance_recovery))}
+            }
+        }
+        functionalTestJob=job;nativeFunctionalCleanup=job;job.start()
+    }
+
+    fun runNativeLiveFunctionalTest(
+        device: android.hardware.usb.UsbDevice,
+        requested: com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.Target,
+        keyUri: Uri, confirmedConnection: Long, confirmedVehicle: VehicleProfile
+    ) {
+        if (!requested.valid) return
+        val target = requested.pinned()
+        val channel = target.channel
+        if (channel.connectionGeneration != maxOf(1L,confirmedConnection) ||
+            confirmedConnection != connectionAttemptGeneration || confirmedVehicle != _vehicle.value ||
+            channel.vehicle != confirmedVehicle.vin || channel.connector != device.deviceName) return
+        if (_adapter.value.tier != AdapterTier.DISCONNECTED || _isBusy.value || _isObdScanning.value ||
+            _calibrationWorkspace.value.isJ2534BridgeConnected ||
+            functionalTestJob?.isCompleted == false || nativeFunctionalCleanup?.isCompleted == false ||
+            connectionAttemptJob?.isCompleted == false || enhancedUdsJob?.isCompleted == false ||
+            canMonitorJob?.isCompleted == false || canRequestJob?.isCompleted == false ||
+            detachedCanMonitorJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false) {
+            _connectionMessage.value = localizedContext.getString(R.string.functional_native_usb_disconnected)
+            return
+        }
+        val owner = authenticatedAccountUid ?: return
+        val account = accountSessionGeneration
+        val connection = nextConnectionGeneration()
+        val approved = target.copy(channel=channel.copy(connectionGeneration=connection))
+        val execution = ++functionalTestGeneration
+        fun current() = isCurrentAccountGeneration(account) && execution == functionalTestGeneration &&
+            connection == connectionAttemptGeneration && confirmedVehicle == _vehicle.value &&
+            FirebaseAuth.getInstance().currentUser?.uid == owner && currentLicenseLevel == LicenseLevel.OWNER
+        val job = viewModelScope.launch(start=CoroutineStart.LAZY) {
+            if (!confirmFunctionalTestOwner(owner) || !current()) return@launch
+            val context=getApplication<Application>()
+            val usb=context.getSystemService(android.hardware.usb.UsbManager::class.java) ?: return@launch
+            _functionalTestState.value=FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
+                protocol=FunctionalProtocol.J1979,checks=FunctionalTestPlanner.j1979Checks(),
+                context=FunctionalTestContext(confirmedVehicle.vin,device.deviceName,"NATIVE_USB_CU3",connection),
+                nativeLiveTarget=approved)
+            beginBusyOperation()
+            try {
+                val evidence=withContext(Dispatchers.IO) {
+                    check(current() && usb.hasPermission(device))
+                    val key=ByteArray(32)
+                    try {
+                        val input=context.contentResolver.openInputStream(keyUri) ?: error("Credential unavailable")
+                        java.io.DataInputStream(input).use { it.readFully(key); check(it.read()==-1) }
+                        check(current())
+                        val accountKey=MessageDigest.getInstance("SHA-256").digest(owner.toByteArray(Charsets.UTF_8))
+                            .joinToString("") { "%02x".format(it) }
+                        val folder=File(context.filesDir,"native-usb-evidence-"+accountKey)
+                        check(folder.isDirectory || folder.mkdirs())
+                        com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.run(
+                            usb,device,approved,key,folder
+                        ) { generation -> generation==connection && current() }
+                    } finally { key.fill(0) }
+                }
+                if(current()) {
+                    val summary=evidence.replay?.summary
+                    val counts=(summary?.get("raw_per_pid") as? List<*>).orEmpty()
+                    val checks=approved.pids.map { pid ->
+                        val label="%02X".format(java.util.Locale.ROOT,pid)
+                        val count=counts.mapNotNull { it as? Map<*,*> }
+                            .firstOrNull { (it["pid"] as? Number)?.toInt()==pid }
+                            ?.get("count") as? Number
+                        val outcome=if(evidence.executionCompleted && (count?.toInt() ?: 0)>0)
+                            FunctionalTestOutcome.PASSED else FunctionalTestOutcome.NOT_TESTED
+                        val detail=localizedContext.getString(R.string.j1979_native_live_samples,count?.toInt() ?: 0)
+                        FunctionalTestCheck("live-native:$label","j1979_live",label,label,outcome,detail,detail)
+                    }
+                    _functionalTestState.update { state -> state.copy(
+                        nativeLiveEvidence=evidence,checks=checks,
+                        context=state.context?.copy(observedVin=approved.channel.vehicle.takeIf {
+                            summary?.get("initial_identity_verified")==true }),
+                        error=if(evidence.executionCompleted) null else
+                            localizedContext.getString(R.string.j1979_native_live_incomplete)) }
+                }
+            } catch(cancelled:CancellationException) { throw cancelled }
+            catch(_:Exception) {
+                if(current())_functionalTestState.update { it.copy(
+                    error=localizedContext.getString(R.string.j1979_native_live_incomplete)) }
+            } finally {
+                endBusyOperation()
+                if(execution==functionalTestGeneration && isCurrentAccountGeneration(account))
+                    _functionalTestState.update { it.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        error=if(current()) it.error else localizedContext.getString(R.string.functional_tests_cancelled)) }
+            }
+        }
+        functionalTestJob=job
+        nativeFunctionalCleanup=job
+        job.start()
+    }
+
+    fun runNativeUsbFunctionalTest(
+        device: android.hardware.usb.UsbDevice,
+        target: com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.Target,
+        keyUri: Uri, confirmedConnection: Long, confirmedVehicle: VehicleProfile
+    ) = runNativeUsbCampaign(device,target,keyUri,confirmedConnection,confirmedVehicle,false)
+
+    fun runNativeUsbObdScan(
+        device: android.hardware.usb.UsbDevice,
+        target: com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.Target,
+        keyUri: Uri, confirmedConnection: Long, confirmedVehicle: VehicleProfile
+    ) {
+        if (!requirePremiumLicense()) return
+        runNativeUsbCampaign(device,target,keyUri,confirmedConnection,confirmedVehicle,true)
+    }
+
+    private fun runNativeUsbCampaign(
+        device: android.hardware.usb.UsbDevice,
+        target: com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.Target,
+        keyUri: Uri, confirmedConnection: Long, confirmedVehicle: VehicleProfile, publishScan:Boolean
+    ) {
+        if (!target.valid || target.connectionGeneration != maxOf(1L,confirmedConnection) ||
+            confirmedConnection != connectionAttemptGeneration || confirmedVehicle != _vehicle.value ||
+            target.vehicle != confirmedVehicle.vin || target.connector != device.deviceName) return
+        if (_adapter.value.tier != AdapterTier.DISCONNECTED || _isBusy.value || _isObdScanning.value ||
+            _calibrationWorkspace.value.isJ2534BridgeConnected ||
+            functionalTestJob?.isCompleted == false || nativeFunctionalCleanup?.isCompleted == false ||
+            connectionAttemptJob?.isCompleted == false || enhancedUdsJob?.isCompleted == false ||
+            canMonitorJob?.isCompleted == false || canRequestJob?.isCompleted == false ||
+            detachedCanMonitorJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false) {
+            _connectionMessage.value = localizedContext.getString(R.string.functional_native_usb_disconnected)
+            return
+        }
+        val owner = authenticatedAccountUid ?: return
+        val account = accountSessionGeneration
+        val connection = nextConnectionGeneration()
+        val approved = target.copy(connectionGeneration=connection)
+        val execution = ++functionalTestGeneration
+        fun current() = isCurrentAccountGeneration(account) && execution == functionalTestGeneration &&
+            connection == connectionAttemptGeneration && confirmedVehicle == _vehicle.value &&
+            FirebaseAuth.getInstance().currentUser?.uid == owner
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            if (!confirmFunctionalTestOwner(owner) || !current()) {
+                if(publishScan&&current()) _obdScanMessage.value=localizedContext.getString(R.string.functional_tests_denied)
+                return@launch
+            }
+            if(publishScan&&!hasPremiumLicense()) return@launch
+            val context = getApplication<Application>()
+            val usb = context.getSystemService(android.hardware.usb.UsbManager::class.java) ?: return@launch
+            _functionalTestState.value = FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
+                protocol=FunctionalProtocol.J1979,checks=NativeUsbFunctionalEvidence.initial(),
+                context=FunctionalTestContext(confirmedVehicle.vin,device.deviceName,"NATIVE_USB_CU1",connection))
+            if(publishScan) {
+                _isObdScanning.value=true
+                _obdScanReport.value=null
+                _obdScanMessage.value=null
+            }
+            beginBusyOperation()
+            try {
+                val json = withContext(Dispatchers.IO) {
+                    check(current() && usb.hasPermission(device))
+                    val key = ByteArray(32)
+                    try {
+                        val input = context.contentResolver.openInputStream(keyUri) ?: error("Credential unavailable")
+                        java.io.DataInputStream(input).use {
+                            it.readFully(key)
+                            check(it.read() == -1)
+                        }
+                        check(current())
+                        val accountKey = MessageDigest.getInstance("SHA-256").digest(owner.toByteArray(Charsets.UTF_8))
+                            .joinToString("") { "%02x".format(it) }
+                        val folder = File(context.filesDir,"native-usb-evidence-" + accountKey)
+                        check(folder.isDirectory || folder.mkdirs())
+                        val result = com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.run(
+                            usb,device,approved,key,folder,com.camarodiag.gen5.BuildConfig.VERSION_NAME
+                        ) { generation -> generation == connection && current() }
+                        JSONObject(result.report.readText(Charsets.UTF_8))
+                    } finally { key.fill(0) }
+                }
+                if (current()) {
+                    val result = NativeUsbFunctionalEvidence.results(_functionalTestState.value,json)
+                    val complete = json.optBoolean("capture_integrity_verified") &&
+                        json.optJSONObject("summary")?.optString("end") == "COMPLETE" &&
+                        result.context?.observedVin == confirmedVehicle.vin
+                    _functionalTestState.value = result.copy(error=if (complete) null else
+                        localizedContext.getString(R.string.functional_native_usb_incomplete))
+                    if(publishScan&&hasPremiumLicense()) {
+                        val scan=NativeUsbObdScanProjection.project(json,confirmedVehicle.vin,approved.tx,approved.rx,approved.extended)
+                        _obdScanReport.value=scan
+                        // A single-ECU capture must not replace global DTCs, establish
+                        // an active connection or authorize Camaro-specific operations.
+                        _obdScanMessage.value=localizedContext.getString(when {
+                            scan==null -> R.string.functional_native_usb_scan_rejected
+                            complete -> R.string.functional_native_usb_scan_complete
+                            else -> R.string.functional_native_usb_scan_partial
+                        })
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                if(publishScan&&isCurrentAccountGeneration(account)&&connection==connectionAttemptGeneration)
+                    _obdScanMessage.value=localizedContext.getString(R.string.functional_tests_cancelled)
+                throw cancelled
+            }
+            catch (_: Exception) {
+                if(publishScan&&current()) _obdScanMessage.value=localizedContext.getString(R.string.functional_native_usb_scan_rejected)
+                if (current()) _functionalTestState.update {
+                    it.copy(error=localizedContext.getString(R.string.functional_native_usb_incomplete))
+                }
+            } finally {
+                endBusyOperation()
+                if(publishScan&&isCurrentAccountGeneration(account)) _isObdScanning.value=false
+                if (execution == functionalTestGeneration && isCurrentAccountGeneration(account))
+                    _functionalTestState.update { it.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        error=if (current()) it.error else localizedContext.getString(R.string.functional_tests_cancelled)) }
+            }
+        }
+        functionalTestJob = job
+        nativeFunctionalCleanup = job
+        job.start()
+    }
+
+    fun runFunctionalTests(protocol: FunctionalProtocol? = null, doIpTarget: DoIpFunctionalTarget? = null) {
+        if (protocol != null && !protocol.implemented) return
+        if (protocol == FunctionalProtocol.DOIP && doIpTarget?.valid != true) return
+        if (functionalTestJob?.isCompleted == false || enhancedUdsJob?.isCompleted == false ||
+            _liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest) return
         val accountUid = authenticatedAccountUid ?: return
         val sessionGeneration = accountSessionGeneration
         val connection = connectionAttemptGeneration
-        val selectedVin = _vehicle.value.vin
+        val selectedProfile = _vehicle.value
+        val selectedVin = selectedProfile.vin
         val adapterName = _adapter.value.deviceName
         val execution = ++functionalTestGeneration
         functionalTestJob = viewModelScope.launch {
@@ -4285,23 +5883,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             if (!isCurrentAccountGeneration(sessionGeneration) || execution != functionalTestGeneration ||
-                connection != connectionAttemptGeneration || selectedVin != _vehicle.value.vin) {
+                connection != connectionAttemptGeneration || selectedProfile != _vehicle.value) {
                 return@launch
             }
             val connected = !obdManager.isDemoMode && !obdManager.isSimulationActive &&
                 (obdManager.isObdCommandChannelAvailable || obdManager.isJ2534BridgeConnected())
             val transport = obdManager.currentTransportKind
-            val topology = _modules.value.ifEmpty {
-                CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
-            }
+            val topology = if (com.camarodiag.gen5.domain.model.VehicleVinMatcher.isCamaroCandidate(selectedVin))
+                _modules.value.ifEmpty { CamaroUdsProtocol.buildTopology(selectedProfile, _adapter.value) }
+            else emptyList()
             _functionalTestState.value = FunctionalTestState(
                 running = true, startedAtMillis = System.currentTimeMillis(),
-                checks = FunctionalTestPlanner.initial(topology, transport, connected),
-                context = FunctionalTestContext(selectedVin, adapterName, transport, connection)
+                checks = when {
+                    protocol?.isJ1979Recipe == true -> FunctionalTestPlanner.j1979Checks()
+                    protocol == FunctionalProtocol.DOIP -> FunctionalTestPlanner.doIpChecks()
+                    else -> FunctionalTestPlanner.initial(topology, transport, connected)
+                },
+                context = if (protocol == FunctionalProtocol.DOIP)
+                    FunctionalTestContext(requireNotNull(doIpTarget).vin, "Direct Ethernet", "DOIP", connection)
+                    else FunctionalTestContext(selectedVin, adapterName, transport, connection),
+                protocol = protocol, doIpTarget = doIpTarget
             )
             fun current(): Boolean = execution == functionalTestGeneration &&
                 isCurrentAccountGeneration(sessionGeneration) &&
-                connection == connectionAttemptGeneration && selectedVin == _vehicle.value.vin
+                connection == connectionAttemptGeneration && selectedProfile == _vehicle.value
             fun mark(
                 key: String, outcome: FunctionalTestOutcome,
                 english: String, french: String
@@ -4314,6 +5919,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
+            suspend fun <T> withRecordedObd(read: suspend (Obd2FeatureEngine) -> T): T =
+                obdManager.withObdCommandSession { engine ->
+                    try {
+                        read(engine)
+                    } finally {
+                        if (current()) {
+                            _functionalTestState.value = FunctionalTestPlanner.appendRawObdExchanges(
+                                _functionalTestState.value, engine.rawExchangeLog())
+                        }
+                    }
+                }
             suspend fun checkRead(
                 key: String, read: suspend () -> Pair<String, String>
             ) {
@@ -4333,71 +5949,160 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             try {
-                if (!connected) {
+                if (protocol == FunctionalProtocol.DOIP) {
+                    val input = requireNotNull(doIpTarget)
+                    DoIpDirectRead.Target.parse(input.host, input.tester, input.ecu, input.vin, input.tls)
+                    val trace = java.util.Collections.synchronizedList(mutableListOf<String>())
+                    fun control(pdu: DoIpDirectRead.ControlTrace) {
+                        trace.add("${pdu.observedAtUtcMillis} ${pdu.transport} ${pdu.direction} ${pdu.payloadHex}")
+                    }
+                    fun diagnostic(pdu: DoIpDirectRead.Trace) {
+                        trace.add("${pdu.observedAtUtcMillis} UDS ${pdu.direction} ${pdu.payloadHex}")
+                    }
+                    fun publishTrace() {
+                        if (current()) _functionalTestState.update {
+                            it.copy(rawObdExchanges = synchronized(trace) { trace.toList() })
+                        }
+                    }
+                    try {
+                        var gateway: DoIpDirectRead.Gateway? = null
+                        checkRead("protocol:discovery") {
+                            val result = DoIpDirectRead.inspectGateway(input.host, input.vin,
+                                DoIpDirectRead.GatewayOperation.DISCOVER, onControlTrace = ::control)
+                            require(result.gateway.vin == input.vin) { "Gateway VIN not verified" }
+                            gateway = result.gateway
+                            "Gateway VIN verified; address %04X".format(result.gateway.logicalAddress) to
+                                "VIN passerelle vérifié ; adresse %04X".format(result.gateway.logicalAddress)
+                        }
+                        publishTrace()
+                        gateway?.let { observed ->
+                            val target = DoIpDirectRead.Target.parse(input.host, input.tester, input.ecu,
+                                input.vin, input.tls, observed.logicalAddress, observed)
+                            checkRead("protocol:status") {
+                                val status = requireNotNull(DoIpDirectRead.inspectGateway(input.host, input.vin,
+                                    DoIpDirectRead.GatewayOperation.STATUS, selectedGateway = observed,
+                                    onControlTrace = ::control).status)
+                                "Sockets ${status.currentSockets}/${status.maxSockets}" to
+                                    "Sockets ${status.currentSockets}/${status.maxSockets}"
+                            }
+                            publishTrace()
+                            checkRead("protocol:power") {
+                                val power = requireNotNull(DoIpDirectRead.inspectGateway(input.host, input.vin,
+                                    DoIpDirectRead.GatewayOperation.POWER, selectedGateway = observed,
+                                    onControlTrace = ::control).power)
+                                "Power mode response: $power" to "Réponse mode alimentation : $power"
+                            }
+                            publishTrace()
+                            var verifiedVin: String? = null
+                            checkRead("protocol:vin") {
+                                val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.VIN,
+                                    onTrace = ::diagnostic, onControlTrace = ::control, isReadContextCurrent = ::current)
+                                require(result.vin == input.vin)
+                                verifiedVin = result.vin
+                                if (current()) _functionalTestState.update { state ->
+                                    state.copy(context = state.context?.copy(observedVin = result.vin))
+                                }
+                                "ECU VIN verified: ${result.vin}" to "VIN ECU vérifié : ${result.vin}"
+                            }
+                            publishTrace()
+                            if (verifiedVin != null) {
+                                checkRead("protocol:dtc_count") {
+                                    val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.DTC_COUNT,
+                                        onTrace = ::diagnostic, onControlTrace = ::control, isReadContextCurrent = ::current)
+                                    require(result.vin == verifiedVin && result.dtcCount != null)
+                                    "Valid DTC count response." to "Réponse de comptage DTC valide."
+                                }
+                                publishTrace()
+                                checkRead("protocol:dtcs") {
+                                    val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.DTC,
+                                        onTrace = ::diagnostic, onControlTrace = ::control, isReadContextCurrent = ::current)
+                                    require(result.vin == verifiedVin && result.dtcs != null)
+                                    "Valid DTC read; no clear." to "Lecture DTC valide ; sans effacement."
+                                }
+                            }
+                        }
+                    } finally { publishTrace() }
+                } else if (protocol?.isJ1979Recipe == true && connected && obdManager.isStandardObdReadAvailable()) {
+                    val expectedLegacy = protocol.expectedLegacyElmProtocol
+                    if (expectedLegacy != null && !obdManager.isObdCommandChannelAvailable) {
+                        mark("protocol:transport", FunctionalTestOutcome.NOT_TESTED,
+                            "Legacy ELM-compatible transport required.", "Interface ELM legacy compatible requise.")
+                    } else {
+                        val report = if (expectedLegacy == null && obdManager.isJ2534StandardObdAvailable())
+                            obdManager.fullJ2534StandardObdScan()
+                        else withRecordedObd { it.fullReadOnlyScan(expectedLegacy) }
+                        if (current()) _functionalTestState.value =
+                            FunctionalTestPlanner.j1979Results(_functionalTestState.value, report)
+                        if (expectedLegacy != null && current() &&
+                            report.negotiatedElmProtocol == expectedLegacy &&
+                            obdManager.legacyMutationProtocol == expectedLegacy) {
+                            val discovery = obdManager.discoverElmLegacySources(expectedLegacy,::current)
+                            if (current()) _functionalTestState.value =
+                                FunctionalTestPlanner.withLegacyDiscovery(_functionalTestState.value,discovery)
+                        }
+                    }
+                } else if (protocol != null || !connected) {
                     if (current()) _functionalTestState.value = _functionalTestState.value.copy(
                         error = localizedContext.getString(R.string.functional_tests_not_connected)
                     )
                 } else if (obdManager.isObdCommandChannelAvailable) {
-                    // Only a physically observed 7E8 reply to SAE 0100 permits
-                    // confirmation of the standard 11-bit powertrain OBD responder.
-                    // It does not certify GM enhanced addressing or ECU programming.
-                    if (current()) {
-                        try {
-                            val responders = obdManager.withObdCommandSession {
-                                it.discoverFunctionalObdResponders()
-                            }
-                            if ("7E8" in responders) {
-                                mark(
-                                    "module:ECM", FunctionalTestOutcome.PASSED,
-                                    "Physical 7E8 reply to standard 0100 observed; standard OBD only.",
-                                    "Réponse physique 7E8 à 0100 observée ; OBD standard uniquement."
-                                )
-                            } else {
-                                mark(
-                                    "module:ECM", FunctionalTestOutcome.NOT_TESTED,
-                                    "No verified 7E8 response; enhanced ECM access not tested.",
-                                    "Aucune réponse 7E8 confirmée ; accès ECM étendu non testé."
-                                )
-                            }
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
-                            mark(
-                                "module:ECM", FunctionalTestOutcome.FAILED,
-                                "Physical OBD responder discovery failed.",
-                                "Échec de la découverte des réponses OBD physiques."
-                            )
-                        }
-                    }
+                    // A generic OBD reply is never an OEM module identity. Read VIN first
+                    // and retain the physical observation independently of the saved profile.
                     checkRead("service:vin") {
-                        val vin = obdManager.withObdCommandSession { it.readVin() }
+                        val vin = withRecordedObd { it.readVinForVerification() }
                             ?.trim()?.uppercase(java.util.Locale.ROOT)
                             ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                             ?: error("VIN missing from physical response")
-                        val chosen = _vehicle.value.vin.trim().uppercase(java.util.Locale.ROOT)
-                        require(chosen.isEmpty() || chosen == vin) {
-                            "VIN mismatch"
-                        }
-                        "Vehicle VIN read and checked against selected profile." to
-                            "VIN physique lu et comparé au véhicule sélectionné."
+                        if (!current()) throw CancellationException("Account or run changed")
+                        _functionalTestState.value = FunctionalTestPlanner.withObservedIdentity(_functionalTestState.value, vin)
+                        "Physical vehicle VIN received: $vin" to "VIN physique reçu : $vin"
+                    }
+                    if (current()) {
+                        // Without verified Camaro identity, omit model-specific topology entirely.
+                        if (_functionalTestState.value.context?.observedVin == null)
+                            _functionalTestState.value = FunctionalTestPlanner.withObservedIdentity(_functionalTestState.value, null)
+                        try {
+                            val responders = withRecordedObd { it.discoverFunctionalObdResponders() }
+                            if (!current()) throw CancellationException("Account or run changed")
+                            _functionalTestState.value = _functionalTestState.value.copy(
+                                checks = FunctionalTestPlanner.withStandardResponders(_functionalTestState.value.checks, responders)
+                            )
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) { /* No responder evidence is not a pass. */ }
                     }
                     checkRead("service:pids") {
-                        val pids = obdManager.withObdCommandSession { it.discoverSupportedPids() }
-                        require(pids.isNotEmpty()) { "No supported PID response" }
-                        ("ECU responded with " + pids.size + " supported PIDs.") to
-                            ("Réponse OBD physique : " + pids.size + " PID pris en charge.")
+                        val discovery = withRecordedObd { it.discoverPidAvailability() }
+                        require(discovery.firstUnresolvedPid != 1) { "No positive PID 00 response" }
+                        require(discovery.firstUnresolvedPid == null) { "Incomplete supported PID bitmap" }
+                        ("ECU responded with " + discovery.supported.size + " supported PIDs.") to
+                            ("Réponse OBD physique : " + discovery.supported.size + " PID pris en charge.")
                     }
+                    var partialDtcEvidence = false
                     checkRead("service:dtcs") {
-                        val (dtcResults, positiveResponse) =
-                            obdManager.withObdCommandSession { it.readDtcsWithPositiveResponseProof() }
-                        require(positiveResponse) { "No positive physical DTC service response" }
-                        val (confirmed, pending, permanent) = dtcResults
-                        val count = confirmed.size + pending.size + permanent.size
-                        ("Physical DTC response verified: " + count + " codes, no clearing.") to
-                            ("Réponse physique DTC vérifiée : " + count + " défauts, sans effacement.")
+                        val modes = withRecordedObd { it.readDtcModeEvidence() }
+                        if (!current()) throw CancellationException("Account or run changed")
+                        val state = _functionalTestState.value
+                        _functionalTestState.value = state.copy(checks =
+                            FunctionalTestPlanner.withDtcModeEvidence(state.checks, modes.mapValues { it.value?.size }))
+                        require(modes.values.any { it != null }) { "No positive physical DTC service response" }
+                        val count = modes.values.filterNotNull().sumOf { it.size }
+                        val unavailable = modes.filterValues { it == null }.keys
+                        if (unavailable.isNotEmpty()) {
+                            partialDtcEvidence = true
+                            val missing = unavailable.joinToString("/") { "%02X".format(it) }
+                            ("Partial physical DTC response: $count codes; modes $missing not confirmed, no clearing.") to
+                                ("Réponse DTC physique partielle : $count défauts ; modes $missing non confirmés, sans effacement.")
+                        } else {
+                            "Physical DTC response verified: $count codes, no clearing." to
+                                "Réponse physique DTC vérifiée : $count défauts, sans effacement."
+                        }
+                    }
+                    if (partialDtcEvidence && current()) {
+                        val partial = _functionalTestState.value.checks.first { it.key == "service:dtcs" }
+                        mark("service:dtcs", FunctionalTestOutcome.NOT_TESTED, partial.detailEn, partial.detailFr)
                     }
                     checkRead("service:readiness") {
-                        val response = obdManager.withObdCommandSession { it.readReadiness() }
+                        val response = withRecordedObd { it.readReadiness() }
                         require(!response.isNullOrBlank()) { "Readiness response missing" }
                         "Physical emissions readiness response received." to
                             "Réponse physique des moniteurs antipollution reçue."
@@ -4411,27 +6116,48 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val vin = identity.vin?.trim()?.uppercase(java.util.Locale.ROOT)
                             ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                             ?: error("J2534 ECU VIN missing")
-                        val chosen = _vehicle.value.vin.trim().uppercase(java.util.Locale.ROOT)
-                        require(chosen.isEmpty() || chosen == vin) { "VIN mismatch" }
+                        if (!current()) throw CancellationException("Account or run changed")
+                        _functionalTestState.value = FunctionalTestPlanner.withObservedIdentity(_functionalTestState.value, vin)
                         "ECU VIN received over the selected physical J2534 UDS profile." to
                             "VIN reçu via le profil UDS J2534 physique sélectionné."
+                    }
+                    if (current() && _functionalTestState.value.context?.observedVin == null) {
+                        _functionalTestState.value = FunctionalTestPlanner.withObservedIdentity(_functionalTestState.value, null)
                     }
                     // A capable bridge now offers standard OBD payloads without
                     // an ELM command channel. Test each service independently.
                     if (obdManager.isJ2534StandardObdAvailable()) {
                         checkRead("service:pids") {
                             val pids = obdManager.probeJ2534StandardPids()
-                            require(pids.isNotEmpty()) { "No supported physical PIDs" }
+                            // A successfully decoded empty bitmap is still a physical reply.
                             ("Physical J2534 PID bitmap: " + pids.size + " supported PIDs.") to
                                 ("Bitmap physique J2534 : " + pids.size + " PID pris en charge.")
                         }
+                        var partialJ2534Dtcs = false
                         checkRead("service:dtcs") {
                             val snapshot = obdManager.readJ2534StandardDtcs()
-                            require(snapshot.unavailableModes.isEmpty()) {
-                                "Complete standard DTC coverage not confirmed"
+                            if (!current()) throw CancellationException("Account or run changed")
+                            val state = _functionalTestState.value
+                            _functionalTestState.value = state.copy(checks =
+                                FunctionalTestPlanner.withDtcModeEvidence(state.checks, snapshot.modeCounts))
+                            require(snapshot.modeCounts.values.any { it != null }) {
+                                "No positive physical DTC service response"
                             }
-                            ("Physical J2534 DTC reads verified: " + snapshot.records.size + " codes, no clearing.") to
-                                ("Lectures physiques J2534 vérifiées : " + snapshot.records.size + " défauts, sans effacement.")
+                            partialJ2534Dtcs = snapshot.unavailableModes.isNotEmpty()
+                            if (partialJ2534Dtcs) {
+                                val missing = snapshot.unavailableModes.sorted().joinToString("/") {
+                                    "%02X".format(java.util.Locale.ROOT, it)
+                                }
+                                ("Partial physical J2534 DTC response: " + snapshot.records.size + " codes; modes $missing not confirmed.") to
+                                    ("Réponse DTC J2534 physique partielle : " + snapshot.records.size + " défauts ; modes $missing non confirmés.")
+                            } else {
+                                ("Physical J2534 DTC reads verified: " + snapshot.records.size + " codes, no clearing.") to
+                                    ("Lectures physiques J2534 vérifiées : " + snapshot.records.size + " défauts, sans effacement.")
+                            }
+                        }
+                        if (partialJ2534Dtcs && current()) {
+                            val partial = _functionalTestState.value.checks.first { it.key == "service:dtcs" }
+                            mark("service:dtcs", FunctionalTestOutcome.NOT_TESTED, partial.detailEn, partial.detailFr)
                         }
                         checkRead("service:readiness") {
                             obdManager.probeJ2534StandardReadiness()
@@ -4444,6 +6170,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (_: Exception) {
+                if (current()) _functionalTestState.update { it.copy(error = localizedContext.getString(R.string.functional_protocol_failed)) }
             } finally {
                 if (execution == functionalTestGeneration && isCurrentAccountGeneration(sessionGeneration)) {
                     _functionalTestState.value = _functionalTestState.value.copy(
@@ -4456,15 +6184,407 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun canRunFunctionalEvapTest(): Boolean = obdManager.isElmEvapCandidate
+
+    fun functionalLegacyMutationProtocol(): Int? = obdManager.legacyMutationProtocol
+
+    fun functionalLiveProtocol(): Int? = obdManager.j1979LiveProtocol
+
+    fun runFunctionalNetwork(requested: com.camarodiag.gen5.data.obd.J1979NetworkPlan,
+        confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
+        val plan=requested.copy(selectedResponseIds=requested.selectedResponseIds.toList())
+        if(!plan.valid||plan.vin!=confirmedVehicle.vin||
+            confirmedConnection!=connectionAttemptGeneration||confirmedVehicle!=_vehicle.value||
+            functionalTestJob?.isCompleted==false||enhancedUdsJob?.isCompleted==false||
+            nativeFunctionalCleanup?.isCompleted==false||_liveCanMonitorState.value.isCapturing||
+            _liveCanMonitorState.value.isSendingRequest||obdManager.j1979LiveProtocol!=plan.protocol)return
+        val account=authenticatedAccountUid?:return
+        val generation=accountSessionGeneration
+        val execution=++functionalTestGeneration
+        fun current()=execution==functionalTestGeneration&&isCurrentAccountGeneration(generation)&&
+            authenticatedAccountUid==account&&confirmedConnection==connectionAttemptGeneration&&
+            confirmedVehicle==_vehicle.value&&currentLicenseLevel==LicenseLevel.OWNER
+        functionalTestJob=viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            _functionalTestState.value=FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
+                protocol=FunctionalProtocol.J1979,networkPlan=plan,checks=FunctionalTestPlanner.j1979Checks(),
+                context=FunctionalTestContext(confirmedVehicle.vin,_adapter.value.deviceName,
+                    obdManager.currentTransportKind,confirmedConnection))
+            var report:com.camarodiag.gen5.data.obd.J1979NetworkReport?=null
+            var failure:String?=null
+            try {
+                report=obdManager.runJ1979Network(plan,::current){report=it}
+            }catch(cancelled:CancellationException){
+                failure="CANCELLED";throw cancelled
+            }catch(e:Exception){failure=e.javaClass.simpleName}
+            finally {
+                if(current()){
+                    val retained=report?.let { if(failure==null)it else it.copy(completed=false,stopReason=failure) }
+                    val rows=retained?.let { r->
+                        r.discovery.responders.map {
+                            val label="%X".format(it.responseId)
+                            FunctionalTestCheck("network:discovery:$label","j1979_network",label,label,
+                                when(it.status){
+                                    "PASSED"->FunctionalTestOutcome.PASSED
+                                    "FAILED"->FunctionalTestOutcome.FAILED
+                                    else->FunctionalTestOutcome.NOT_TESTED
+                                },it.detail?:it.status,it.detail?:it.status)
+                        }+r.ecus.map {
+                            val label="%X".format(it.responseId)
+                            FunctionalTestCheck("network:ecu:$label","j1979_network",label,label,
+                                when(it.status){
+                                    "PASSED"->FunctionalTestOutcome.PASSED
+                                    "FAILED"->FunctionalTestOutcome.FAILED
+                                    else->FunctionalTestOutcome.NOT_TESTED
+                                },it.stopReason?:it.status,it.stopReason?:it.status)
+                        }
+                    }
+                    _functionalTestState.update { state->state.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        networkReport=retained,checks=rows?.takeIf { it.isNotEmpty() }?:state.checks,
+                        context=state.context?.copy(observedVin=retained?.ecus?.mapNotNull { it.observedVin }
+                            ?.distinct()?.singleOrNull()),
+                        error=if(retained?.completed==true)null else localizedContext.getString(R.string.j1979_network_incomplete)) }
+                }
+            }
+        }
+    }
+
+    fun runFunctionalFreeze(requested: com.camarodiag.gen5.data.obd.J1979FreezePlan,
+        confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
+        if (!requested.valid) return
+        val plan = requested.pinned()
+        if (plan.target.vin != confirmedVehicle.vin || confirmedConnection != connectionAttemptGeneration ||
+            confirmedVehicle != _vehicle.value || functionalTestJob?.isCompleted == false ||
+            enhancedUdsJob?.isCompleted == false || nativeFunctionalCleanup?.isCompleted == false ||
+            _liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest ||
+            obdManager.j1979LiveProtocol != plan.target.protocol) return
+        val account = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        val execution = ++functionalTestGeneration
+        fun current() = execution == functionalTestGeneration && isCurrentAccountGeneration(generation) &&
+            authenticatedAccountUid == account && confirmedConnection == connectionAttemptGeneration &&
+            confirmedVehicle == _vehicle.value && currentLicenseLevel == LicenseLevel.OWNER
+        functionalTestJob = viewModelScope.launch {
+            if (!confirmFunctionalTestOwner(account) || !current()) return@launch
+            _functionalTestState.value = FunctionalTestState(running = true,
+                startedAtMillis = System.currentTimeMillis(),protocol = FunctionalProtocol.J1979,
+                freezePlan = plan,checks = FunctionalTestPlanner.j1979Checks(),
+                context = FunctionalTestContext(confirmedVehicle.vin,_adapter.value.deviceName,
+                    obdManager.currentTransportKind,confirmedConnection))
+            var report: com.camarodiag.gen5.data.obd.J1979FreezeReport? = null
+            var failure: String? = null
+            try {
+                report = obdManager.runJ1979Freeze(plan,::current) { report = it }
+            } catch (cancelled: CancellationException) {
+                failure = "CANCELLED"
+                throw cancelled
+            } catch (_: Exception) {
+                failure = "TRANSPORT_ERROR"
+            } finally {
+                if (current()) {
+                    val retained = report?.let { if (failure == null) it else it.copy(transportProblem=failure) }
+                    val rows = retained?.result?.frames?.map { frame ->
+                        val label = "%02X".format(java.util.Locale.ROOT,frame.frame)
+                        val outcome = when (frame.status) {
+                            "COMPLETE", "ABSENT" -> if (retained.executionCompleted)
+                                FunctionalTestOutcome.PASSED else FunctionalTestOutcome.NOT_TESTED
+                            "CHANGED" -> FunctionalTestOutcome.FAILED
+                            else -> FunctionalTestOutcome.NOT_TESTED
+                        }
+                        FunctionalTestCheck("freeze:$label","j1979_freeze",label,label,outcome,
+                            frame.detail ?: frame.status,frame.detail ?: frame.status)
+                    }
+                    _functionalTestState.update { state -> state.copy(running = false,
+                        finishedAtMillis = System.currentTimeMillis(),freezeReport = retained,
+                        checks = rows?.takeIf { it.isNotEmpty() } ?: state.checks,
+                        context = state.context?.copy(observedVin=retained?.result?.initialVin),
+                        error = if (retained?.executionCompleted == true && retained.result.allFramesStable) null
+                            else localizedContext.getString(R.string.j1979_freeze_incomplete)) }
+                }
+            }
+        }
+    }
+
+    fun runFunctionalLive(requested: com.camarodiag.gen5.data.obd.J1979LivePlan,
+        confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
+        val plan=requested.copy(pids=requested.pids.toList())
+        if(!plan.valid||plan.target.vin!=confirmedVehicle.vin||
+            confirmedConnection!=connectionAttemptGeneration||confirmedVehicle!=_vehicle.value||
+            functionalTestJob?.isCompleted==false||enhancedUdsJob?.isCompleted==false||
+            nativeFunctionalCleanup?.isCompleted==false||_liveCanMonitorState.value.isCapturing||
+            _liveCanMonitorState.value.isSendingRequest||obdManager.j1979LiveProtocol!=plan.target.protocol)return
+        val account=authenticatedAccountUid?:return
+        val accountGeneration=accountSessionGeneration
+        val execution=++functionalTestGeneration
+        fun current()=execution==functionalTestGeneration&&isCurrentAccountGeneration(accountGeneration)&&
+            authenticatedAccountUid==account&&confirmedConnection==connectionAttemptGeneration&&
+            confirmedVehicle==_vehicle.value&&currentLicenseLevel==LicenseLevel.OWNER
+        functionalTestJob=viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            _functionalTestState.value=FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
+                protocol=if(plan.target.legacy)FunctionalProtocol.entries.single {
+                    it.expectedLegacyElmProtocol==plan.target.protocol
+                } else FunctionalProtocol.J1979,livePlan=plan,checks=FunctionalTestPlanner.j1979Checks(),
+                context=FunctionalTestContext(confirmedVehicle.vin,_adapter.value.deviceName,
+                    obdManager.currentTransportKind,confirmedConnection))
+            var report: com.camarodiag.gen5.data.obd.J1979LiveReport?=null
+            var failure: String?=null
+            var lastUpdate=-1000L
+            try {
+                report=obdManager.runJ1979Live(plan,::current,onSample={ row ->
+                    if(current()&&row.elapsedMs-lastUpdate>=150){
+                        lastUpdate=row.elapsedMs
+                        _functionalTestState.update { it.copy(liveRecent=(it.liveRecent+row).takeLast(40)) }
+                    }
+                },retain={report=it})
+            }catch(cancelled:CancellationException){
+                failure="CANCELLED"
+                throw cancelled
+            }catch(error:Exception){failure=error.javaClass.simpleName}
+            finally {
+                if(current()){
+                    val retained=report?.let { if(failure!=null)it.copy(completed=false,stopReason=failure) else it }
+                    val checks=retained?.summaries?.map { item ->
+                        val passed=item.statusCounts[if(plan.rawOnly)"RAW" else "PASSED"]?:0
+                        val failed=item.statusCounts["FAILED"]?:0
+                        val name="%02X".format(java.util.Locale.ROOT,item.pid)
+                        FunctionalTestCheck("live:$name","j1979_live",name,name,
+                            if(failed>0)FunctionalTestOutcome.FAILED else if(passed>0)FunctionalTestOutcome.PASSED
+                            else FunctionalTestOutcome.NOT_TESTED,
+                            "$passed/${item.attempted}","${passed}/${item.attempted}")
+                    }
+                    _functionalTestState.update { state -> state.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        liveReport=retained,liveRecent=retained?.observations?.takeLast(40)?:state.liveRecent,
+                        checks=checks?.takeIf { it.isNotEmpty() }?:state.checks,
+                        context=state.context?.copy(observedVin=retained?.observedVin),
+                        error=if(retained?.completed==true)null else localizedContext.getString(R.string.j1979_live_incomplete)) }
+                }
+            }
+        }
+    }
+
+    fun runFunctionalLegacyRead(target: com.camarodiag.gen5.data.obd.LegacyReadTarget,
+        confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
+        if(!target.valid || confirmedConnection!=connectionAttemptGeneration ||
+            confirmedVehicle!=_vehicle.value || target.expectedVin!=confirmedVehicle.vin ||
+            functionalTestJob?.isCompleted==false || enhancedUdsJob?.isCompleted==false ||
+            _liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest ||
+            obdManager.legacyMutationProtocol!=target.protocol) return
+        val account=authenticatedAccountUid ?: return
+        val accountGeneration=accountSessionGeneration
+        val execution=++functionalTestGeneration
+        fun current()=execution==functionalTestGeneration &&
+            isCurrentAccountGeneration(accountGeneration) && authenticatedAccountUid==account &&
+            confirmedConnection==connectionAttemptGeneration && confirmedVehicle==_vehicle.value
+        functionalTestJob=viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            val protocol=FunctionalProtocol.entries.single { it.expectedLegacyElmProtocol==target.protocol }
+            _functionalTestState.value=FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
+                protocol=protocol,checks=FunctionalTestPlanner.j1979Checks(),
+                context=FunctionalTestContext(confirmedVehicle.vin,_adapter.value.deviceName,
+                    obdManager.currentTransportKind,confirmedConnection))
+            try {
+                val report=obdManager.runElmLegacyRead(target,::current)
+                if(current()) {
+                    val checks=report.steps.map { step ->
+                        FunctionalTestCheck("legacy-read:"+step.requestHex,"legacy_read",step.requestHex,step.requestHex,
+                            when(step.status) {
+                                "PASSED" -> FunctionalTestOutcome.PASSED
+                                "FAILED" -> FunctionalTestOutcome.FAILED
+                                else -> FunctionalTestOutcome.NOT_TESTED
+                            },step.detail?:step.status,step.detail?:step.status)
+                    }
+                    _functionalTestState.update { state ->
+                        state.copy(legacyRead=report,checks=checks.ifEmpty { state.checks },
+                            context=state.context?.copy(observedVin=report.observedVin),
+                            rawObdExchanges=report.steps.map { "> ${it.requestHex} -> ${it.rawResponse.orEmpty()}" },
+                            error=if(report.completed)null else localizedContext.getString(R.string.legacy_read_incomplete))
+                    }
+                }
+            } catch(cancelled:CancellationException) { throw cancelled }
+            catch(_:Exception) {
+                if(current())_functionalTestState.update { it.copy(error=localizedContext.getString(R.string.functional_protocol_failed)) }
+            } finally {
+                if(execution==functionalTestGeneration && isCurrentAccountGeneration(accountGeneration))
+                    _functionalTestState.update { it.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        error=if(!current())localizedContext.getString(R.string.functional_tests_cancelled) else it.error) }
+            }
+        }
+    }
+
+    fun runFunctionalLegacyMutation(target: com.camarodiag.gen5.data.obd.LegacyMutationTarget,
+        approval: EcuWriteConsentFlow.Approval, confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
+        if (!target.valid || !approval.warningAcknowledged || !approval.confirmedYes ||
+            confirmedConnection != connectionAttemptGeneration || confirmedVehicle != _vehicle.value ||
+            !confirmedVehicle.vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) ||
+            functionalTestJob?.isCompleted == false || enhancedUdsJob?.isCompleted == false ||
+            _liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest ||
+            obdManager.legacyMutationProtocol != target.protocol) return
+        val account = authenticatedAccountUid ?: return
+        val accountGeneration = accountSessionGeneration
+        val execution = ++functionalTestGeneration
+        val immutableTarget = target.copy(sources=target.sources.toList())
+        fun current() = execution == functionalTestGeneration &&
+            isCurrentAccountGeneration(accountGeneration) && authenticatedAccountUid == account &&
+            confirmedConnection == connectionAttemptGeneration && confirmedVehicle == _vehicle.value
+        functionalTestJob = viewModelScope.launch {
+            if (!confirmFunctionalTestOwner(account) || !current()) return@launch
+            val started = System.currentTimeMillis()
+            val protocol = FunctionalProtocol.entries.single { it.expectedLegacyElmProtocol == immutableTarget.protocol }
+            _functionalTestState.value = FunctionalTestState(running=true,startedAtMillis=started,
+                checks=FunctionalTestPlanner.legacyMutationChecks(),
+                context=FunctionalTestContext(confirmedVehicle.vin,_adapter.value.deviceName,
+                    obdManager.currentTransportKind,confirmedConnection),
+                protocol=protocol,legacyTarget=immutableTarget)
+            var baselineSaved = false
+            try {
+                val result = obdManager.runElmLegacyMutation(immutableTarget,confirmedVehicle.vin,approval,::current) { baseline ->
+                    withContext(Dispatchers.IO) {
+                        check(current())
+                        val directory = File(getApplication<Application>().filesDir,"legacy-mutation-evidence")
+                        check(directory.isDirectory || directory.mkdirs())
+                        val file = File(directory,"legacy-$started-${java.util.UUID.randomUUID()}.baseline.json")
+                        val json = LegacyMutationEvidenceJson.encode(baseline)
+                            .put("schema","camarodiag-j1979-legacy-baseline-v1")
+                            .put("expectedVin",confirmedVehicle.vin)
+                            .put("appVersion",com.camarodiag.gen5.BuildConfig.VERSION_NAME)
+                            .put("createdAtMillis",System.currentTimeMillis())
+                        check(file.createNewFile())
+                        try {
+                            java.io.FileOutputStream(file).use {
+                                it.write(json.toString(2).toByteArray(Charsets.UTF_8))
+                                it.flush()
+                                it.fd.sync()
+                            }
+                            check(current())
+                        } catch (error: Exception) {
+                            file.delete()
+                            throw error
+                        }
+                    }
+                    check(current())
+                    baselineSaved = true
+                    // Preserve the verified pre-operation evidence in the
+                    // report even if the user cancels after transmission.
+                    _functionalTestState.update { it.copy(legacyBaseline=baseline) }
+                }
+                if (current()) _functionalTestState.value = FunctionalTestPlanner.legacyMutationResults(
+                    _functionalTestState.value,result,baselineSaved)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _functionalTestState.update {
+                    it.copy(error=localizedContext.getString(R.string.functional_legacy_mutation_uncertain))
+                }
+            } finally {
+                if (execution == functionalTestGeneration && isCurrentAccountGeneration(accountGeneration))
+                    _functionalTestState.update { it.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        error=if (!current()) localizedContext.getString(R.string.functional_legacy_mutation_uncertain) else it.error) }
+            }
+        }
+    }
+
+    fun runFunctionalEvapTest(approval: EcuWriteConsentFlow.Approval, confirmedConnection: Long,
+        confirmedVehicle: VehicleProfile) =
+        runFunctionalObdMutation(approval, confirmedConnection, confirmedVehicle, clear = false)
+
+    fun runFunctionalClearTest(approval: EcuWriteConsentFlow.Approval, confirmedConnection: Long,
+        confirmedVehicle: VehicleProfile) =
+        runFunctionalObdMutation(approval, confirmedConnection, confirmedVehicle, clear = true)
+
+    private fun runFunctionalObdMutation(approval: EcuWriteConsentFlow.Approval, confirmedConnection: Long,
+        confirmedVehicle: VehicleProfile, clear: Boolean) {
+        if (confirmedConnection != connectionAttemptGeneration || confirmedVehicle != _vehicle.value ||
+            !confirmedVehicle.vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) ||
+            functionalTestJob?.isCompleted == false || enhancedUdsJob?.isCompleted == false ||
+            _liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest ||
+            !obdManager.isElmEvapCandidate) return
+        val account = authenticatedAccountUid ?: return
+        val accountGeneration = accountSessionGeneration
+        val execution = ++functionalTestGeneration
+        fun current() = execution == functionalTestGeneration &&
+            isCurrentAccountGeneration(accountGeneration) && authenticatedAccountUid == account &&
+            confirmedConnection == connectionAttemptGeneration && confirmedVehicle == _vehicle.value
+        functionalTestJob = viewModelScope.launch {
+            if (!confirmFunctionalTestOwner(account) || !current()) return@launch
+            _functionalTestState.value = FunctionalTestState(
+                running = true, startedAtMillis = System.currentTimeMillis(),
+                checks = if (clear) FunctionalTestPlanner.clearChecks() else FunctionalTestPlanner.evapChecks(),
+                context = FunctionalTestContext(confirmedVehicle.vin, _adapter.value.deviceName,
+                    obdManager.currentTransportKind, confirmedConnection),
+                protocol = FunctionalProtocol.J1979, evapCampaign = !clear, clearCampaign = clear)
+            val uncertainMessage = if (clear) R.string.functional_clear_uncertain else R.string.functional_evap_uncertain
+            try {
+                if (clear) {
+                    val result = obdManager.runElmClearRecipe(confirmedVehicle.vin, approval, ::current) { baseline ->
+                        withContext(Dispatchers.IO) {
+                            check(current())
+                            val directory=File(getApplication<Application>().filesDir,"can-clear-evidence")
+                            check(directory.isDirectory || directory.mkdirs())
+                            val file=File(directory,"clear-"+java.util.UUID.randomUUID()+".baseline.json")
+                            val json=CanClearEvidenceJson.encode(baseline)
+                                .put("schema","camarodiag-j1979-can-clear-baseline-v1")
+                                .put("expectedVin",confirmedVehicle.vin)
+                                .put("appVersion",com.camarodiag.gen5.BuildConfig.VERSION_NAME)
+                                .put("createdAtMillis",System.currentTimeMillis())
+                            check(file.createNewFile())
+                            try {
+                                java.io.FileOutputStream(file).use {
+                                    it.write(json.toString(2).toByteArray(Charsets.UTF_8))
+                                    it.flush();it.fd.sync()
+                                }
+                                check(current())
+                            } catch(error:Exception) {
+                                file.delete();throw error
+                            }
+                        }
+                        check(current())
+                        _functionalTestState.update { it.copy(clearBaseline=baseline) }
+                    }
+                    if (current()) _functionalTestState.value =
+                        FunctionalTestPlanner.clearResults(_functionalTestState.value, result)
+                } else {
+                    val result = obdManager.runElmEvapTest(confirmedVehicle.vin, approval, ::current)
+                    if (current()) _functionalTestState.value =
+                        FunctionalTestPlanner.evapResults(_functionalTestState.value, result)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (current()) _functionalTestState.update {
+                    it.copy(error = localizedContext.getString(uncertainMessage))
+                }
+            } finally {
+                if (execution == functionalTestGeneration && isCurrentAccountGeneration(accountGeneration)) {
+                    _functionalTestState.update {
+                        it.copy(running = false, finishedAtMillis = System.currentTimeMillis(),
+                            error = if (!current()) localizedContext.getString(uncertainMessage) else it.error)
+                    }
+                }
+            }
+        }
+    }
+
     fun cancelFunctionalTests() {
+        // Live read cancellation retains its prefix after exclusive transport
+        // restoration. Account/connection changes still invalidate generation.
+        if(_functionalTestState.value.running&&(_functionalTestState.value.livePlan!=null||_functionalTestState.value.networkPlan!=null)){
+            functionalTestJob?.cancel()
+            return
+        }
         functionalTestGeneration++
+        // Retain the cancelled job until transport cleanup actually finishes.
         functionalTestJob?.cancel()
-        functionalTestJob = null
         if (_functionalTestState.value.running) {
             _functionalTestState.value = _functionalTestState.value.copy(
                 running = false,
                 finishedAtMillis = System.currentTimeMillis(),
-                error = localizedContext.getString(R.string.functional_tests_cancelled)
+                error = localizedContext.getString(when {
+                    _functionalTestState.value.legacyTarget != null -> R.string.functional_legacy_mutation_uncertain
+                    _functionalTestState.value.clearCampaign -> R.string.functional_clear_uncertain
+                    _functionalTestState.value.evapCampaign -> R.string.functional_evap_uncertain
+                    else -> R.string.functional_tests_cancelled
+                })
             )
         }
     }
@@ -4478,16 +6598,181 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val snapshot = _functionalTestState.value
             if (!snapshot.canExport) return@launch
             val evidenceContext = snapshot.context ?: return@launch
+            snapshot.nativeMaintenanceEvidence?.let { evidence ->
+                fun current()=isCurrentAccountGeneration(sessionGeneration)&&authenticatedAccountUid==accountUid&&
+                    currentLicenseLevel==LicenseLevel.OWNER&&_functionalTestState.value===snapshot
+                val context=getApplication<Application>()
+                try{
+                    val maximum=com.camarodiag.connectors.J1979MaintenanceJournal.MAX_JOURNAL.toLong()
+                    var journalPath:String?=null
+                    if(evidence.sha256!=null){
+                        val before=withContext(Dispatchers.IO){evidence.journal.inputStream().use{
+                            CamaroDiagExportStorage.fingerprint(it,maximum)
+                        }}
+                        check(before.sha256==evidence.sha256&&current())
+                        journalPath=CamaroDiagExportStorage.write(context,
+                            "CamaroDiag_SAE-J1979_NATIVE_MAINTENANCE_${snapshot.startedAtMillis}.cm",
+                            "application/octet-stream",category=CamaroDiagExportStorage.Category.TESTS,
+                            beforePublish={check(current())},verifyStaged={input->
+                                check(CamaroDiagExportStorage.fingerprint(input,maximum)==before)
+                            }){output->evidence.journal.inputStream().use{it.copyTo(output)}}
+                    }
+                    check(current())
+                    val json=JSONObject(evidence.document).apply{
+                        put("raw_journal_name",journalPath?.substringAfterLast('/')?:JSONObject.NULL)
+                    }
+                    val bytes=json.toString(2).toByteArray(Charsets.UTF_8)
+                    val reportPath=CamaroDiagExportStorage.write(context,
+                        "CamaroDiag_SAE-J1979_NATIVE_MAINTENANCE_${snapshot.startedAtMillis}.json",
+                        "application/json",category=CamaroDiagExportStorage.Category.TESTS,
+                        beforePublish={check(current())},verifyStaged={input->
+                            PhysicalRecoveryEvidenceJson.requireExactJson(input,bytes)
+                        }){it.write(bytes)}
+                    if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_success)+
+                        "\n"+listOfNotNull(journalPath,reportPath).joinToString("\n")
+                }catch(cancelled:CancellationException){throw cancelled}
+                catch(_:Exception){if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_failed)}
+                return@launch
+            }
+            if(snapshot.nativeMaintenanceTarget!=null)return@launch
+            snapshot.nativeLiveEvidence?.let { evidence ->
+                fun current()=isCurrentAccountGeneration(sessionGeneration) &&
+                    authenticatedAccountUid==accountUid && currentLicenseLevel==LicenseLevel.OWNER &&
+                    _functionalTestState.value===snapshot
+                val context=getApplication<Application>()
+                try {
+                    var capturePath:String?=null
+                    val digest=evidence.sha256
+                    if(digest!=null) {
+                        val maximum=com.camarodiag.connectors.J1979LiveNativeReplay.MAX_CAPTURE.toLong()
+                        val file=evidence.capture
+                        val before=withContext(Dispatchers.IO) { file.inputStream().use {
+                            CamaroDiagExportStorage.fingerprint(it,maximum)
+                        } }
+                        check(before.sha256==digest && current())
+                        capturePath=CamaroDiagExportStorage.write(context,
+                            "CamaroDiag_SAE-J1979_NATIVE_LIVE_${snapshot.startedAtMillis}.cl",
+                            "application/octet-stream",category=CamaroDiagExportStorage.Category.TESTS,
+                            beforePublish={check(current())},verifyStaged={input ->
+                                check(CamaroDiagExportStorage.fingerprint(input,maximum)==before)
+                            }) { output -> file.inputStream().use { it.copyTo(output) } }
+                    }
+                    check(current())
+                    val json=JSONObject(evidence.report()).apply {
+                        put("version",com.camarodiag.gen5.BuildConfig.VERSION_NAME)
+                        put("raw_capture_name",capturePath?.substringAfterLast('/') ?: JSONObject.NULL)
+                    }
+                    val bytes=json.toString(2).toByteArray(Charsets.UTF_8)
+                    val reportPath=CamaroDiagExportStorage.write(context,
+                        "CamaroDiag_SAE-J1979_NATIVE_LIVE_${snapshot.startedAtMillis}.json",
+                        "application/json",category=CamaroDiagExportStorage.Category.TESTS,
+                        beforePublish={check(current())},verifyStaged={input ->
+                            PhysicalRecoveryEvidenceJson.requireExactJson(input,bytes)
+                        }) { it.write(bytes) }
+                    if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_success)+
+                        "\n"+listOfNotNull(capturePath,reportPath).joinToString("\n")
+                } catch(cancelled:CancellationException) { throw cancelled }
+                catch(_:Exception) {
+                    if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_failed)
+                }
+                return@launch
+            }
+            if(snapshot.nativeLiveTarget!=null)return@launch
+            snapshot.nativeFreezeEvidence?.let { evidence ->
+                fun current()=isCurrentAccountGeneration(sessionGeneration) &&
+                    authenticatedAccountUid==accountUid && currentLicenseLevel==LicenseLevel.OWNER &&
+                    _functionalTestState.value===snapshot
+                val context=getApplication<Application>()
+                try {
+                    var capturePath:String?=null
+                    val digest=evidence.sha256
+                    if(digest!=null) {
+                        val file=evidence.capture
+                        val maximum=com.camarodiag.connectors.J1979FreezeUsbCapture.MAX_CAPTURE
+                        val before=withContext(Dispatchers.IO) { file.inputStream().use {
+                            CamaroDiagExportStorage.fingerprint(it,maximum)
+                        } }
+                        check(before.sha256==digest && current())
+                        capturePath=CamaroDiagExportStorage.write(context,
+                            "CamaroDiag_SAE-J1979_NATIVE_FREEZE_${snapshot.startedAtMillis}.cf",
+                            "application/octet-stream",category=CamaroDiagExportStorage.Category.TESTS,
+                            beforePublish={check(current())},verifyStaged={input ->
+                                check(CamaroDiagExportStorage.fingerprint(input,maximum)==before)
+                            }) { output ->
+                                file.inputStream().use { input -> input.copyTo(output) }
+                            }
+                    }
+                    check(current())
+                    val json=J1979FreezeEvidenceJson.encodeNative(evidence,
+                        com.camarodiag.gen5.BuildConfig.VERSION_NAME,capturePath?.substringAfterLast('/'))
+                    val bytes=json.toString(2).toByteArray(Charsets.UTF_8)
+                    val reportPath=CamaroDiagExportStorage.write(context,
+                        "CamaroDiag_SAE-J1979_NATIVE_FREEZE_${snapshot.startedAtMillis}.json",
+                        "application/json",category=CamaroDiagExportStorage.Category.TESTS,
+                        beforePublish={check(current())},verifyStaged={input ->
+                            PhysicalRecoveryEvidenceJson.requireExactJson(input,bytes)
+                        }) { it.write(bytes) }
+                    if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_success)+
+                        "\n"+listOfNotNull(capturePath,reportPath).joinToString("\n")
+                } catch(cancelled:CancellationException) { throw cancelled }
+                catch(_:Exception) {
+                    if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_failed)
+                }
+                return@launch
+            }
+            if(snapshot.nativeFreezeTarget!=null)return@launch
+            snapshot.freezeReport?.let { report ->
+                fun current() = isCurrentAccountGeneration(sessionGeneration) &&
+                    authenticatedAccountUid == accountUid && currentLicenseLevel == LicenseLevel.OWNER &&
+                    _functionalTestState.value === snapshot
+                try {
+                    val bytes = J1979FreezeEvidenceJson.encode(report,evidenceContext.adapterName,
+                        com.camarodiag.gen5.BuildConfig.VERSION_NAME).toString(2).toByteArray(Charsets.UTF_8)
+                    val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(),
+                        "CamaroDiag_SAE-J1979_FREEZE_${snapshot.startedAtMillis}.json","application/json",
+                        category = CamaroDiagExportStorage.Category.TESTS,beforePublish={check(current())},
+                        verifyStaged={input -> PhysicalRecoveryEvidenceJson.requireExactJson(input,bytes)}) {
+                        it.write(bytes)
+                    }
+                    if (current()) _connectionMessage.value =
+                        localizedContext.getString(R.string.export_folder_success) + "\n" + savedPath
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) {
+                    if (current()) _connectionMessage.value = localizedContext.getString(R.string.export_folder_failed)
+                }
+                return@launch
+            }
+            if (snapshot.freezePlan != null) return@launch
             val json = JSONObject()
-                .put("schema", "camarodiag-functional-test-v1")
+                .put("schema", when {
+                    snapshot.livePlan?.target?.legacy == true -> "camarodiag-j1979-legacy-live-v1"
+                    snapshot.livePlan != null -> "camarodiag-j1979-live-v1"
+                    snapshot.nativeUsbEvidence != null -> "camarodiag-functional-j1979-native-usb-v1"
+                    snapshot.legacyRead != null -> "camarodiag-functional-j1979-legacy-source-v1"
+                    snapshot.legacyTarget != null -> "camarodiag-functional-j1979-legacy-mutation-v1"
+                    snapshot.clearCampaign -> "camarodiag-functional-j1979-clear-v1"
+                    snapshot.evapCampaign -> "camarodiag-functional-j1979-evap-v1"
+                    else -> "camarodiag-functional-test-v1"
+                })
+                .put("protocol", snapshot.protocol?.id ?: JSONObject.NULL)
+                .put("appVersion", com.camarodiag.gen5.BuildConfig.VERSION_NAME)
                 .put("startedAtMillis", snapshot.startedAtMillis)
                 .put("finishedAtMillis", snapshot.finishedAtMillis)
-                .put("vin", evidenceContext.selectedVin)
+                .put("vin", evidenceContext.observedVin ?: "")
+                .put("selectedVin", evidenceContext.selectedVin)
+                .put("observedVin", evidenceContext.observedVin ?: JSONObject.NULL)
+                .put("allChecksPassed", snapshot.error == null && snapshot.checks.all { it.outcome == FunctionalTestOutcome.PASSED })
+                .put("failedChecks", snapshot.checks.count { it.outcome == FunctionalTestOutcome.FAILED })
                 .put("adapter", evidenceContext.adapterName)
                 .put("transport", evidenceContext.transport)
                 .put("connectionGeneration", evidenceContext.connectionGeneration)
                 .put("completedWithoutError", snapshot.error == null)
-                .put("warning", "NOT_TESTED is not a PASS. No write or actuation was tested.")
+                .put("warning", when {
+                    snapshot.legacyTarget != null -> "Functional vehicle-wide scope; silent ECUs may be affected. No automatic retry or whole-vehicle coverage claim."
+                    snapshot.clearCampaign -> "Mode 04 ACK is not evidence of all faults being absent. Permanent DTCs are observed only. Do not retry uncertain commands automatically."
+                    snapshot.evapCampaign -> "EVAP acknowledgment is not monitor completion. Do not retry uncertain commands automatically."
+                    else -> "NOT_TESTED is not a PASS. No write or actuation was tested."
+                })
             val checks = JSONArray()
             snapshot.checks.forEach { check ->
                 checks.put(
@@ -4500,8 +6785,72 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             json.put("checks", checks)
+            json.put("rawObdExchanges", JSONArray(snapshot.rawObdExchanges))
+            snapshot.liveReport?.let { json.put("live",J1979LiveEvidenceJson.encode(it)) }
+            snapshot.networkReport?.let { json.put("network",J1979NetworkEvidenceJson.encode(it)) }
+            snapshot.nativeUsbEvidence?.let { json.put("nativeUsb", JSONObject(it)) }
+            snapshot.legacyRead?.let { json.put("legacyRead", LegacyReadEvidenceJson.encode(it)) }
+            json.put("error", snapshot.error ?: JSONObject.NULL)
+            snapshot.doIpTarget?.let { target ->
+                json.put("doIp", JSONObject().put("host", target.host).put("tester", target.tester)
+                    .put("ecu", target.ecu).put("tls", target.tls)
+                    .put("physicalVehicleDeclaredByOperator", target.physicalVehicleConfirmed)
+                    .put("expectedVin", target.vin))
+            }
+            snapshot.obdScan?.let { json.put("obdScan", JSONObject(ObdScanJsonExport.encode(it, System.currentTimeMillis()))) }
+            snapshot.legacyDiscovery?.let { discovery ->
+                json.put("legacySourceDiscovery",JSONObject()
+                    .put("selectedProtocol",discovery.protocol)
+                    .put("observedProtocol",discovery.observedProtocol ?: JSONObject.NULL)
+                    .put("rawResponse",discovery.rawResponse)
+                    .put("rawProtocolResponse",discovery.rawProtocolResponse)
+                    .put("wholeVehicleCoverageVerified",false)
+                    .put("error",discovery.error ?: JSONObject.NULL)
+                    .put("verifiedSources",JSONArray(discovery.verifiedSources))
+                    .put("sources",JSONArray(discovery.sources.map {
+                        JSONObject().put("source",it.source).put("status",it.status)
+                            .put("supportedPidBitmap",it.supportedPidBitmap ?: JSONObject.NULL)
+                            .put("rawFrames",JSONArray(it.rawFrames))
+                    })))
+            }
+            if (snapshot.evapCampaign) {
+                json.put("monitorCompletionVerified", false)
+                json.put("evap", snapshot.evapResult?.let { result ->
+                    JSONObject().put("outcome", result.outcome).put("commandAttempted", result.attempted)
+                        .put("reason", result.reason ?: JSONObject.NULL)
+                        .put("elmProtocol", result.protocol).put("requestCanId", result.requestCanId)
+                        .put("responseCanId", result.responseCanId)
+                        .put("exchanges", JSONArray(result.exchanges.map { exchange ->
+                            JSONObject().put("requestHex", exchange.requestHex)
+                                .put("responseHex", exchange.responseHex ?: JSONObject.NULL)
+                        }))
+                } ?: JSONObject.NULL)
+            }
+            if (snapshot.clearCampaign) {
+                json.put("clear",snapshot.clearResult?.let(CanClearEvidenceJson::encode)?:JSONObject.NULL)
+                    .put("clearBaseline",snapshot.clearBaseline?.let(CanClearEvidenceJson::encode)?:JSONObject.NULL)
+            }
+            snapshot.legacyTarget?.let { target ->
+                json.put("legacyMutation",snapshot.legacyResult?.let(LegacyMutationEvidenceJson::encode) ?: JSONObject.NULL)
+                    .put("legacyBaseline",snapshot.legacyBaseline?.let(LegacyMutationEvidenceJson::encode) ?: JSONObject.NULL)
+                    .put("legacyOperation",if (target.clear) "CLEAR" else "EVAP_PREPARATION")
+                    .put("legacyEngineSource","%02X".format(java.util.Locale.ROOT,target.engineSource))
+                    .put("legacyDocumentedSources",JSONArray(target.sources.map { "%02X".format(java.util.Locale.ROOT,it) }))
+                    .put("legacyProtocol",target.protocol).put("wholeVehicleCoverageVerified",false)
+            }
+            val exportName = if (snapshot.livePlan != null)
+                "CamaroDiag_SAE-J1979_${if(snapshot.livePlan.target.legacy)"LEGACY_" else ""}LIVE_${snapshot.startedAtMillis}.json"
+                else if (snapshot.nativeUsbEvidence != null)
+                "CamaroDiag_SAE-J1979_NATIVE_USB_" + snapshot.startedAtMillis + ".json"
+                else if (snapshot.legacyRead != null)
+                "CamaroDiag_SAE-J1979_LEGACY_${snapshot.legacyRead.target.protocol}_${snapshot.legacyRead.target.sourceHex}_${snapshot.startedAtMillis}.json"
+                else if (snapshot.legacyTarget != null)
+                "CamaroDiag_SAE-J1979_LEGACY_${snapshot.legacyTarget.protocol}_${if (snapshot.legacyTarget.clear) "CLEAR" else "EVAP"}_${snapshot.startedAtMillis}.json"
+                else if (snapshot.clearCampaign) "CamaroDiag_SAE-J1979_CLEAR_${snapshot.startedAtMillis}.json"
+                else if (snapshot.evapCampaign) "CamaroDiag_SAE-J1979_EVAP_${snapshot.startedAtMillis}.json"
+                else snapshot.protocol?.let { "CamaroDiag_protocol_${it.id}_${snapshot.startedAtMillis}.json" } ?: fileName
             try {
-                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), exportName, "application/json",
                     category = CamaroDiagExportStorage.Category.TESTS, beforePublish = { check(isCurrentAccountGeneration(sessionGeneration) &&
                         authenticatedAccountUid == accountUid && currentLicenseLevel == LicenseLevel.OWNER) }
                 ) { it.write(json.toString(2).toByteArray(Charsets.UTF_8)) }
@@ -4518,9 +6867,338 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var functionalCatalogueJob: Job? = null
+
+    fun projectFunctionalCatalogue(catalogue: Uri, reference: Uri, report: Uri, referencePin: String,
+                                   confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
+        val account = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        if (functionalCatalogueJob?.isActive == true || _functionalTestState.value.running ||
+            confirmedConnection != connectionAttemptGeneration || confirmedVehicle != _vehicle.value) return
+        val input = J1979CatalogueFiles.Inputs(catalogue, reference, report, referencePin)
+        if (runCatching { input.validate() }.isFailure ||
+            !J1979CatalogueProjection.validVin(confirmedVehicle.vin)) return
+        fun current() = isCurrentAccountGeneration(generation) && authenticatedAccountUid == account &&
+            currentLicenseLevel == LicenseLevel.OWNER && confirmedConnection == connectionAttemptGeneration &&
+            confirmedVehicle == _vehicle.value && !_functionalTestState.value.running
+        functionalCatalogueJob = viewModelScope.launch {
+            if (!confirmFunctionalTestOwner(account) || !current()) return@launch
+            _connectionMessage.value = localizedContext.getString(R.string.j1979_catalogue_working)
+            try {
+                val path = withContext(Dispatchers.IO) {
+                    val context = getApplication<Application>()
+                    val resolver = context.contentResolver
+                    val job = currentCoroutineContext()[Job]
+                    fun requireCurrent() {
+                        check(job?.isActive == true && current())
+                    }
+                    val prepared = J1979CatalogueFiles.prepare(resolver, input, confirmedVehicle.vin, ::requireCurrent)
+                    requireCurrent()
+                    CamaroDiagExportStorage.write(context,
+                        "CamaroDiag_SAE-J1979_CATALOGUE_" + System.currentTimeMillis() + ".json",
+                        "application/json", category = CamaroDiagExportStorage.Category.TESTS,
+                        beforePublish = {
+                            requireCurrent()
+                            J1979CatalogueFiles.revalidate(resolver, input, prepared.result, ::requireCurrent)
+                        }) {
+                        it.write(prepared.bytes)
+                    }
+                }
+                if (current()) _connectionMessage.value = localizedContext.getString(R.string.export_folder_success) + "\n" + path
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _connectionMessage.value = localizedContext.getString(R.string.j1979_catalogue_rejected)
+            }
+        }
+    }
+
+    fun inspectFunctionalNativeLivePrefix(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile) =
+        inspectFunctionalNativeFile(source,confirmedConnection,confirmedVehicle,false)
+
+    fun inspectFunctionalNativeMaintenance(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile) =
+        inspectFunctionalNativeFile(source,confirmedConnection,confirmedVehicle,true)
+
+    fun inspectFunctionalNativeMaintenancePrefix(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile) =
+        inspectFunctionalNativeFile(source,confirmedConnection,confirmedVehicle,true,true)
+
+    fun verifyFunctionalNativeFreezePrefix(capture: Uri,report: Uri,
+                                           confirmedConnection: Long,confirmedVehicle: VehicleProfile) {
+        val account=authenticatedAccountUid ?: return
+        val generation=accountSessionGeneration
+        if(capture.scheme!="content"||report.scheme!="content"||capture==report||
+            functionalCatalogueJob?.isActive==true||_functionalTestState.value.running||
+            confirmedConnection!=connectionAttemptGeneration||confirmedVehicle!=_vehicle.value||
+            !J1979CatalogueProjection.validVin(confirmedVehicle.vin))return
+        fun current()=isCurrentAccountGeneration(generation)&&authenticatedAccountUid==account&&
+            currentLicenseLevel==LicenseLevel.OWNER&&confirmedConnection==connectionAttemptGeneration&&
+            confirmedVehicle==_vehicle.value&&!_functionalTestState.value.running
+        functionalCatalogueJob=viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            _connectionMessage.value=localizedContext.getString(R.string.j1979_catalogue_working)
+            try {
+                val path=withContext(Dispatchers.IO) {
+                    val context=getApplication<Application>()
+                    val resolver=context.contentResolver
+                    val job=currentCoroutineContext()[Job]
+                    fun requireCurrent(){check(job?.isActive==true&&current())}
+                    val prepared=J1979NativePrefixFiles.prepareFreezeVerification(
+                        resolver,capture,report,confirmedVehicle.vin,::requireCurrent)
+                    requireCurrent()
+                    CamaroDiagExportStorage.write(context,
+                        "CamaroDiag_SAE-J1979_FREEZE_PREFIX_VERIFICATION_"+
+                            System.currentTimeMillis()+".json",
+                        "application/json",category=CamaroDiagExportStorage.Category.TESTS,
+                        beforePublish={
+                            requireCurrent()
+                            J1979NativePrefixFiles.revalidateFreezeVerification(resolver,
+                                capture,report,prepared.captureSha,prepared.reportSha,::requireCurrent)
+                        },verifyStaged={
+                            input -> PhysicalRecoveryEvidenceJson.requireExactJson(input,prepared.bytes)
+                        }) { stream -> stream.write(prepared.bytes) }
+                }
+                if(current())_connectionMessage.value=localizedContext.getString(
+                    R.string.j1979_freeze_prefix_verify_saved)+"\n"+path
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){
+                if(current())_connectionMessage.value=localizedContext.getString(
+                    R.string.j1979_freeze_prefix_verify_rejected)
+            }
+        }
+    }
+
+    fun verifyFunctionalNativeScalar(capture: Uri,report: Uri,
+                                           confirmedConnection: Long,confirmedVehicle: VehicleProfile) {
+        val account=authenticatedAccountUid ?: return
+        val generation=accountSessionGeneration
+        if(capture.scheme!="content"||report.scheme!="content"||capture==report||
+            functionalCatalogueJob?.isActive==true||_functionalTestState.value.running||
+            confirmedConnection!=connectionAttemptGeneration||confirmedVehicle!=_vehicle.value||
+            !J1979CatalogueProjection.validVin(confirmedVehicle.vin))return
+        fun current()=isCurrentAccountGeneration(generation)&&authenticatedAccountUid==account&&
+            currentLicenseLevel==LicenseLevel.OWNER&&confirmedConnection==connectionAttemptGeneration&&
+            confirmedVehicle==_vehicle.value&&!_functionalTestState.value.running
+        functionalCatalogueJob=viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            _connectionMessage.value=localizedContext.getString(R.string.j1979_catalogue_working)
+            try {
+                val path=withContext(Dispatchers.IO) {
+                    val context=getApplication<Application>()
+                    val resolver=context.contentResolver
+                    val job=currentCoroutineContext()[Job]
+                    fun requireCurrent(){check(job?.isActive==true&&current())}
+                    val prepared=J1979NativePrefixFiles.prepareScalarVerification(
+                        resolver,capture,report,confirmedVehicle.vin,::requireCurrent)
+                    requireCurrent()
+                    CamaroDiagExportStorage.write(context,
+                        "CamaroDiag_SAE-J1979_CL1_SCALAR_VERIFICATION_"+
+                            System.currentTimeMillis()+".json",
+                        "application/json",category=CamaroDiagExportStorage.Category.TESTS,
+                        beforePublish={
+                            requireCurrent()
+                            J1979NativePrefixFiles.revalidateScalarVerification(resolver,
+                                capture,report,prepared.captureSha,prepared.reportSha,::requireCurrent)
+                        },verifyStaged={
+                            input -> PhysicalRecoveryEvidenceJson.requireExactJson(input,prepared.bytes)
+                        }) { stream -> stream.write(prepared.bytes) }
+                }
+                if(current())_connectionMessage.value=localizedContext.getString(
+                    R.string.j1979_scalar_verify_saved)+"\n"+path
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){
+                if(current())_connectionMessage.value=localizedContext.getString(
+                    R.string.j1979_scalar_verify_rejected)
+            }
+        }
+    }
+
+    fun inspectFunctionalNativeFreezePrefix(source: Uri,confirmedConnection: Long,
+                                            confirmedVehicle: VehicleProfile) =
+        inspectFunctionalNativeFile(source,confirmedConnection,confirmedVehicle,false,false,true)
+
+    private fun inspectFunctionalNativeFile(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile,
+                                            maintenance: Boolean,interrupted:Boolean=false,freeze:Boolean=false) {
+        val account=authenticatedAccountUid ?: return
+        val generation=accountSessionGeneration
+        if(source.scheme!="content" || functionalCatalogueJob?.isActive==true || _functionalTestState.value.running ||
+            confirmedConnection!=connectionAttemptGeneration || confirmedVehicle!=_vehicle.value ||
+            !J1979CatalogueProjection.validVin(confirmedVehicle.vin))return
+        fun current()=isCurrentAccountGeneration(generation)&&authenticatedAccountUid==account&&
+            currentLicenseLevel==LicenseLevel.OWNER&&confirmedConnection==connectionAttemptGeneration&&
+            confirmedVehicle==_vehicle.value&&!_functionalTestState.value.running
+        functionalCatalogueJob=viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            _connectionMessage.value=localizedContext.getString(R.string.j1979_catalogue_working)
+            try {
+                val (path,progress)=withContext(Dispatchers.IO) {
+                    val context=getApplication<Application>()
+                    val resolver=context.contentResolver
+                    val job=currentCoroutineContext()[Job]
+                    fun requireCurrent(){check(job?.isActive==true&&current())}
+                    val prepared=when {
+                        freeze -> J1979NativePrefixFiles.prepareFreeze(resolver,source,confirmedVehicle.vin,::requireCurrent)
+                        maintenance -> J1979NativePrefixFiles.prepareMaintenance(resolver,source,confirmedVehicle.vin,::requireCurrent,interrupted)
+                        else -> J1979NativePrefixFiles.prepare(resolver,source,confirmedVehicle.vin,::requireCurrent)
+                    }
+                    val outputPath=CamaroDiagExportStorage.write(context,
+                        "CamaroDiag_SAE-J1979_NATIVE_"+(if(freeze) "FREEZE_PREFIX_" else if(interrupted) "MAINTENANCE_PREFIX_" else if(maintenance) "MAINTENANCE_" else "PREFIX_")+System.currentTimeMillis()+".json",
+                        "application/json",category=CamaroDiagExportStorage.Category.TESTS,
+                        beforePublish={
+                            requireCurrent()
+                            check(J1979NativePrefixFiles.digest(resolver,source,::requireCurrent,
+                                if(maintenance) com.camarodiag.connectors.J1979MaintenanceJournal.MAX_JOURNAL
+                                else if(freeze) com.camarodiag.connectors.J1979FreezeUsbCapture.MAX_CAPTURE.toInt()
+                                else com.camarodiag.connectors.J1979LiveNativeReplay.MAX_CAPTURE)==prepared.sha256)
+                        },verifyStaged={input -> PhysicalRecoveryEvidenceJson.requireExactJson(input,prepared.bytes)}) {
+                        it.write(prepared.bytes)
+                    }
+                    val summary=if(freeze) {
+                        val frames=J1979CatalogueJson.array(prepared.document["observed_frame_progress"],0,8)
+                        val observations=prepared.document["complete_observations"] as Int
+                        val ignored=prepared.document["discarded_tail_bytes"] as Int
+                        localizedContext.getString(R.string.j1979_freeze_prefix_summary,frames.size,observations,ignored)
+                    } else null
+                    outputPath to summary
+                }
+                if(current()) {
+                    _connectionMessage.value=localizedContext.getString(
+                        if(freeze) R.string.j1979_freeze_prefix_saved
+                        else if(maintenance) R.string.j1979_native_maintenance_saved
+                        else R.string.j1979_native_prefix_saved)+"\n"+path+
+                        (progress?.let { "\n"+it } ?: "")
+                }
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){
+                if(current())_connectionMessage.value=localizedContext.getString(
+                    if(freeze) R.string.j1979_freeze_prefix_rejected
+                    else if(maintenance) R.string.j1979_native_maintenance_rejected
+                    else R.string.j1979_native_prefix_rejected)
+            }
+        }
+    }
+
+    fun exportFunctionalNativeScalar(csv:Boolean) {
+        val account=authenticatedAccountUid?:return
+        val generation=accountSessionGeneration
+        val snapshot=_functionalTestState.value
+        val evidence=snapshot.nativeLiveEvidence?:return
+        if(snapshot.running||!snapshot.canExport||!evidence.captureIntegrityVerified)return
+        val sourceDigest=evidence.sha256?:return
+        fun current()=isCurrentAccountGeneration(generation)&&authenticatedAccountUid==account&&
+            currentLicenseLevel==LicenseLevel.OWNER&&_functionalTestState.value===snapshot
+        viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            try {
+                val bytes=withContext(Dispatchers.IO) {
+                    check(current())
+                    val replay=com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.verifiedReplay(evidence)
+                    val projection=com.camarodiag.connectors.J1979LiveScalarProjection.project(replay,evidence.target.channel.vehicle)
+                    check(current())
+                    if(csv) com.camarodiag.connectors.J1979LiveScalarProjection.csv(projection,sourceDigest)
+                    else JSONObject(projection.report()).apply {
+                        put("capture_sha256",sourceDigest)
+                        put("expected_vin_independently_supplied",true)
+                    }.toString(2).toByteArray(Charsets.UTF_8)
+                }
+                val extension=if(csv)"csv" else "json"
+                val path=CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_SAE-J1979_CL1_SCALAR_"+snapshot.startedAtMillis+"."+extension,
+                    if(csv)"text/csv" else "application/json",category=CamaroDiagExportStorage.Category.TESTS,
+                    beforePublish={
+                        check(current()&&com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.digest(evidence.capture)==sourceDigest)
+                    },verifyStaged={input ->
+                        val read=input.readBytes()
+                        check(read.contentEquals(bytes))
+                    }){it.write(bytes)}
+                if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_success)+"\n"+path
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_failed)}
+        }
+    }
+
+    fun exportFunctionalNativeLiveCsv() {
+        val account=authenticatedAccountUid?:return
+        val generation=accountSessionGeneration
+        val snapshot=_functionalTestState.value
+        val evidence=snapshot.nativeLiveEvidence?:return
+        if(snapshot.running||!snapshot.canExport||!evidence.captureIntegrityVerified)return
+        fun current()=isCurrentAccountGeneration(generation)&&authenticatedAccountUid==account&&
+            currentLicenseLevel==LicenseLevel.OWNER&&_functionalTestState.value===snapshot
+        viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            try {
+                val bytes=withContext(Dispatchers.IO) {
+                    check(current())
+                    val replay=com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.verifiedReplay(evidence)
+                    val output=J1979NativeLiveCsv.encode(replay)
+                    check(current())
+                    output
+                }
+                val path=CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_SAE-J1979_NATIVE_LIVE_${snapshot.startedAtMillis}.csv","text/csv",
+                    category=CamaroDiagExportStorage.Category.TESTS,beforePublish={
+                        check(current() && com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.digest(evidence.capture)==evidence.sha256)
+                    }){it.write(bytes)}
+                if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_success)+"\n"+path
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_failed)}
+        }
+    }
+
+    fun exportFunctionalLiveCsv() {
+        if(_functionalTestState.value.nativeLiveEvidence!=null) {
+            exportFunctionalNativeLiveCsv()
+            return
+        }
+        val account=authenticatedAccountUid?:return
+        val generation=accountSessionGeneration
+        val snapshot=_functionalTestState.value
+        val report=snapshot.liveReport?:return
+        if(snapshot.running||!snapshot.canExport)return
+        fun current()=isCurrentAccountGeneration(generation)&&authenticatedAccountUid==account&&
+            currentLicenseLevel==LicenseLevel.OWNER&&_functionalTestState.value===snapshot
+        viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            try {
+                val path=CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_SAE-J1979_LIVE_${snapshot.startedAtMillis}.csv","text/csv",
+                    category=CamaroDiagExportStorage.Category.TESTS,beforePublish={check(current())}){
+                    it.write(J1979LiveEvidenceJson.csv(report).toByteArray(Charsets.UTF_8))
+                }
+                if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_success)+"\n"+path
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_failed)}
+        }
+    }
+
+    fun exportFullObdScan(report: ObdScanReport) {
+        if (!requirePremiumLicense() || _obdScanReport.value !== report) return
+        val owner = authenticatedAccountUid ?: return
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        fun current() = canResumeExport(account, owner) && hasPremiumLicense() &&
+            connection == connectionAttemptGeneration && _obdScanReport.value === report && !_isObdScanning.value
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                check(current())
+                val json = ObdScanJsonExport.encode(report, System.currentTimeMillis())
+                val path = CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_OBD_scan_${System.currentTimeMillis()}.json", "application/json",
+                    category = CamaroDiagExportStorage.Category.REPORTS, beforePublish = { check(current()) }) {
+                    it.write(json.toByteArray(Charsets.UTF_8))
+                }
+                if (current()) _obdScanMessage.value = localizedContext.getString(R.string.obd_export_full_scan_success, path)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _obdScanMessage.value = localizedContext.getString(R.string.obd_export_full_scan_failed)
+            }
+        }
+    }
+
     fun runFullObdScan() {
         if (!requirePremiumLicense()) return
-        if (_isObdScanning.value) return
+        if (_isObdScanning.value || nativeFunctionalCleanup?.isCompleted==false) return
         val startedGeneration = accountSessionGeneration
         val connection = connectionAttemptGeneration
         val selectedVin = _vehicle.value.vin
@@ -4551,7 +7229,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (!current()) return@launch
                 _obdScanReport.value = report
-                if (report.physicalCanResponder == null) {
+                if (!obdManager.isSimulationActive && !obdManager.isDemoMode) {
+                    _observedStandardVin.value = VehicleVinMatcher.normalize(report.vin)
+                    _observedObdResponders.value = report.respondingEcuAddresses.distinct().sorted()
+                    if (!VehicleVinMatcher.admitsCamaroSpecificRead(selectedVin, report.vin))
+                        _modules.value = emptyList()
+                }
+                if (!obdManager.isSimulationActive && report.vin != null && !VehicleVinMatcher.isCamaroCandidate(report.vin)) {
+                    _modules.value = emptyList()
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(ecuVinResponse = report.vin.orEmpty(),
+                        ecuIdentityFromSimulation = false, vinComparison = VehicleVinMatcher.compare(selectedVin, report.vin),
+                        vinModelYear = VehicleVinMatcher.modelYearFromVin(report.vin))
+                }
+                if (report.physicalCanResponder == null &&
+                    com.camarodiag.gen5.domain.model.VehicleVinMatcher.isCamaroCandidate(report.vin) &&
+                    com.camarodiag.gen5.domain.model.VehicleVinMatcher.normalize(selectedVin) == report.vin) {
                     _modules.value = CamaroUdsProtocol.applyStandardObdDiscovery(
                         topology = _modules.value,
                         respondingAddresses = report.respondingEcuAddresses
@@ -4563,6 +7255,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     replaceStandardDtcRecords(allDtcs, report.unavailableDtcModes)
                 }
+                _dtcScanNotice.value = if (obdManager.isSimulationActive)
+                    localizedContext.getString(R.string.msg_dtc_simulated_lfx)
+                else unavailableDtcNotice(report.unavailableDtcModes).orEmpty()
                 _obdScanMessage.value = if (obdManager.isSimulationActive) {
                     localizedContext.getString(R.string.msg_full_scan_simulation_complete, report.supportedPids.size, allDtcs.size)
                 } else {
@@ -4663,7 +7358,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun refreshTopologyAndDefaults(runInitialScans: Boolean = false) {
-        _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
+        _modules.value = if (_observedStandardVin.value != null && !hasMatchingPhysicalCamaro())
+            emptyList() else CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
         if (runInitialScans && obdManager.isObdCommandChannelAvailable) {
             // Read the ECU VIN immediately after a successful OBD connection so that
             // the selected vehicle profile can be checked before the user starts diagnosis.
@@ -4681,6 +7377,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
                     if (!current()) return@launch
                     val comparison = VehicleVinMatcher.compare(profile.vin, identity.vin)
+                    if (!sourceWasSimulated && !obdManager.isSimulationActive && !obdManager.isDemoMode) {
+                        _observedStandardVin.value = VehicleVinMatcher.normalize(identity.vin)
+                        _observedObdResponders.value = identity.respondingEcuAddresses.distinct().sorted()
+                        if (!VehicleVinMatcher.admitsCamaroSpecificRead(profile.vin, identity.vin))
+                            _modules.value = emptyList()
+                    }
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         ecuVinResponse = identity.vin.orEmpty(),
                         ecuIdentityFromSimulation = sourceWasSimulated ||
@@ -4694,9 +7396,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     // Do not automatically interpret or audit data against the wrong saved vehicle.
                     // The user can resolve the mismatch first, then start diagnostics explicitly.
-                    if (comparison?.matches != false) {
+                    if (comparison?.matches == true && VehicleVinMatcher.isCamaroCandidate(identity.vin)) {
                         scanDtcs()
                         runMileageAudit()
+                    } else if (!sourceWasSimulated && identity.vin != null && !VehicleVinMatcher.isCamaroCandidate(identity.vin)) {
+                        _modules.value = emptyList()
+                        _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_non_camaro_vin)
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -4714,10 +7419,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         calibrationIdResponse = "",
                         cvnResponse = ""
                     )
-                    if (!connectionLost) {
-                        scanDtcs()
-                        runMileageAudit()
-                    }
+                    // Identification failed: do not automatically run Camaro-specific scans.
                 }
             }
         }
@@ -4729,9 +7431,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             var consecutiveFailures = 0
             var activeTelemetryBatch = 0
             val histories = mutableMapOf<String, ArrayDeque<Double>>()
-            val sensorRecency = LiveSignalRecency()
+            var sensorRecency = LiveSignalRecency()
+            var lastEvidenceGeneration = -1L
+            var batchEvidenceGeneration = -1L
+            var liveSources = com.camarodiag.gen5.data.obd.StableLivePidSources()
+            var lastReadResponder: String? = null
+            val signalSources = mutableMapOf<String, String>()
 
             fun push(id: String, value: Double): List<Double> {
+                lastReadResponder?.let { signalSources[id] = it }
                 val queue = histories.getOrPut(id) { ArrayDeque() }
                 if (queue.size >= 24) queue.removeFirst()
                 queue.addLast(value)
@@ -4744,18 +7452,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Spread the supported PID catalogue across four polling batches. This avoids
                 // flooding slower ELM327 adapters with every optional sensor on each refresh.
                 if (pidValue % 4 != activeTelemetryBatch) return null
-                val response = obdManager.readMode01PidIfSupported(pidValue) ?: return null
-                if (response.equals("NO_SOCKET", ignoreCase = true) ||
-                    response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
-                    throw ObdTransportDisconnectedException("Live OBD transport is disconnected")
-                }
-                return CamaroUdsProtocol.parsePidBytes(
-                    response, pid, primaryPowertrainResponderOnly = true
-                )
+                if (batchEvidenceGeneration != liveEvidenceGeneration) return null
+                val observations = obdManager.readMode01PidObservationsIfSupported(pidValue)
+                if (batchEvidenceGeneration != liveEvidenceGeneration) return null
+                // Generic live data may come from an explicitly selected
+                // secondary ECU even on a Camaro; fuel analysis has its own
+                // primary powertrain restriction. Only advertised responders
+                // may contribute when the transport knows their PID bitmaps.
+                val observation = liveSources.select(pidValue, observations)
+                lastReadResponder = observation?.responder
+                return observation?.bytes?.toIntArray()
             }
 
             while (currentCoroutineContext().isActive) {
-                if (_isStreamingLive.value) {
+                if (_isStreamingLive.value && connectionAttemptJob?.isActive != true) {
+                    batchEvidenceGeneration = liveEvidenceGeneration
+                    if (lastEvidenceGeneration != batchEvidenceGeneration) {
+                        histories.clear()
+                        sensorRecency = LiveSignalRecency()
+                        liveSources = com.camarodiag.gen5.data.obd.StableLivePidSources()
+                        signalSources.clear()
+                        lastReadResponder = null
+                        lastEvidenceGeneration = batchEvidenceGeneration
+                    }
                     activeTelemetryBatch = (activeTelemetryBatch + 1) % 4
                     var valuesForRecording = emptyList<LivePidValue>()
                     try {
@@ -4941,16 +7660,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     val v = (b[0] * 256 + b[1]) / 1000.0
                                     values += LivePidValue("BAT", "Control Module Voltage", "Tension calculateur", v, "V", v, "V", 9.0, 16.0, push("BAT", v))
                                 }
+                                read("A6")?.takeIf { it.size == 4 }?.let { b ->
+                                    val km = b.fold(0L) { acc, byte -> (acc shl 8) or byte.toLong() } / 10.0
+                                    values += LivePidValue("ODOMETER", "OBD total odometer (PID A6)",
+                                        "Kilométrage total OBD (PID A6)", km, "km",
+                                        km / 1.609344, "mi", 0.0, maxOf(1.0, km * 1.05), push("ODOMETER", km))
+                                }
+                                read("5B")?.singleOrNull()?.let { b ->
+                                    val v = b * 100.0 / 255.0
+                                    values += LivePidValue("HYBRID_BAT_LIFE",
+                                        "Reported traction battery remaining (PID 5B)",
+                                        "Niveau restant déclaré batterie de traction (PID 5B)",
+                                        v, "%", v, "%", 0.0, 100.0, push("HYBRID_BAT_LIFE", v))
+                                }
+                                if (batchEvidenceGeneration != liveEvidenceGeneration) continue
+                                val attributedValues = values.map { value ->
+                                    val source = signalSources[value.id]
+                                    if (source == null) value else value.copy(
+                                        labelEn = "${value.labelEn} [${source}]",
+                                        labelFr = "${value.labelFr} [${source}]")
+                                }
                                 val mergedValues = _livePids.value.associateBy { it.id }.toMutableMap()
                                 val now = System.currentTimeMillis()
-                                values.forEach {
+                                attributedValues.forEach {
                                     mergedValues[it.id] = it
                                     sensorRecency.record(it.id, now)
                                 }
                                 _livePids.value = mergedValues.values.filter {
                                     sensorRecency.isRecent(it.id, now)
                                 }
-                                valuesForRecording = values
+                                valuesForRecording = attributedValues
                                 _liveTelemetryMessage.value = if (_livePids.value.isEmpty()) {
                                     localizedContext.getString(R.string.msg_live_no_pid_response)
                                 } else {
@@ -4958,11 +7697,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             }
                         }
-                        captureLiveTelemetrySample(valuesForRecording)
+                        if (batchEvidenceGeneration == liveEvidenceGeneration) {
+                            _detectedLiveSensors.value = LiveSensorCatalog.mergeObserved(
+                                _detectedLiveSensors.value,
+                                valuesForRecording.map { LiveSensorDefinition(it.id, it.labelEn, it.labelFr) }
+                            )
+                            captureLiveTelemetrySample(valuesForRecording)
+                        }
                         consecutiveFailures = 0
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Exception) {
+                        if (batchEvidenceGeneration != liveEvidenceGeneration) continue
                         val connectionLost = ObdTransportFailurePolicy.isConnectionLoss(error)
                         if (connectionLost) {
                             // A physical disconnect stops polling; retain the dedicated
@@ -4996,7 +7742,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         nextConnectionGeneration()
         val activeJobs = listOfNotNull(
             canMonitorJob, canRequestJob, detachedCanMonitorJob,
-            detachedCanRequestJob, connectionAttemptJob
+            detachedCanRequestJob, connectionAttemptJob, bluetoothDiscoveryJob
         )
             .distinct()
         canMonitorJob = null
@@ -5004,6 +7750,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         detachedCanMonitorJob = null
         detachedCanRequestJob = null
         connectionAttemptJob = null
+        bluetoothDiscoveryJob = null
         activeJobs.forEach(Job::cancel)
         consoleEventJournal.dispose()
         consoleEventJournalFailed = true

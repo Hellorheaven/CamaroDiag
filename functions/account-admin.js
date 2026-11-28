@@ -13,7 +13,7 @@ const maxSessionAge = 5 * 60;
 // Do not require attestation until real debug/release validation succeeds.
 const ENFORCE_APP_CHECK = process.env.CAMARODIAG_ENFORCE_APP_CHECK === "true";
 const { licenseStatus } = require("./license-status");
-const { isSessionRevoked, displayLicenseWithoutLookup, isVerifiedGoogleSession, isRecentAuthTime } = require("./account-policy");
+const { isSessionRevoked, displayLicenseWithoutLookup, isVerifiedGoogleSession, isRecentAuthTime, mayDeleteAccount } = require("./account-policy");
 
 function adminIdentity(request) {
     if (!request.auth?.uid || (request.auth.token?.[adminRole] !== true &&
@@ -57,6 +57,19 @@ function publicUser(user) {
     };
 }
 
+// Bounded pages; listing does not grant licenses or expose auth tokens.
+exports.adminListAccounts = onCall({ region, enforceAppCheck: ENFORCE_APP_CHECK }, async request => {
+    const actor = adminIdentity(request);
+    await requireCurrentAdmin(actor, request.auth.token.auth_time);
+    const token = request.data?.pageToken;
+    if (token !== undefined && (typeof token !== "string" || !token.length || token.length > 4096))
+        throw new HttpsError("invalid-argument", "Invalid page token.");
+    const page = await getAuth().listUsers(25, token);
+    const accounts = await Promise.all(page.users.map(visibleAccount));
+    await requireCurrentAdmin(actor, request.auth.token.auth_time);
+    return { accounts, nextPageToken: page.pageToken || null };
+});
+
 exports.adminGetAccount = onCall({ region, enforceAppCheck: ENFORCE_APP_CHECK }, async request => {
     const actor = adminIdentity(request);
     await requireCurrentAdmin(actor, request.auth.token.auth_time);
@@ -80,7 +93,7 @@ exports.adminUpdateAccount = onCall({ region, enforceAppCheck: ENFORCE_APP_CHECK
     const { uid, action, value } = request.data || {};
     if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid))
         throw new HttpsError("invalid-argument", "UID invalide.");
-    if (!["disable", "revoke_sessions", "administrator", "license"].includes(action))
+    if (!["disable", "revoke_sessions", "administrator", "license", "delete"].includes(action))
         throw new HttpsError("invalid-argument", "Action non autorisée.");
     if (uid === actor)
         throw new HttpsError("failed-precondition", "Modification de son propre compte interdite.");
@@ -90,7 +103,19 @@ exports.adminUpdateAccount = onCall({ region, enforceAppCheck: ENFORCE_APP_CHECK
     // Owner enrolment stays exclusive to its separate, HMAC-guarded script.
     if (target.customClaims?.owner_functional_tests === true)
         throw new HttpsError("permission-denied", "Compte propriétaire protégé.");
-    if (action === "license") {
+    if (action === "delete") {
+        if (value !== true || !mayDeleteAccount(actor, target))
+            throw new HttpsError("failed-precondition", "Suppression non autorisée.");
+        await requireCurrentAdmin(actor, request.auth.token.auth_time);
+        // Re-read target claims before deleting; no client-provided role is trusted.
+        const latest = await auth.getUser(uid);
+        if (!mayDeleteAccount(actor, latest))
+            throw new HttpsError("failed-precondition", "Compte protégé.");
+        await auth.deleteUser(uid);
+        // Keep the historical license document (including purchase records).
+        // Authentication is deleted; this does not erase local vehicle data.
+        return { deletedUid: uid };
+    } else if (action === "license") {
         if (typeof value !== "boolean")
             throw new HttpsError("invalid-argument", "Valeur booléenne requise.");
         if (value && (!target.emailVerified || !target.email))

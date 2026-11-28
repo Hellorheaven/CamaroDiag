@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_info_ipt_spark">Surveillance en utilisation — essence</string>
+    <string name="j1979_info_ipt_diesel">Surveillance en utilisation — diesel</string>
+    <string name="j1979_info_ecu_name">Nom du calculateur</string>
+    <string name="j1979_info_serial">Numéro de série moteur</string>
+    <string name="j1979_info_approval">Homologation antipollution</string>
+    <string name="j1979_info_other">Autre enregistrement</string>
+    <string name="j1979_info_counter_totals">Conditions OBD : %1$d · Cycles de démarrage : %2$d</string>
+    <string name="j1979_info_counter_pair">%1$s : %2$d/%3$d · Ratio %4$s</string>
+    <string name="j1979_info_ratio_unavailable">N/D</string>
+    <string name="j1979_info_cat1">Catalyseur banc 1</string>
+    <string name="j1979_info_cat2">Catalyseur banc 2</string>
+    <string name="j1979_info_o21">Sonde lambda banc 1</string>
+    <string name="j1979_info_o22">Sonde lambda banc 2</string>
+    <string name="j1979_info_so21">Sonde lambda secondaire banc 1</string>
+    <string name="j1979_info_so22">Sonde lambda secondaire banc 2</string>
+    <string name="j1979_info_egr">EGR/VVT</string>
+    <string name="j1979_info_air">Air secondaire</string>
+    <string name="j1979_info_evap">EVAP</string>
+    <string name="j1979_info_nmhc">Catalyseur NMHC</string>
+    <string name="j1979_info_scr">Catalyseur NOx/SCR</string>
+    <string name="j1979_info_adsorber">Piège à NOx</string>
+    <string name="j1979_info_pm">Filtre à particules</string>
+    <string name="j1979_info_egs">Capteur de gaz d’échappement</string>
+    <string name="j1979_info_boost">Pression de suralimentation</string>
+    <string name="j1979_info_fuel">Circuit de carburant</string>
+</resources>

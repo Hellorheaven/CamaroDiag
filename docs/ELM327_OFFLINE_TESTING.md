@@ -8,6 +8,10 @@ Les adaptateurs ELM327 génériques et les clones n’offrent pas tous les même
 
 La présence du Bluetooth LE (BLE) ne signifie pas que le boîtier est compatible avec la liaison Bluetooth classique utilisée par ce profil. Les adaptateurs BLE doivent être considérés comme non vérifiés tant que leur modèle précis n’est pas indiqué comme pris en charge.
 
+### Conservation du protocole réellement observé
+
+Lorsqu'un adaptateur fournit une réponse positive au PID 00 puis annonce son protocole courant via `ATDPN`, CamaroDiag conserve ce choix pour restaurer la session après une fonction diagnostic avancée. Cela couvre les numéros ELM `1` à `A` : J1850, ISO 9141, KWP, CAN et J1939 selon les capacités réelles de l'adaptateur et du véhicule. Pour J1850, K-Line et J1939, aucune adresse fonctionnelle CAN `7DF` ou `18DB33F1` n'est inventée. Si la preuve PID 00 manque, le logiciel revient au mode automatique. Il s'agit d'une correction de restauration de session, **pas d'une nouvelle prise en charge de la programmation ECU**, et le comportement des clones reste à qualifier sur Release.
+
 ## Première connexion
 
 1. Stationner le véhicule dans un endroit sûr.

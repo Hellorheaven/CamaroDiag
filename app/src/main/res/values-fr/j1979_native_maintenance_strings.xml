@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_native_maintenance_title">Inspecter le journal de maintenance natif</string>
+    <string name="j1979_native_maintenance_select">Sélectionner le journal CM/1 original</string>
+    <string name="j1979_native_maintenance_run">Inspecter et exporter le journal</string>
+    <string name="j1979_native_maintenance_scope">Preuve hors ligne uniquement. Un acquittement ne prouve pas la fin du test et ne permet pas une nouvelle commande.</string>
+    <string name="j1979_native_maintenance_saved">Rapport du journal de maintenance exporté</string>
+    <string name="j1979_native_maintenance_rejected">Inspection du journal de maintenance refusée</string>
+    <string name="j1979_native_maintenance_operation">Maintenance native (connecteur qualifié uniquement)</string>
+    <string name="j1979_native_maintenance_clear">Mode 04 — effacer les informations de diagnostic</string>
+    <string name="j1979_native_maintenance_evap">Mode 08 — préparation EVAP</string>
+    <string name="j1979_native_maintenance_clear_warning">L’effacement réinitialise les états de préparation et ne répare pas le véhicule. Véhicule immobilisé, moteur arrêté, local ventilé et carte qualifiée requis.</string>
+    <string name="j1979_native_maintenance_evap_warning">Préparation uniquement, pas un test de fuite. Véhicule immobilisé, moteur arrêté, local ventilé et carte qualifiée requis.</string>
+    <string name="j1979_native_maintenance_warning_accept">Je reconnais les conséquences et les conditions requises</string>
+    <string name="j1979_native_maintenance_confirm">Je confirme cette opération unique sur le VIN %1$s avec autorisation locale indépendante</string>
+    <string name="j1979_native_maintenance_execute">Exécuter une opération native unique</string>
+    <string name="j1979_native_maintenance_recovery">Résultat incertain ou récupération requise. Ne pas relancer automatiquement.</string>
+    <string name="j1979_native_maintenance_journal_checked">Cohérence du journal contrôlée ; aucune validation physique revendiquée.</string>
+    <string name="j1979_native_maintenance_unverified">Journal non vérifié ; aucun succès revendiqué.</string>
+    <string name="j1979_native_maintenance_prefix_title">Inspecter un journal de maintenance interrompu</string>
+    <string name="j1979_native_maintenance_prefix_scope">Seuls les enregistrements complets sont contrôlés. Un terminal absent ou incomplet laisse le résultat incertain. Ne pas relancer automatiquement.</string>
+    <string name="j1979_native_maintenance_archive">Lire une archive de maintenance (CU/5)</string>
+    <string name="j1979_native_maintenance_archive_budget">Budget de l’opération d’origine (ms)</string>
+    <string name="j1979_native_maintenance_archive_warning">Lecture seule du journal existant sélectionné ; aucune opération de maintenance n’est envoyée.</string>
+    <string name="j1979_native_maintenance_archive_accept">J’autorise la lecture seule du journal</string>
+    <string name="j1979_native_maintenance_archive_confirm">Confirmer la récupération du journal pour le VIN %1$s</string>
+    <string name="j1979_native_maintenance_archive_run">Récupérer le journal</string>
+</resources>

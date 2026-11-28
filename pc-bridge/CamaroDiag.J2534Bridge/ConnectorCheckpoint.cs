@@ -1,4 +1,7 @@
 using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace CamaroDiag.J2534Bridge;
 
@@ -51,36 +54,118 @@ internal static class ConnectorCheckpoint
             ? Disposition.SafeButBlocked : Disposition.RecoveryRequired);
     }
 
-    internal static Inspection InspectFile(string path)
+    internal sealed record FileAssessment(string Schema, string Version, string FileName,
+        DateTimeOffset InspectedAtUtc, string? SnapshotSha256, Inspection Inspection,
+        string? ExpectedTransaction, string? ExpectedManifest, string? Problem)
     {
-        if (!File.Exists(path)) return Inspect(ReadOnlySpan<byte>.Empty);
-        if ((File.GetAttributes(path) & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
-            return Inspect(ReadOnlySpan<byte>.Empty);
-        using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (file.Length != RecordSize) return Inspect(ReadOnlySpan<byte>.Empty);
-        Span<byte> bytes = stackalloc byte[RecordSize];
+        public bool Authenticated => false;
+        public bool PhysicalVehicleVerified => false;
+        public bool PermitsProgramming => false;
+        public bool PermitsAutomaticRecovery => false;
+    }
+
+    internal sealed record Options(string Input, string? Output, string? Transaction, string? Manifest);
+
+    private static string? ExpectedHex(string? value,int length)
+    {
+        if(value is null)return null;
+        if(value.Length!=length || !value.All(Uri.IsHexDigit))
+            throw new ArgumentException("Expected a complete hexadecimal identity.");
+        return value.ToLowerInvariant();
+    }
+
+    private static byte[] ReadSnapshot(string path)
+    {
+        if((File.GetAttributes(path)&(FileAttributes.Directory|FileAttributes.ReparsePoint))!=0)
+            throw new InvalidDataException("Expected an unlinked checkpoint file.");
+        using var file=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read);
+        if(file.Length!=RecordSize)throw new InvalidDataException("Expected exactly 64 checkpoint bytes.");
+        var bytes=new byte[RecordSize];
         file.ReadExactly(bytes);
-        return file.ReadByte() == -1 ? Inspect(bytes) : Inspect(ReadOnlySpan<byte>.Empty);
+        if(file.ReadByte()!=-1||file.Length!=RecordSize||
+            (File.GetAttributes(path)&(FileAttributes.Directory|FileAttributes.ReparsePoint))!=0)
+            throw new InvalidDataException("Checkpoint changed during inspection.");
+        return bytes;
+    }
+
+    internal static FileAssessment AssessFile(string path,string? expectedTransaction=null,string? expectedManifest=null)
+    {
+        expectedTransaction=ExpectedHex(expectedTransaction,32);
+        expectedManifest=ExpectedHex(expectedManifest,64);
+        var schema="camarodiag-offline-connector-checkpoint-v1";
+        var version=typeof(ConnectorCheckpoint).Assembly.GetName().Version?.ToString()??"";
+        var name=Path.GetFileName(path);
+        var utc=DateTimeOffset.UtcNow;
+        try {
+            var bytes=ReadSnapshot(path);
+            var inspection=Inspect(bytes,expectedTransaction,expectedManifest);
+            if(!CryptographicOperations.FixedTimeEquals(bytes,ReadSnapshot(path)))
+                throw new InvalidDataException("Checkpoint changed between reads.");
+            return new(schema,version,name,utc,Convert.ToHexString(SHA256.HashData(bytes)),
+                inspection,expectedTransaction,expectedManifest,null);
+        }catch(Exception error) when(error is IOException or InvalidDataException or UnauthorizedAccessException or
+            ArgumentException or NotSupportedException){
+            return new(schema,version,name,utc,null,Inspect(ReadOnlySpan<byte>.Empty),
+                expectedTransaction,expectedManifest,error.Message);
+        }
+    }
+
+    internal static Inspection InspectFile(string path)=>AssessFile(path).Inspection;
+
+    internal static string Encode(FileAssessment assessment)=>JsonSerializer.Serialize(assessment,
+        new JsonSerializerOptions{WriteIndented=true,PropertyNamingPolicy=JsonNamingPolicy.CamelCase,
+            Converters={new JsonStringEnumConverter()}});
+
+    internal static FileAssessment ExportCurrent(string output,string path,FileAssessment displayed)
+    {
+        var current=AssessFile(path,displayed.ExpectedTransaction,displayed.ExpectedManifest);
+        if(displayed.SnapshotSha256 is null || displayed.SnapshotSha256!=current.SnapshotSha256 ||
+            Encode(displayed with{InspectedAtUtc=current.InspectedAtUtc})!=Encode(current))
+            throw new InvalidDataException("Checkpoint evidence changed or is unavailable.");
+        using var stream=new FileStream(output,FileMode.CreateNew,FileAccess.Write,FileShare.None);
+        using var writer=new StreamWriter(stream);
+        writer.WriteLine(Encode(current));
+        writer.Flush();
+        stream.Flush(true);
+        return current;
+    }
+
+    internal static Options Parse(string[] args)
+    {
+        if(args.Length<2||!args[0].Equals(Command,StringComparison.OrdinalIgnoreCase)||
+            string.IsNullOrWhiteSpace(args[1])||args[1].StartsWith("--",StringComparison.Ordinal))
+            throw new ArgumentException("Expected checkpoint input.");
+        var values=new Dictionary<string,string>(StringComparer.Ordinal);
+        for(int i=2;i<args.Length;i++){
+            var key=args[i];
+            if(key is not ("--output" or "--transaction" or "--manifest") ||
+                i+1>=args.Length||string.IsNullOrWhiteSpace(args[i+1])||
+                args[i+1].StartsWith("--",StringComparison.Ordinal)||!values.TryAdd(key,args[++i]))
+                throw new ArgumentException("Invalid or repeated checkpoint option.");
+        }
+        return new(args[1],values.GetValueOrDefault("--output"),
+            ExpectedHex(values.GetValueOrDefault("--transaction"),32),
+            ExpectedHex(values.GetValueOrDefault("--manifest"),64));
     }
 
     internal static int Run(string[] args)
     {
-        if (args.Length != 2 || !args[0].Equals(Command, StringComparison.OrdinalIgnoreCase))
-        {
-            Console.Error.WriteLine("Usage: --inspect-connector-checkpoint <checkpoint.bin>");
-            return 6;
-        }
         try
         {
-            var report = InspectFile(args[1]);
+            var options=Parse(args);
+            var assessment=AssessFile(options.Input,options.Transaction,options.Manifest);
+            if(options.Output is not null)
+                assessment=ExportCurrent(options.Output,options.Input,assessment);
+            var report=assessment.Inspection;
             Console.WriteLine("CDJ/1: " + report.Status);
             if (report.Record is { } record) Console.WriteLine($"Stage: {record.Stage}; sequence: {record.Sequence}");
             Console.WriteLine("Offline, unauthenticated evidence. No programming or automatic recovery authorized.");
             return report.Status == Disposition.SafeButBlocked ? 0 : 8;
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException
             or NotSupportedException)
         {
+            Console.Error.WriteLine("Usage: --inspect-connector-checkpoint <checkpoint.bin> [--transaction HEX32] [--manifest HEX64] [--output new.json]");
             Console.Error.WriteLine("Checkpoint inspection failed: " + error.Message);
             return 6;
         }

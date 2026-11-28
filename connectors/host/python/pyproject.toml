@@ -14,6 +14,25 @@ serial = ["pyserial>=3.5"]
 [project.scripts]
 camarodiagconnectors = "camarodiagconnectors.__main__:main"
 camarodiagconnectors-offline = "camarodiagconnectors.offline_cli:main"
+camarodiagconnectors-doip = "camarodiagconnectors.doip_cli:main"
+camarodiagconnectors-j1979 = "camarodiagconnectors.j1979_cli:main"
+camarodiagconnectors-j1979-freeze = "camarodiagconnectors.j1979_freeze_cli:main"
+camarodiagconnectors-j1979-freeze-native = "camarodiagconnectors.j1979_freeze_native_cli:main"
+camarodiagconnectors-j1979-live-native = "camarodiagconnectors.j1979_live_native_cli:main"
+camarodiagconnectors-j1979-network = "camarodiagconnectors.j1979_can_network_cli:main"
+camarodiagconnectors-j1979-live = "camarodiagconnectors.j1979_live_cli:main"
+camarodiagconnectors-j1979-legacy-freeze = "camarodiagconnectors.j1979_legacy_freeze_cli:main"
+camarodiagconnectors-j1979-legacy-live = "camarodiagconnectors.j1979_legacy_live_cli:main"
+camarodiagconnectors-j1979-evap = "camarodiagconnectors.j1979_evap_cli:main"
+camarodiagconnectors-j1979-clear = "camarodiagconnectors.j1979_clear_cli:main"
+camarodiagconnectors-j1979-legacy = "camarodiagconnectors.j1979_legacy_cli:main"
+camarodiagconnectors-j1979-legacy-mutation = "camarodiagconnectors.j1979_legacy_mutation_cli:main"
+camarodiagconnectors-j1979-capture = "camarodiagconnectors.j1979_campaign_capture_cli:main"
+camarodiagconnectors-j1979-usb = "camarodiagconnectors.j1979_usb_live_cli:main"
+
+camarodiagconnectors-j1979-catalogue = "camarodiagconnectors.j1979_catalogue_cli:main"
+
+camarodiagconnectors-j1979-maintenance-journal = "camarodiagconnectors.j1979_maintenance_journal_cli:main"
 
 [tool.setuptools]
 packages = ["camarodiagconnectors"]

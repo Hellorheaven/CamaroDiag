@@ -1,3 +1,91 @@
+PR117 — grouped Debug validation of typed generic Windows DoIP CLI DID and scaling
+Parent: ba811a855c781d93471a8adc8a02213a28ac2e07
+Previous 45553393453 succeeded all 12 technical jobs. Validate exclusive typed UDS 22/24, verified F190, raw JSON and bilingual help/regressions. Intermediate C6/DoIP. No merge or Release.
+
+PR117 — grouped Debug revalidation after Windows simulator fix, scaling DID and typed DTC identity
+Parent: 61ae62ee15599fd02a31aa223d2399ba388a5f5b
+Validate prior Windows F802/F810 loopback correction, SID 24 on Android/Windows/Connectors, final F190 on typed DTC reads, Windows loopback and Python tests. Intermediate C6 / DoIP only. No merge, release or physical qualification.
+
+PR117 — grouped Debug validation of multi-DID and verified DoIP reads
+Implementation parent: cfccf02cbb9efc21b219aa4755f5e4e17a9e6aa6
+Previous full Debug run 45501625699 passed all 12 technical jobs. Validate multi-DID Android Windows Python, Windows verified CLI, DTC record and WWH correlation, single DID identity revalidation and Python CLI generic DID revalidation in this checkpoint. No merge, release or physical qualification.
+
+PR117 — grouped Debug validation of WWH OBDonUDS over DoIP on Android Windows Connectors
+Implementation parent: 81013db5c12775018c1c8b397f959e76cdce8275
+Previous full Debug run 45498873150 succeeded. Validate WWH 19/42 19/55 19/56, same-socket VIN/protocol revalidation, Android and Windows localized UI. No physical qualification, merge or Release.
+
+PR117 — revalidate Android JUnit signatures and Kotlin warnings after 11/12 checkpoint
+Implementation parent: b618d3477a3e42a8a4f5d0526abe5febb6a113dc
+Run 45459305032: all non-Android technical jobs passed, Android JUnit initialization failed. Full Debug gate, no merge or release.
+
+PR117 — validate complete new DoIP discovery/control/monitoring batch
+Implementation parent: 3a129db2739762ef77288a95cb01b8a478776901
+Previous run 45456278234 succeeded all 12 technical jobs. Validate Android EID, gateway control preservation, scoped IPv6 and passive discovery, interface selector and multicast lock, Windows gateway status correlation/scoped TLS/monitor P2-P2*, Python status identity validation. Full Debug only; no merge, release, physical qualification or deployment.
+
+PR117 — DoIP grouped validation after successful 8b4672f checkpoint
+Implementation parent: 962a70b66d96670d006d89d2c3ecc6a25aebdf7b
+Run 45454645809 completed successfully. Validate new Android and Windows session settings (P2/P2*, routing OEM), Python scoped IPv6 discovery and TLS IP verification; full Debug, no merge, Release, deployment or physical qualification.
+
+PR117 — grouped DoIP Windows receive race, monitor CLI, IPv4/EID discovery and TLS identity checkpoint
+Implementation parent: e888c091d1e669a638fb86f8da139058fadd1af0
+Previous run 45453585549 at 9afc5ff2606fda563ebdf565c87250ed864696b0: 11 technical jobs succeeded including Android; Windows compilation 0 warnings/errors but monitoring self-test failed. Validate Windows serialized receive exchange boundaries and 128 exchanges, OBD monitor GUI and CLI, UDP gateway revalidation, selected mTLS certificate check, Python discovery EID/broadcast/passive and confirmation revalidation, all Debug jobs. Intermediate C6/DoIP; no merge, Release or deployment.
+
+PR117 — grouped Debug checkpoint after Android Kotlin path consolidation and DoIP host/Android monitoring
+Parent: d55e123e2b5673a1486b1a38b8a29fd64e8935ed
+Validate Android restored canonical package paths, mTLS, gateway correlation, OBDonUDS and new monitoring/CSV; Connectors host P2/P2*, routing options and OBD monitoring. Previous run 45452211613 failed Android due to duplicate source paths; all other technical jobs passed. No merge, Release or deployment.
+
+PR117 — Android unit-test compilation import correction after grouped DoIP / OBDonUDS integration
+Parent: d11dab8cb4940bad1b492a85a0d958351611b984
+Previous run 45450659055: unresolved assertArrayEquals in UdsDtcDecoderTest. Re-run full Debug validation on corrected revision; no merge or release.
+
+PR117 — grouped DoIP selected gateway correlation and OBDonUDS route validation
+Implementation parent: 4ffc898af22dfa560934f953f277a0656ece3cd0
+Validate Android EID/GID identity binding, selected route and F802/F810 correlation; Windows and Python legislated DID paths, FR/EN and regression suite. Intermediate C6. No merge, deployment, release or physical qualification.
+
+PR117 — grouped Android DoIP mutual TLS checkpoint
+Parent implementation HEAD: 1dcc903704432fd4e59402af3fcfaa346631a715
+Validate KeyChain certificate selection and target binding, TLS key manager, localhost mutual TLS certificate presentation, server identity/trust, all Android DoIP paths and resources FR/EN; existing cross-platform Debug checks. No merge/release/deployment/physical qualification.
+
+PR117 — grouped host DoIP transport and scoped capture, cross-platform command sequences checkpoint
+Parent implementation HEAD: 17ba6af8cedd06e14d8bd9d45332d7f9cace2cb5
+Validate Connectors Python UDP/TCP/TLS host, VIN ambiguity, DTC/monitor, scoped capture archive, consent and ordered sequence; Android and Windows GUI/CLI same-session UDS sequence, correlation, cancellation, localization, existing Debug checks. No merge/release/deployment/physical qualification.
+
+PR117 — grouped Android DoIP command and cross-platform DTC details checkpoint
+Implementation HEAD: 103a959555d8431c66c3a68b33a9d339ac28a752
+Validate Android consent-bound exchange, UDS response correlation, Android/Windows DTC 19/04 and 19/06 detail reads, localization and existing regression suite. Intermediate C6/DoIP only; no merge, release, deployment or physical qualification.
+
+PR117 — grouped DoIP command console and DTC count/filter checkpoint
+Parent implementation HEAD: 33709b51ad6ffb64694de28afa14a0d77d5cea25
+Validate Windows confirmed UDS exchange, same-session VIN correlation, Android and Windows 19/01 DTC count, Android 19/02 filtering and FR/EN. Intermediate C6/DoIP only. No merge, release, deployment or physical qualification.
+
+PR117 — grouped DoIP TCP/TLS console and automatic endpoint routing checkpoint
+Implementation and handoff HEAD: af93c360baf505452230f3d933b245a4626cf7f0
+Full Debug validation: Windows PDU journal, TCP/TLS diagnostic loopback, GUI and backup tracing, FR/EN resources, Android VIN-based route resolution and profile binding, existing native/Connectors/backend offline checks. Intermediate C6/DoIP only. No merge, release, deployment or physical qualification.
+
+PR117 — grouped Windows and Android DoIP VIN gateway and ECU correlation checkpoint
+Implementation and handoff HEAD: e9d93c81500c7c40738eed8c549781134cd161b0
+Full Debug validation: Windows GUI/UDP tracing and loopback VIN discovery, F190 identity correlation before DID/DTC/monitor, Android EID/GID ambiguity, FR/EN resources, existing Android/native/Connectors/Firebase offline checks. Intermediate C6/DoIP only. No merge, release, deployment or physical qualification.
+
+PR117 — grouped Android DoIP control journal and VIN discovery checkpoint
+Implementation and handoff HEAD: 6a1acc1e018354c3b200ed411e47ce3728a80000
+Full grouped Debug validation of new DoIP UDP discovery and routing/control TX/RX journal, FR/EN, loopback tests and all existing Android/Windows/native/Connectors/Firebase checks. C6 and DoIP intermediate only. No merge, Release, physical qualification or deployment.
+
+PR117 — DoIP offline verification, live monitoring, SW-CAN capture, gateway controls, Connectors host integration
+Implementation HEAD: 73e5607befd7eb980f465caf0b8cce036e86996b
+Grouped full Debug checkpoint on exact marker SHA: Android unit/lint/assemble, Windows warnings-as-errors/self-tests, native/Connectors firmware/hosts and Firebase offline. Intermediate C6/DoIP, not final C8. No hardware tests, merge, release or Firebase deployment.
+
+PR117 — DoIP Windows/Android functional integration checkpoint — 2026-11-24
+Implementation HEAD 84be7d7ed407c785f96631d08cdf895e9b1e9fef.
+Full Debug gate: Android compile/lint/tests, Windows warnaserror/selftests, native/Connectors and Firebase offline. Intermediate, not C8. No hardware tests, merge, release or deployment.
+
+PR117 — CAPABILITIES / ELM UDS / DOIP FUNCTIONAL INTEGRATION — INTERMEDIATE DEBUG CHECKPOINT
+Implementation HEAD: c0ea895772505f25412dc67c389b113c8750d7dc
+Full grouped Android/backend/Windows/native/Connectors Debug validation, including administration table/deletion, connector capability inventory, ELM ISO-TP and CAN profiles, DoIP DID monitoring, context and resource regressions. Intermediate only, not C8. No deployment Firebase, no merge, no Release, no physical qualification.
+
+PR117 — UI CLEANUP AND DOIP INTERMEDIATE DEBUG CHECKPOINT — 2026-11-24
+Implementation + handoff HEAD: 8523a18dc0612cdb7446da5d079140d8912e6af3
+Run full Debug validation of Android and Windows UI cleanup, DoIP DTC TCP regression tests and shared DID reading, native and connectors. This is not C8 final. No merge or release.
+
 PR95 MERGE CONFLICT RESOLUTION — FULL DEBUG CHECKPOINT
 Preserve both UDS response deadline test suites and integrate main cfadb863d5ef9ffcadcde064bfd60224e3217058 into PR95 0ec8be1d7e7c8a0717d3333cf39273a1cd896e51. Validate exact merge candidate before final merge. No release or final C8 implied.
 

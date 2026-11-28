@@ -9,6 +9,18 @@ class VehicleVinMatcherTest {
     private val ecuVin = "1G1FB1E30C9123457"
 
     @Test
+    fun gmSpecificReadsRequireMatchingObservedCamaroCandidate() {
+        val camaro = "2G1FF3D36C9100001"
+        val ford = "WF0TK3SS7PMA00001"
+        assertEquals(true, VehicleVinMatcher.admitsCamaroSpecificRead(camaro.lowercase(), camaro))
+        assertEquals(false, VehicleVinMatcher.admitsCamaroSpecificRead(camaro, ford))
+        assertEquals(false, VehicleVinMatcher.admitsCamaroSpecificRead(ford, ford))
+        assertEquals(false, VehicleVinMatcher.admitsCamaroSpecificRead(camaro, null))
+        assertEquals(false, VehicleVinMatcher.admitsCamaroSpecificRead("", camaro))
+        assertEquals(false, VehicleVinMatcher.admitsCamaroSpecificRead(camaro, camaro.dropLast(1) + "2"))
+    }
+
+    @Test
     fun matchingVinsAreNormalizedBeforeComparison() {
         val result = VehicleVinMatcher.compare("1g1fb1e30c9123456", "1G1FB1E30C9123456")
 

@@ -1,5 +1,19 @@
 # Nouveautés — CamaroDiag
 
+## En développement — PR #117 (non publié) / In development (unreleased)
+
+### Français
+- Connexion ELM327 : la recherche d'adaptateurs et la connexion sélectionnée ne se chevauchent plus. Initialisation bornée, traitement d'un ancien flux de surveillance CAN et arrêt de la session en cas d'écriture Bluetooth bloquée.
+- Données temps réel : reprise de la découverte à la nouvelle connexion, sélection limitée aux capteurs effectivement lus, case et ligne sélectionnables, préférences temporaires isolées lorsque le VIN n'est pas connu.
+- Diagnostic OBD : réassemblage des réponses DTC CAN multitrames par calculateur et affichage de la couverture PID observée par calculateur.
+- Modifications non encore compilées ni testées sur véhicule ; validation finale du chantier C6 à venir.
+
+### English
+- ELM327 connection: adapter discovery no longer overlaps a selected connection. Bounded initialization, previous CAN-monitor stream handling and session retirement on blocked Bluetooth writes.
+- Live data: discovery resumes on a newly selected connection, selection is limited to actually measured signals, checkbox and row are selectable, and temporary selections are isolated when the VIN is unknown.
+- OBD diagnostics: multi-frame CAN DTC replies are reassembled per ECU and observed PID coverage is displayed per ECU.
+- Changes have not yet been built or tested on a vehicle; C6 completion validation is pending.
+
 ## En préparation — PR #54 (non publié)
 
 - Capture CAN commandée par Play/Stop, avec export de la capture complète.

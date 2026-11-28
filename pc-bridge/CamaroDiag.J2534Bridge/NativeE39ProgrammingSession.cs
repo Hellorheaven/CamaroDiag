@@ -60,6 +60,7 @@ internal static class NativeE39ProgrammingSession
             throw new ArgumentException("No qualified programming-session voltage window.");
         await RequireSupplyAsync();
         var enter = await transport.ExchangeAsync([0x10, 0x02], cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         RequireServiceAck(enter, 0x10, 0x50, 0x02);
 
         // Communication control is optional for some stock GM firmware.
@@ -67,37 +68,46 @@ internal static class NativeE39ProgrammingSession
         // security denial, bus failure or ambiguous replies are fatal.
         await RequireSupplyAsync();
         var comm = await transport.ExchangeAsync([0x28], cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!((comm.Length >= 1 && comm[0] is 0x68 or 0x60) ||
               (comm.Length == 3 && comm[0] == 0x7F &&
                comm[1] == 0x28 && comm[2] is 0x11 or 0x12 or 0x31)))
             throw new InvalidDataException("GM communication-control state is ambiguous.");
 
         await transport.SendAsync([0x3E], cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Access is per programming session: unlock only AFTER 10/02.
         await RequireSupplyAsync();
         var response = await transport.ExchangeAsync(
             NativeE39Security.SeedRequest(), cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         var seed = NativeE39Security.ParseSeedResponse(response);
         if (!NativeE39Security.IsAlreadyGranted(seed))
         {
             await RequireSupplyAsync();
             response = await transport.ExchangeAsync(
                 NativeE39Security.BuildKeyRequest(seed), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             NativeE39Security.RequireUnlockAck(response);
         }
 
         await RequireSupplyAsync();
         response = await transport.ExchangeAsync([0xA5, 0x01], cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         RequireServiceAck(response, 0xA5, 0xE5, null);
         await transport.SendAsync([0x3E], cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         await transport.DelayAsync(TimeSpan.FromSeconds(2), cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         // GM A5/03 is intentionally fire-and-forget; waiting for a standard
         // positive reply would generate false failures or a duplicate send.
         await RequireSupplyAsync();
         await transport.SendAsync([0xA5, 0x03], cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         await transport.DelayAsync(TimeSpan.FromMilliseconds(300), cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         await RequireSupplyAsync();
         return new(identity.Vin, identity.OperatingSystemId,

@@ -1,0 +1,3924 @@
+#define _POSIX_C_SOURCE 200809L
+#include "cf1.h"
+#include "j1979_host_freeze.hpp"
+#include "cf1_usb.h"
+#include "cl1.h"
+#include "cl1_usb.h"
+#include "j1979_can_cli.h"
+#include "j1979_socket_campaign.hpp"
+#include "j1979_live_export.hpp"
+#include "j1979_live_options.hpp"
+#include "j1979_live_progress.hpp"
+#include "j1979_network_journal.hpp"
+#include "j1979_can_network.hpp"
+#include "j1979_elm_can.hpp"
+#include "j1979_elm_can_trace.hpp"
+#include "j1979_elm_can_journal.hpp"
+#include "j1979_elm_can_campaign.hpp"
+#include "j1979_catalogue_projection.hpp"
+#include "j1979_isotp.h"
+#include "j1979_cm1.hpp"
+#include "j1979_host_maintenance.hpp"
+#include "j1979_cu45_session.hpp"
+#include "j1979_cj1.hpp"
+#include "j1979_cj1_history.hpp"
+#include "j1979_cf1_history.hpp"
+#include "j1979_cu1.hpp"
+#include "j1979_discovery.hpp"
+#include "j1979_legacy_scan.hpp"
+#include "j1979_legacy_scan_wire.hpp"
+#include "j1979_legacy_journal.hpp"
+#include "j1979_legacy_live_journal.hpp"
+#include "j1979_legacy_mutation.hpp"
+#include "j1979_legacy_mutation_inspection.hpp"
+#include "j1979_can_history.hpp"
+#include "j1979_network_history.hpp"
+#include "j1979_native_live_inspection.hpp"
+#include "j1979_live_evidence.hpp"
+#include "j1979_historical_can_plan.hpp"
+#include "j1979_legacy_discovery_history.hpp"
+#include "j1979_legacy_scan_history.hpp"
+#include "j1979_legacy_mutation_history.hpp"
+#include "j1979_legacy_freeze_history.hpp"
+#include "j1979_can_freeze_history.hpp"
+#include "j1979_live_history.hpp"
+#include "j1979_legacy_discovery_binding.hpp"
+#include "j1979_legacy_freeze_wire.hpp"
+#include "j1979_legacy_live_wire.hpp"
+#include <time.h>
+#include <array>
+#include <algorithm>
+#include <charconv>
+#include <string_view>
+#include <exception>
+
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <openssl/evp.h>
+#include <openssl/crypto.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <memory>
+#include <new>
+#include <utility>
+
+#ifndef O_NOFOLLOW
+#error "Native evidence input requires O_NOFOLLOW (POSIX Linux)"
+#endif
+#ifndef O_CLOEXEC
+#error "Native evidence input requires O_CLOEXEC (POSIX Linux)"
+#endif
+
+typedef struct {
+    std::unique_ptr<unsigned char[]> bytes;
+    size_t length;
+    dev_t device;
+    ino_t inode;
+    char digest[65];
+} input;
+struct json_writer {
+    std::unique_ptr<char[]> bytes;
+    size_t used = 0;
+    size_t capacity;
+    bool failed = false;
+    explicit json_writer(size_t maximum) : capacity(maximum) {}
+};
+
+static int error(const char *message) {
+    fprintf(stderr, "CamaroDiag native J1979: %s\n", message);
+    return 2;
+}
+static void sha256_hex(const unsigned char *bytes, size_t n, char digest[65]) {
+    unsigned char result[EVP_MAX_MD_SIZE];
+    unsigned int produced = 0;
+    if (!EVP_Digest(bytes, n, result, &produced, EVP_sha256(), NULL) || produced != 32) {
+        fprintf(stderr, "SHA-256 unavailable\n"); exit(2);
+    }
+    const char alphabet[] = "0123456789abcdef";
+    for (size_t i = 0; i < 32; ++i) {
+        digest[2*i] = alphabet[result[i] >> 4];
+        digest[2*i+1] = alphabet[result[i] & 15];
+    }
+    digest[64] = '\0';
+}
+static bool load_regular(const char *path, size_t maximum, input *out) {
+    *out = input{};
+    int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (fd < 0) return false;
+    struct stat st;
+    bool ok = fstat(fd, &st) == 0 && S_ISREG(st.st_mode) &&
+              st.st_size > 0 && (uint64_t)st.st_size <= maximum;
+    if (ok) {
+        out->length = (size_t)st.st_size;
+        out->device = st.st_dev; out->inode = st.st_ino;
+        out->bytes.reset(new (std::nothrow) unsigned char[out->length]);
+        ok = out->bytes.get() != NULL;
+    }
+    size_t n = 0;
+    while (ok && n < out->length) {
+        ssize_t got = read(fd, out->bytes.get() + n, out->length - n);
+        if (got < 0 && errno == EINTR) continue;
+        if (got <= 0) { ok = false; break; }
+        n += (size_t)got;
+    }
+    if (ok) {
+        unsigned char extra;
+        ssize_t got;
+        do { got = read(fd, &extra, 1); } while (got < 0 && errno == EINTR);
+        ok = got == 0;
+    }
+    close(fd);
+    if (!ok) {
+        *out = input{};
+        return false;
+    }
+    sha256_hex(out->bytes.get(), out->length, out->digest);
+    return true;
+}
+static void free_input(input *v) { *v = input{}; }
+static bool same_input(const input *a, const input *b) {
+    return a->length == b->length && a->device == b->device &&
+        a->inode == b->inode && !memcmp(a->bytes.get(), b->bytes.get(), a->length);
+}
+static bool separate(const input *a, const input *b) {
+    return a->device != b->device || a->inode != b->inode;
+}
+static void write_literal(json_writer *j, const char *text) {
+    size_t length = strlen(text);
+    if (j->failed || j->used >= j->capacity || length >= j->capacity - j->used) { j->failed = true; return; }
+    memcpy(j->bytes.get() + j->used, text, length);
+    j->used += length; j->bytes[j->used] = 0;
+}
+static void write_unsigned(json_writer *j, uint64_t n) {
+    char b[32];
+    snprintf(b, sizeof(b), "%" PRIu64, n);
+    write_literal(j, b);
+}
+static void write_bool(json_writer *j, bool b) { write_literal(j, b ? "true" : "false"); }
+static void write_string(json_writer *j, const char *value) {
+    /* All values in this exporter come from fixed trusted strings, or from
+     * the validated VIN. No untrusted filenames or arbitrary ECU bytes. */
+    write_literal(j, "\""); write_literal(j, value); write_literal(j, "\"");
+}
+static void write_hex(json_writer *j, const uint8_t *bytes, size_t n) {
+    static const char alphabet[] = "0123456789ABCDEF";
+    char local[7] = {0};
+    if (!bytes || n > 3) { j->failed = true; return; }
+    for (size_t i = 0; i < n; ++i) {
+        local[2*i] = alphabet[bytes[i] >> 4];
+        local[2*i+1] = alphabet[bytes[i] & 15];
+    }
+    write_string(j, local);
+}
+static void write_can_hex(json_writer *j, uint32_t value) {
+    char local[9];
+    snprintf(local, sizeof(local), "%X", value);
+    write_string(j, local);
+}
+static void write_array(json_writer *j, const uint8_t *values, size_t n) {
+    write_literal(j, "[");
+    for (size_t i = 0; i < n; ++i) {
+        if (i) write_literal(j, ",");
+        write_unsigned(j, values[i]);
+    }
+    write_literal(j, "]");
+}
+static void write_prefix(json_writer *j, const cf1_evidence *e, const char *capture_digest) {
+    write_literal(j, "{\n"
+        "\"schema\":\"camarodiag-j1979-native-freeze-prefix-linux-c-v1\","
+        "\"protocol\":\"SAE-J1979\","
+        "\"source\":\"OFFLINE_CF1_PREFIX\","
+        "\"profile\":{"
+        "\"request_can_id\":");
+    write_can_hex(j, e->plan.tx);
+    write_literal(j, ",\"response_can_id\":"); write_can_hex(j, e->plan.rx);
+    write_literal(j, ",\"extended\":"); write_bool(j, e->plan.extended);
+    write_literal(j, ",\"plan\":{\"expected_vin\":"); write_string(j, e->plan.vin);
+    write_literal(j, ",\"frames\":"); write_array(j, e->plan.frames, e->plan.frame_count);
+    write_literal(j, ",\"selected_pids\":"); write_array(j, e->plan.pids, e->plan.pid_count);
+    write_literal(j, ",\"budget_ms\":"); write_unsigned(j, e->plan.budget_ms);
+    write_literal(j, "}},"
+        "\"expected_vin_independently_supplied\":true,"
+        "\"prefix_integrity_verified\":true,"
+        "\"capture_integrity_verified\":false,"
+        "\"execution_completed\":false,"
+        "\"terminal_present\":false,"
+        "\"physical_vehicle_verified\":false,"
+        "\"hardware_provenance_verified\":false,"
+        "\"evidence_authenticated\":false,"
+        "\"permits_programming\":false,"
+        "\"unobserved_request_transmitted\":false,"
+        "\"frame_states_are_provisional\":true,"
+        "\"timing_independently_verified\":false,"
+        "\"authenticated\":false,"
+        "\"diagnostic_verdict\":null,"
+        "\"complete_records\":");
+    write_unsigned(j, e->record_count);
+    write_literal(j, ",\"complete_observations\":");
+    write_unsigned(j, e->observation_count);
+    write_literal(j, ",\"last_complete_offset\":");
+    write_unsigned(j, e->last_complete_offset);
+    write_literal(j, ",\"discarded_tail_bytes\":");
+    write_unsigned(j, e->discarded_tail_bytes);
+    write_literal(j, ",\"interruption\":");
+    write_string(j, e->interruption);
+    write_literal(j, ",\"replay_terminated_by_missing_observation\":");
+    write_bool(j, e->replay_missing_observation);
+    write_literal(j, ",\"last_observed_request_hex\":");
+    if (e->has_last_request) write_hex(j, e->last_request, e->last_request_length);
+    else write_literal(j, "null");
+    write_literal(j, ",\"next_unobserved_request_hex\":");
+    if (e->has_next_request) write_hex(j, e->next_request, e->next_request_length);
+    else write_literal(j, "null");
+    write_literal(j, ",\"observed_initial_vin_in_prefix\":");
+    if (e->initial_vin_observed) write_string(j, e->initial_vin);
+    else write_literal(j, "null");
+    write_literal(j, ",\"observed_final_vin_in_prefix\":");
+    if (e->final_vin_observed) write_string(j, e->final_vin);
+    else write_literal(j, "null");
+    write_literal(j, ",\"visited_frame_numbers_in_prefix\":[");
+    for (size_t i = 0; i < e->visited_frames; ++i) {
+        if (i) write_literal(j, ",");
+        write_unsigned(j, e->progress[i].number);
+    }
+    write_literal(j, "],\"unvisited_frame_numbers_in_prefix\":[");
+    for (size_t i = e->visited_frames; i < e->plan.frame_count; ++i) {
+        if (i != e->visited_frames) write_literal(j, ",");
+        write_unsigned(j, e->plan.frames[i]);
+    }
+    write_literal(j, "],\"observed_frame_progress\":[");
+    for (size_t i = 0; i < e->visited_frames; ++i) {
+        const cf1_frame_progress *f = &e->progress[i];
+        if (i) write_literal(j, ",");
+        write_literal(j, "{\"frame\":"); write_unsigned(j, f->number);
+        write_literal(j, ",\"provisional_status\":");
+        write_string(j, f->provisional_status);
+        write_literal(j, ",\"status_finalized\":false,\"inventory_complete_in_prefix\":");
+        write_bool(j, f->inventory_complete);
+        write_literal(j, ",\"trigger_stable_in_prefix\":");
+        write_bool(j, f->trigger_stable);
+        write_literal(j, ",\"advertised_measurement_count\":");
+        write_unsigned(j, f->advertised_count);
+        write_literal(j, ",\"measurement_observation_count\":");
+        write_unsigned(j, f->measurement_count);
+        write_literal(j, ",\"transmitted_measurement_count\":");
+        write_unsigned(j, f->transmitted_count);
+        write_literal(j, "}");
+    }
+    write_literal(j, "],\"recorded_observation_duration_ms\":");
+    write_unsigned(j, e->total_duration_ms);
+    write_literal(j, ",\"capture_sha256\":");
+    write_string(j, capture_digest);
+    write_literal(j, ",\"replay_stop_reason\":");
+    if (e->recipe_stopped) write_string(j, e->recipe_stop_reason);
+    else write_literal(j, "null");
+    write_literal(j, "}\n");
+}
+static void write_complete(json_writer *j, const cf1_evidence *e, const char *digest,
+                           bool live, bool authenticated, bool proof_sent) {
+    write_literal(j, "{\n"
+        "\"schema\":\"camarodiag-functional-j1979-native-freeze-linux-c-v1\","
+        "\"protocol\":\"SAE-J1979\","
+        "\"source\":");
+    write_string(j, live ? "LIVE_USB_CU2" : "OFFLINE_CF1");
+    write_literal(j, ",\"capture_integrity_verified\":");
+    write_bool(j, e->capture_integrity_verified);
+    write_literal(j, ",\"execution_completed\":"); write_bool(j, e->execution_completed);
+    write_literal(j,
+        ",\"terminal_present\":true,"
+        "\"device_credential_authenticated\":");
+    write_bool(j, authenticated);
+    write_literal(j, ",\"client_proof_sent\":");
+    write_bool(j, proof_sent);
+    write_literal(j, ",\"physical_vehicle_verified\":false,"
+        "\"hardware_provenance_verified\":false,"
+        "\"permits_programming\":false,"
+        "\"evidence_authenticated\":false,"
+        "\"profile\":{\"request_can_id\":");
+    write_can_hex(j, e->plan.tx);
+    write_literal(j, ",\"response_can_id\":"); write_can_hex(j, e->plan.rx);
+    write_literal(j, ",\"extended\":"); write_bool(j, e->plan.extended);
+    write_literal(j, ",\"plan\":{\"expected_vin\":"); write_string(j, e->plan.vin);
+    write_literal(j, ",\"frames\":"); write_array(j, e->plan.frames, e->plan.frame_count);
+    write_literal(j, ",\"selected_pids\":"); write_array(j, e->plan.pids, e->plan.pid_count);
+    write_literal(j, ",\"budget_ms\":"); write_unsigned(j, e->plan.budget_ms);
+    write_literal(j, "}},\"observations\":"); write_unsigned(j, e->observation_count);
+    write_literal(j, ",\"duration_ms\":"); write_unsigned(j, e->terminal_duration_ms);
+    write_literal(j, ",\"stop_reason\":");
+    if (e->recipe_stopped) write_string(j, e->terminal_stop_reason);
+    else write_literal(j, "null");
+    write_literal(j, ",\"initial_vin\":");
+    if (e->initial_vin_observed) write_string(j, e->initial_vin);
+    else write_literal(j, "null");
+    write_literal(j, ",\"final_vin\":");
+    if (e->final_vin_observed) write_string(j, e->final_vin);
+    else write_literal(j, "null");
+    write_literal(j, ",\"frame_states\":[");
+    for (size_t i = 0; i < e->visited_frames; ++i) {
+        if (i) write_literal(j, ",");
+        write_string(j, e->progress[i].provisional_status);
+    }
+    write_literal(j, "],\"capture_sha256\":");
+    write_string(j, digest);
+    write_literal(j, "}\n");
+}
+static bool atomic_create(const char *path, const char *content, size_t n) {
+    int fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+    if (fd < 0) return false;
+    size_t written = 0;
+    bool ok = true;
+    while (written < n) {
+        ssize_t w = write(fd, content + written, n - written);
+        if (w < 0 && errno == EINTR) continue;
+        if (w <= 0) { ok = false; break; }
+        written += (size_t)w;
+    }
+    if (ok) ok = fsync(fd) == 0;
+    if (close(fd) < 0) ok = false;
+    if (!ok) unlink(path);
+    return ok;
+}
+static bool report_prefix(const input *capture, const char *vin,
+                          std::unique_ptr<char[]> *json_out, size_t *size_out) {
+    cf1_evidence e{};
+    char err[256] = {0};
+    if (cf1_inspect_prefix(capture->bytes.get(), capture->length, vin, &e, err, sizeof(err))) {
+        fprintf(stderr, "CF/1 rejected: %s\n", err);
+        cf1_evidence_free(&e);
+        return false;
+    }
+    json_writer writer{65536};
+    writer.bytes.reset(new (std::nothrow) char[writer.capacity]{});
+    if (writer.bytes) write_prefix(&writer, &e, capture->digest);
+    bool ok = writer.bytes.get() && !writer.failed;
+    cf1_evidence_free(&e);
+    if (!ok) { writer.bytes.reset(); return false; }
+    *json_out = std::move(writer.bytes);
+    *size_out = writer.used;
+    return true;
+}
+static int inspect(const char *capture_path, const char *vin, const char *output) {
+    input original{}, again{};
+    std::unique_ptr<char[]> report;
+    size_t report_size = 0;
+    bool ok = load_regular(capture_path, CF1_MAX_BYTES, &original);
+    if (ok) ok = report_prefix(&original, vin, &report, &report_size);
+    if (ok) ok = load_regular(capture_path, CF1_MAX_BYTES, &again) &&
+                 same_input(&original, &again);
+    if (ok) ok = atomic_create(output, report.get(), report_size);
+    report.reset(); free_input(&again); free_input(&original);
+    return ok ? 0 : error("CF/1 inspection failed, source changed, or output exists");
+}
+static int inspect_complete(const char *capture_path, const char *vin, const char *output) {
+    input original{}, again{};
+    bool ok = load_regular(capture_path, CF1_MAX_BYTES, &original);
+    cf1_evidence evidence{};
+    char err[256] = {0};
+    if (ok) ok = cf1_inspect_complete(original.bytes.get(), original.length, vin,
+                                     &evidence, err, sizeof(err)) == 0;
+    if (!ok && *err) fprintf(stderr, "CF/1 rejected: %s\n", err);
+    json_writer writer{65536};
+    if (ok) {
+        writer.bytes.reset(new (std::nothrow) char[writer.capacity]{});
+        ok = writer.bytes.get() != NULL;
+        if (ok) write_complete(&writer, &evidence, original.digest, false, false, false);
+        if (writer.failed) ok = false;
+    }
+    if (ok) ok = load_regular(capture_path, CF1_MAX_BYTES, &again) &&
+                 same_input(&original, &again);
+    if (ok) ok = atomic_create(output, writer.bytes.get(), writer.used);
+    writer.bytes.reset();
+    cf1_evidence_free(&evidence);
+    free_input(&again); free_input(&original);
+    return ok ? 0 : error("Full CF/1 inspection failed or output exists");
+}
+/* Full-terminal verification also replays every observation. It cannot use
+ * prefix verification (which rejects terminal records by design), and it
+ * never inherits live USB authentication claims from a JSON report.
+ */
+static int verify_complete(const char *capture_path, const char *report_path,
+                           const char *output_path, const char *vin) {
+    input capture{}, saved{}, capture_again{}, report_again{};
+    cf1_evidence evidence{};
+    json_writer projection{65536};
+    char failure[256] = {0};
+    bool valid = load_regular(capture_path, CF1_MAX_BYTES, &capture) &&
+                 load_regular(report_path, 67108864, &saved);
+    if (valid) valid = separate(&capture, &saved);
+    if (valid) valid = cf1_inspect_complete(capture.bytes.get(), capture.length,
+                                          vin, &evidence,
+                                          failure, sizeof(failure)) == 0;
+    if (valid) {
+        projection.bytes.reset(new (std::nothrow) char[projection.capacity]{});
+        valid = projection.bytes.get() != NULL;
+    }
+    if (valid) write_complete(&projection, &evidence, capture.digest,
+                              false, false, false);
+    if (valid) valid = !projection.failed &&
+                       projection.used == saved.length &&
+                       !memcmp(projection.bytes.get(), saved.bytes.get(), projection.used);
+    if (valid) valid = load_regular(capture_path, CF1_MAX_BYTES, &capture_again) &&
+                       load_regular(report_path, 67108864, &report_again) &&
+                       same_input(&capture, &capture_again) &&
+                       same_input(&saved, &report_again);
+    if (valid) {
+        char proof[1200];
+        int n = snprintf(proof, sizeof(proof),
+            "{\"schema\":\"camarodiag-j1979-native-freeze-complete-verification-linux-c-v1\","
+            "\"consistent\":true,\"capture_integrity_verified\":true,"
+            "\"execution_completed\":%s,"
+            "\"physical_vehicle_verified\":false,"
+            "\"device_credential_authenticated\":false,"
+            "\"permits_programming\":false,"
+            "\"capture_sha256\":\"%s\",\"report_sha256\":\"%s\","
+            "\"verification_scope\":\"CANONICAL_OFFLINE_CF1\"}\n",
+            evidence.execution_completed ? "true" : "false",
+            capture.digest, saved.digest);
+        valid = n > 0 && (size_t)n < sizeof(proof) &&
+                atomic_create(output_path, proof, (size_t)n);
+    }
+    if (!valid && failure[0]) fprintf(stderr, "CF/1 full verification rejected: %s\n", failure);
+    projection.bytes.reset();
+    cf1_evidence_free(&evidence);
+    free_input(&capture_again); free_input(&report_again);
+    free_input(&capture); free_input(&saved);
+    return valid ? 0 : error("Full CF/1 verification refused: altered or inconsistent evidence");
+}
+static int verify(const char *capture_path, const char *report_path,
+                  const char *output_path, const char *vin) {
+    input capture{}, stored{}, recheck_capture{}, recheck_report{};
+    std::unique_ptr<char[]> replayed;
+    size_t length = 0;
+    bool ok = load_regular(capture_path, CF1_MAX_BYTES, &capture) &&
+              load_regular(report_path, 67108864, &stored);
+    if (ok) ok = separate(&capture, &stored);
+    if (ok) ok = report_prefix(&capture, vin, &replayed, &length);
+    /* Native canonical verification deliberately compares the entire original
+     * byte stream, not an untrusted subset of JSON fields. Alternative JSON
+     * formatting/schema require an explicit, separately reviewed importer. */
+    if (ok) ok = stored.length == length && !memcmp(stored.bytes.get(), replayed.get(), length);
+    if (ok) ok = load_regular(capture_path, CF1_MAX_BYTES, &recheck_capture) &&
+                 load_regular(report_path, 67108864, &recheck_report) &&
+                 same_input(&capture, &recheck_capture) &&
+                 same_input(&stored, &recheck_report);
+    if (ok) {
+        char verification[1600] = {0};
+        int n = snprintf(verification, sizeof(verification),
+            "{\"schema\":\"camarodiag-j1979-native-freeze-prefix-verification-linux-c-v1\","
+            "\"consistent\":true,\"prefix_integrity_verified\":true,"
+            "\"capture_integrity_verified\":false,\"execution_completed\":false,"
+            "\"physical_vehicle_verified\":false,\"permits_programming\":false,"
+            "\"capture_sha256\":\"%s\",\"report_sha256\":\"%s\","
+            "\"verification_scope\":\"CANONICAL_NATIVE_PREFIX_ONLY\"}\n",
+            capture.digest, stored.digest);
+        ok = n > 0 && (size_t)n < sizeof(verification) &&
+             atomic_create(output_path, verification, (size_t)n);
+    }
+    replayed.reset();
+    free_input(&recheck_capture); free_input(&recheck_report);
+    free_input(&capture); free_input(&stored);
+    return ok ? 0 : error("CF/1 verification refused: wrong report, unstable inputs, or output exists");
+}
+typedef struct {
+    cf1_plan plan;
+    const char *port, *credential, *capture, *report;
+    bool approved;
+} capture_options;
+static bool hex_uint32(const char *value, uint32_t *out) {
+    if (!value || !*value || *value == '-' || *value == '+') return false;
+    if (value[0] == '0' && (value[1] == 'x' || value[1] == 'X'))
+        value += 2;
+    if (!*value) return false;
+    for (const char *p = value; *p; ++p)
+        if (!((*p >= '0' && *p <= '9') ||
+              (*p >= 'a' && *p <= 'f') ||
+              (*p >= 'A' && *p <= 'F'))) return false;
+    errno = 0;
+    char *end = NULL;
+    unsigned long n = strtoul(value, &end, 16);
+    if (errno || *end || n > UINT32_MAX) return false;
+    *out = (uint32_t)n; return true;
+}
+static bool decimal_uint32(const char *value, uint32_t *out) {
+    if (!value || !*value) return false;
+    for (const char *p = value; *p; ++p)
+        if (*p < '0' || *p > '9') return false;
+    errno = 0;
+    char *end = NULL;
+    unsigned long n = strtoul(value, &end, 10);
+    if (errno || *end || n > UINT32_MAX) return false;
+    *out = (uint32_t)n; return true;
+}
+static bool parse_capture_options(int argc, char **argv, capture_options *o,bool socketcan=false,bool elm=false) {
+    memset(o, 0, sizeof(*o));
+    o->plan.budget_ms = 180000;
+    bool tx = false, rx = false, budget = false, vin = false, extended = false;
+    for (int i = 2; i < argc; ++i) {
+        const char *name = argv[i];
+        if (!strcmp(name, "--extended")) {
+            if (extended) return false;
+            extended = o->plan.extended = true;
+            continue;
+        }
+        if (!strcmp(name, "--confirm-physical-channel")) {
+            if (o->approved) return false;
+            o->approved = true; continue;
+        }
+        if (i + 1 >= argc || argv[i+1][0] == '-') return false;
+        const char *value = argv[++i];
+        if (!strcmp(name, socketcan&&!elm?"--interface":"--port")) {
+            if (o->port) return false;
+            o->port = value;
+        } else if (!socketcan&&!elm&&!strcmp(name, "--key-file")) {
+            if (o->credential) return false;
+            o->credential = value;
+        } else if (!strcmp(name, "--capture")) {
+            if (o->capture) return false;
+            o->capture = value;
+        } else if (!strcmp(name, "--output")) {
+            if (o->report) return false;
+            o->report = value;
+        } else if (!strcmp(name, "--tx")) {
+            if (tx || !hex_uint32(value, &o->plan.tx)) return false;
+            tx = true;
+        } else if (!strcmp(name, "--rx")) {
+            if (rx || !hex_uint32(value, &o->plan.rx)) return false;
+            rx = true;
+        } else if (!strcmp(name, "--vin")) {
+            if (vin || !cf1_valid_vin(value)) return false;
+            memcpy(o->plan.vin, value, 18);
+            vin = true;
+        } else if (!strcmp(name, "--budget-ms")) {
+            if (budget || !decimal_uint32(value, &o->plan.budget_ms))
+                return false;
+            budget = true;
+        } else if (!strcmp(name, "--frame") || !strcmp(name, "--pid")) {
+            uint32_t byte = 0;
+            if (!hex_uint32(value, &byte) || byte > 255) return false;
+            if (!strcmp(name, "--frame")) {
+                if (o->plan.frame_count >= CF1_MAX_FRAMES) return false;
+                o->plan.frames[o->plan.frame_count++] = (uint8_t)byte;
+            } else {
+                if (o->plan.pid_count >= CF1_MAX_PIDS) return false;
+                o->plan.pids[o->plan.pid_count++] = (uint8_t)byte;
+            }
+        } else return false;
+    }
+    return o->approved && tx && rx && vin &&
+           o->port && (elm||(socketcan?j1979_isotp_valid_interface(o->port):o->credential!=nullptr)) && o->capture && o->report &&
+           strcmp(o->capture, o->report) &&
+           (socketcan||(strcmp(o->credential, o->report) && strcmp(o->credential, o->capture))) &&
+           cf1_valid_plan(&o->plan);
+}
+static bool read_key_file(const char *path, uint8_t key[32]) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return false;
+    struct stat st;
+    bool ok = fstat(fd, &st) == 0 && S_ISREG(st.st_mode) &&
+        st.st_size == 32 && (st.st_mode & 0077) == 0;
+    if (ok) {
+        size_t n = 0;
+        while (n < 32) {
+            ssize_t got = read(fd, key + n, 32 - n);
+            if (got < 0 && errno == EINTR) continue;
+            if (got <= 0) { ok = false; break; }
+            n += (size_t)got;
+        }
+    }
+    if (close(fd) < 0) ok = false;
+    if (!ok) OPENSSL_cleanse(key, 32);
+    return ok;
+}
+static void cancel_handler(int signum) {
+    (void)signum;
+    cf1_usb_request_cancel();
+}
+static int capture_native(int argc, char **argv) {
+    capture_options o{};
+    if (!parse_capture_options(argc, argv, &o))
+        return error("Explicit physical scope, key, port, VIN, frame and --confirm-physical-channel required");
+    if (!isatty(STDIN_FILENO))
+        return error("CU/2 requires an interactive local operator approval");
+    fprintf(stderr,
+        "Selected real USB connector and physical ECU; read-only Mode 02, stationary vehicle? [yes/no] ");
+    char answer[16] = {0};
+    if (!fgets(answer, sizeof(answer), stdin) || strcmp(answer, "yes\n"))
+        return error("No live CU/2 session without explicit confirmation");
+    uint8_t key[32] = {0};
+    if (!read_key_file(o.credential, key))
+        return error("Invalid 32-byte credential file or unsafe file permissions");
+    struct sigaction action{}, oldint{}, oldterm{};
+    action.sa_handler = cancel_handler;
+    sigemptyset(&action.sa_mask);
+    sigaction(SIGINT, &action, &oldint);
+    sigaction(SIGTERM, &action, &oldterm);
+    cf1_usb_capture_result usb{};
+    char failure[256] = {0};
+    int transport = cf1_usb_capture(o.port, &o.plan, key, o.capture,
+                                     &usb, failure, sizeof(failure));
+    sigaction(SIGINT, &oldint, NULL);
+    sigaction(SIGTERM, &oldterm, NULL);
+    OPENSSL_cleanse(key, sizeof(key));
+    input capture{}, again{};
+    cf1_evidence evidence{};
+    bool valid = transport == 0 &&
+                 load_regular(o.capture, CF1_MAX_BYTES, &capture);
+    if (valid) {
+        valid = cf1_inspect_complete(capture.bytes.get(), capture.length,
+                                    o.plan.vin, &evidence,
+                                    failure, sizeof(failure)) == 0;
+    }
+    if (valid) valid = load_regular(o.capture, CF1_MAX_BYTES, &again) &&
+                       same_input(&capture, &again);
+    json_writer writer{65536};
+    writer.bytes.reset(new (std::nothrow) char[writer.capacity]{});
+    if (!writer.bytes) valid = false;
+    if (writer.bytes.get() && valid) {
+        write_complete(&writer, &evidence, capture.digest, true,
+                       usb.authenticated, usb.client_proof_sent);
+    } else if (writer.bytes) {
+        write_literal(&writer,
+            "{\"schema\":\"camarodiag-functional-j1979-native-freeze-linux-c-v1\","
+            "\"protocol\":\"SAE-J1979\","
+            "\"source\":\"LIVE_USB_CU2\","
+            "\"capture_integrity_verified\":false,"
+            "\"execution_completed\":false,"
+            "\"physical_vehicle_verified\":false,"
+            "\"permits_programming\":false,"
+            "\"device_credential_authenticated\":");
+        write_bool(&writer, usb.authenticated);
+        write_literal(&writer, ",\"client_proof_sent\":");
+        write_bool(&writer, usb.client_proof_sent);
+        write_literal(&writer, ",\"observations_received\":0,\"error\":");
+        write_string(&writer, failure[0] ? failure : "Capture not fully validated");
+        write_literal(&writer, "}\n");
+    }
+    bool persisted = writer.bytes.get() && !writer.failed &&
+        atomic_create(o.report, writer.bytes.get(), writer.used);
+    bool all_frames_stable = valid && evidence.execution_completed;
+    for (size_t i = 0; i < evidence.visited_frames && all_frames_stable; ++i)
+        if (strcmp(evidence.progress[i].provisional_status, "COMPLETE") &&
+            strcmp(evidence.progress[i].provisional_status, "ABSENT"))
+            all_frames_stable = false;
+    int status = all_frames_stable && persisted ? 0 : 2;
+    if (!persisted)
+        fprintf(stderr, "Native CF/1 report could not be created; original capture is preserved\n");
+    if (!valid)
+        fprintf(stderr, "Native CF/1 not validated: %s\n", failure[0] ? failure : "Unexpected failure");
+    writer.bytes.reset(); free_input(&capture); free_input(&again);
+    cf1_evidence_free(&evidence);
+    return status;
+}
+
+/* Native CL/1 offline replay reuses the same secure input loading, source
+ * reread and exclusive 0600 publication as CF/1. It never contacts an ECU.
+ * Prefix observations cannot be promoted to a complete terminal receipt.
+ */
+static bool cl1_project(const input *capture, const char *vin, bool prefix,
+                        std::unique_ptr<char[]> *json_out, size_t *size_out, cl1_result *state) {
+    char reason[256] = {0};
+    memset(state, 0, sizeof(*state));
+    int replay = prefix ?
+        cl1_inspect_prefix(capture->bytes.get(), capture->length, vin,
+                           state, reason, sizeof(reason)) :
+        cl1_inspect_complete(capture->bytes.get(), capture->length, vin,
+                             state, reason, sizeof(reason));
+    if (replay != 0) {
+        fprintf(stderr, "CL/1 replay rejected: %s\n", reason);
+        return false;
+    }
+    json_writer w{65536};
+    w.bytes.reset(new (std::nothrow) char[w.capacity]{});
+    if (!w.bytes) return false;
+    write_literal(&w, "{\"schema\":");
+    write_string(&w, prefix ? "camarodiag-j1979-live-prefix-linux-c-v1" :
+                             "camarodiag-j1979-live-complete-linux-c-v1");
+    write_literal(&w, ",\"protocol\":\"SAE-J1979\","
+        "\"transport\":\"OFFLINE_CL1\",\"source\":");
+    write_string(&w, prefix ? "OFFLINE_CL1_PREFIX" : "OFFLINE_CL1");
+    write_literal(&w, ",\"physical_vehicle_verified\":false,"
+        "\"device_credential_authenticated\":false,"
+        "\"hardware_provenance_verified\":false,"
+        "\"permits_programming\":false,"
+        "\"raw_only\":true,\"profile\":{\"request_can_id\":");
+    write_can_hex(&w,state->plan.tx);
+    write_literal(&w,",\"response_can_id\":");
+    write_can_hex(&w,state->plan.rx);
+    write_literal(&w,",\"extended\":");
+    write_bool(&w,state->plan.extended);
+    write_literal(&w,",\"expected_vin\":");
+    write_string(&w,state->plan.vin);
+    write_literal(&w,",\"selected_pids\":");
+    write_array(&w,state->plan.pids,state->plan.pid_count);
+    write_literal(&w,",\"requested_cycles\":");
+    write_unsigned(&w,state->plan.cycles);
+    write_literal(&w,",\"interval_ms\":");
+    write_unsigned(&w,state->plan.interval_ms);
+    write_literal(&w,",\"budget_ms\":");
+    write_unsigned(&w,state->plan.budget_ms);
+    write_literal(&w,"},\"terminal_present\":");
+    write_bool(&w,state->terminal_present);
+    write_literal(&w,",\"prefix_integrity_verified\":");
+    write_bool(&w,state->prefix_integrity_verified);
+    write_literal(&w,",\"capture_integrity_verified\":");
+    write_bool(&w,state->capture_integrity_verified);
+    write_literal(&w,",\"execution_completed\":");
+    write_bool(&w,state->completed && !prefix);
+    write_literal(&w,",\"initial_vin_verified\":");
+    write_bool(&w,state->initial_vin);
+    write_literal(&w,",\"final_vin_verified\":");
+    write_bool(&w,state->final_vin);
+    write_literal(&w,",\"inventory_complete\":");
+    write_bool(&w,state->inventory_complete);
+    write_literal(&w,",\"complete_records\":");
+    write_unsigned(&w,state->records);
+    write_literal(&w,",\"observed_steps\":");
+    write_unsigned(&w,state->steps);
+    write_literal(&w,",\"completed_cycles\":");
+    write_unsigned(&w,state->completed_cycles);
+    write_literal(&w,",\"samples\":");
+    write_unsigned(&w,state->samples);
+    write_literal(&w,",\"raw_samples\":");
+    write_unsigned(&w,state->raw_samples);
+    write_literal(&w,",\"negative_samples\":");
+    write_unsigned(&w,state->negative_samples);
+    write_literal(&w,",\"timeout_samples\":");
+    write_unsigned(&w,state->timeout_samples);
+    write_literal(&w,",\"raw_bytes\":");
+    write_unsigned(&w,state->raw_bytes);
+    write_literal(&w,",\"recorded_duration_ms\":");
+    write_unsigned(&w,state->duration_ms);
+    write_literal(&w,",\"last_complete_offset\":");
+    write_unsigned(&w,state->last_complete_offset);
+    write_literal(&w,",\"discarded_tail_bytes\":");
+    write_unsigned(&w,state->discarded_tail_bytes);
+    write_literal(&w,",\"interruption\":");
+    if (prefix) write_string(&w,state->interruption);
+    else write_literal(&w,"null");
+    write_literal(&w,",\"stop_code\":");
+    write_unsigned(&w,state->stop);
+    write_literal(&w,",\"raw_per_selected_pid\":[");
+    for (unsigned i=0;i<state->plan.pid_count;++i) {
+        if (i) write_literal(&w,",");
+        write_unsigned(&w,state->raw_per_pid[i]);
+    }
+    write_literal(&w,"],\"capture_sha256\":");
+    write_string(&w,capture->digest);
+    write_literal(&w,"}\n");
+    if (w.failed) {w.bytes.reset();return false;}
+    *json_out = std::move(w.bytes);
+    *size_out=w.used;
+    return true;
+}
+static int cl1_inspect_cli(const char *capture_path, const char *vin,
+                           const char *output, bool prefix) {
+    input capture{}, again{};
+    cl1_result state{};
+    std::unique_ptr<char[]> report;
+    size_t n=0;
+    bool ok=load_regular(capture_path,CL1_MAX_CAPTURE,&capture);
+    if (ok) ok=cl1_project(&capture,vin,prefix,&report,&n,&state);
+    if (ok) ok=load_regular(capture_path,CL1_MAX_CAPTURE,&again) &&
+               same_input(&capture,&again);
+    if (ok) ok=atomic_create(output,report.get(),n);
+    report.reset();free_input(&capture);free_input(&again);
+    return ok?0:error("CL/1 inspection refused: invalid capture, source changed or output exists");
+}
+static int cl1_verify_cli(const char *capture_path, const char *report_path,
+                          const char *proof_path, const char *vin, bool prefix) {
+    input capture{}, stored{}, reread_capture{}, reread_report{};
+    cl1_result state{};
+    std::unique_ptr<char[]> canonical;
+    size_t size=0;
+    bool ok=load_regular(capture_path,CL1_MAX_CAPTURE,&capture) &&
+            load_regular(report_path,65536,&stored);
+    if (ok) ok=separate(&capture,&stored);
+    if (ok) ok=cl1_project(&capture,vin,prefix,&canonical,&size,&state);
+    /* No JSON field can be independently asserted by an untrusted saved
+     * report: exact canonical equality is required after strict CL/1 replay.
+     */
+    if (ok) ok=stored.length==size && !memcmp(stored.bytes.get(),canonical.get(),size);
+    if (ok) ok=load_regular(capture_path,CL1_MAX_CAPTURE,&reread_capture) &&
+               load_regular(report_path,65536,&reread_report) &&
+               same_input(&capture,&reread_capture) &&
+               same_input(&stored,&reread_report);
+    if (ok) {
+        char proof[1024];
+        int n=snprintf(proof,sizeof(proof),
+            "{\"schema\":\"camarodiag-j1979-live-verification-linux-c-v1\","
+            "\"consistent\":true,\"prefix\":%s,"
+            "\"capture_integrity_verified\":%s,"
+            "\"execution_completed\":%s,"
+            "\"physical_vehicle_verified\":false,"
+            "\"device_credential_authenticated\":false,"
+            "\"permits_programming\":false,"
+            "\"capture_sha256\":\"%s\",\"report_sha256\":\"%s\","
+            "\"verification_scope\":\"CANONICAL_OFFLINE_CL1\"}\n",
+            prefix?"true":"false",
+            state.capture_integrity_verified?"true":"false",
+            state.completed && !prefix?"true":"false",
+            capture.digest,stored.digest);
+        ok=n>0 && (size_t)n<sizeof(proof) &&
+            atomic_create(proof_path,proof,(size_t)n);
+    }
+    canonical.reset();
+    free_input(&capture);free_input(&stored);
+    free_input(&reread_capture);free_input(&reread_report);
+    return ok?0:error("CL/1 verification refused: altered report, unstable input or output exists");
+}
+
+
+typedef struct {
+    cl1_plan plan;
+    const char *port,*credential,*capture,*output,*projection,*csv;
+    bool approved,tx_set,rx_set,vin_set,budget_set,cycles_set,interval_set,extended_set;
+} cl1_capture_options;
+static bool parse_cl1_capture(int argc,char **argv,cl1_capture_options *o) {
+    memset(o,0,sizeof(*o));
+    o->plan.budget_ms=180000;
+    o->plan.cycles=30;
+    o->plan.interval_ms=1000;
+    for (int i=2;i<argc;++i) {
+        const char *flag=argv[i];
+        if (!strcmp(flag,"--extended")) {
+            if (o->extended_set) return false;
+            o->extended_set=true;
+            o->plan.extended=true;
+            continue;
+        }
+        if (!strcmp(flag,"--confirm-physical-channel")) {
+            if (o->approved) return false;
+            o->approved=true;
+            continue;
+        }
+        if (i+1>=argc || argv[i+1][0]=='-') return false;
+        const char *value=argv[++i];
+        if (!strcmp(flag,"--port")) {
+            if (o->port) return false;
+            o->port=value;
+        } else if (!strcmp(flag,"--key-file")) {
+            if (o->credential) return false;
+            o->credential=value;
+        } else if (!strcmp(flag,"--capture")) {
+            if (o->capture) return false;
+            o->capture=value;
+        } else if (!strcmp(flag,"--output")) {
+            if (o->output) return false;
+            o->output=value;
+        } else if (!strcmp(flag,"--projection-output")) {
+            if(o->projection||!*value)return false;
+            o->projection=value;
+        } else if (!strcmp(flag,"--csv")) {
+            if(o->csv||!*value)return false;
+            o->csv=value;
+        } else if (!strcmp(flag,"--tx")) {
+            if (o->tx_set || !hex_uint32(value,&o->plan.tx)) return false;
+            o->tx_set=true;
+        } else if (!strcmp(flag,"--rx")) {
+            if (o->rx_set || !hex_uint32(value,&o->plan.rx)) return false;
+            o->rx_set=true;
+        } else if (!strcmp(flag,"--vin")) {
+            if (o->vin_set || !cf1_valid_vin(value)) return false;
+            o->vin_set=true;
+            memcpy(o->plan.vin,value,18);
+        } else if (!strcmp(flag,"--budget-ms")) {
+            if (o->budget_set || !decimal_uint32(value,&o->plan.budget_ms))
+                return false;
+            o->budget_set=true;
+        } else if (!strcmp(flag,"--cycles")) {
+            uint32_t n=0;
+            if (o->cycles_set || !decimal_uint32(value,&n) || n>1000)
+                return false;
+            o->cycles_set=true;
+            o->plan.cycles=(uint16_t)n;
+        } else if (!strcmp(flag,"--interval-ms")) {
+            uint32_t n=0;
+            if (o->interval_set || !decimal_uint32(value,&n) || n>60000)
+                return false;
+            o->interval_set=true;
+            o->plan.interval_ms=(uint16_t)n;
+        } else if (!strcmp(flag,"--pid")) {
+            uint32_t n=0;
+            if (o->plan.pid_count>=CL1_MAX_PIDS ||
+                !hex_uint32(value,&n) || n>255) return false;
+            o->plan.pids[o->plan.pid_count++]=(uint8_t)n;
+        } else return false;
+    }
+    const std::array<const char*,5> destinations{o->credential,o->capture,o->output,o->projection,o->csv};
+    for(std::size_t a=0;a<destinations.size();++a)
+        for(std::size_t b=a+1;b<destinations.size();++b)
+            if(destinations[a]&&destinations[b]&&!strcmp(destinations[a],destinations[b]))return false;
+    return o->approved && o->tx_set && o->rx_set && o->vin_set &&
+        o->port && o->credential && o->capture && o->output &&
+        strcmp(o->capture,o->output) && strcmp(o->capture,o->credential) &&
+        strcmp(o->output,o->credential) &&
+        cl1_valid_plan(&o->plan);
+}
+static int capture_cl1_native(int argc,char **argv) {
+    cl1_capture_options o{};
+    if (!parse_cl1_capture(argc,argv,&o))
+        return error("CU/3 requires explicit approved physical pair, VIN, PID, key, port, capture, output, cycles and interval");
+    if (!isatty(STDIN_FILENO))
+        return error("CU/3 requires a local interactive operator and a stationary vehicle");
+    fprintf(stderr,
+        "CU/3 native Mode 01 RAW recording, selected real USB connector and ECU; stationary vehicle? Type yes: ");
+    char confirmation[16]={0};
+    if (!fgets(confirmation,sizeof(confirmation),stdin) ||
+        strcmp(confirmation,"yes\n"))
+        return error("CU/3 physical consent refused, no bytes transmitted");
+    struct Key {
+        uint8_t bytes[32]{};
+        ~Key(){OPENSSL_cleanse(bytes,sizeof(bytes));}
+    } key;
+    if (!read_key_file(o.credential,key.bytes))
+        return error("CU/3 requires a private provisioned 32-byte key, no fallback");
+    // Reserve the independent report before the USB handshake. A destination
+    // collision must never trigger an otherwise unnecessary vehicle read.
+    std::unique_ptr<cd::liveexport::Destination> output,projection,csv;
+    try{
+        output=std::make_unique<cd::liveexport::Destination>(o.output);
+        projection=std::make_unique<cd::liveexport::Destination>(o.projection);
+        csv=std::make_unique<cd::liveexport::Destination>(o.csv);
+    }catch(const std::exception& e){return error(e.what());}
+    struct sigaction action{},oldint{},oldterm{};
+    action.sa_handler=cancel_handler;
+    sigemptyset(&action.sa_mask);
+    bool registered=sigaction(SIGINT,&action,&oldint)==0;
+    if (registered && sigaction(SIGTERM,&action,&oldterm)!=0) {
+        sigaction(SIGINT,&oldint,NULL);
+        registered=false;
+    }
+    cf1_usb_capture_result transport{};
+    char failure[256]={0};
+    int received=registered ?
+        cl1_usb_capture(o.port,&o.plan,key.bytes,o.capture,
+                         &transport,failure,sizeof(failure)) : -1;
+    if (!registered)
+        snprintf(failure,sizeof(failure),"Cannot register cancellation handlers");
+    if (registered) {
+        sigaction(SIGINT,&oldint,NULL);
+        sigaction(SIGTERM,&oldterm,NULL);
+    }
+    OPENSSL_cleanse(key.bytes,sizeof(key.bytes));
+    /* Live credential proof is not an offline hardware attestation.
+     * The published schema records only independently replayed CL/1 bytes.
+     */
+    input capture{},again{};
+    std::unique_ptr<char[]> report;
+    size_t size=0;
+    cl1_result replay{};
+    bool complete=received==0 &&
+        load_regular(o.capture,CL1_MAX_CAPTURE,&capture);
+    // Compare the persisted plan with the approved scope, not only its VIN.
+    // An inventory that ends early after all selected PIDs are advertised is
+    // distinct from whole-inventory coverage; keep the reported flag intact.
+    const bool replayed=complete&&cl1_project(&capture,o.plan.vin,false,&report,&size,&replay);
+    const auto& approved=o.plan;const auto& observed=replay.plan;
+    const bool captured=replayed&&replay.capture_integrity_verified&&
+        observed.tx==approved.tx&&observed.rx==approved.rx&&observed.extended==approved.extended&&
+        observed.budget_ms==approved.budget_ms&&observed.cycles==approved.cycles&&
+        observed.interval_ms==approved.interval_ms&&observed.pid_count==approved.pid_count&&
+        !memcmp(observed.pids,approved.pids,approved.pid_count);
+    complete=captured&&replay.completed&&replay.initial_vin&&replay.final_vin;
+    // Keep a valid negative terminal as a canonical report, with a nonzero
+    // process exit code; only a rejected capture gets a failure envelope.
+    const bool canonical=captured&&load_regular(o.capture,CL1_MAX_CAPTURE,&again)&&
+        same_input(&capture,&again);
+    complete=complete&&canonical;
+    if (canonical) {
+        try{output->persist(std::string_view(report.get(),size));}
+        catch(const std::exception& e){
+            // Do not replace a partial report or retry the physical operation.
+            return error(e.what());
+        }
+    }
+    if (!canonical) {
+        /* A failed live capture is still a valuable forensic prefix.
+         * Never turn its incomplete/unsafe status into a successful report.
+         */
+        char failed_report[1200];
+        int count=snprintf(failed_report,sizeof(failed_report),
+            "{\"schema\":\"camarodiag-j1979-live-capture-failure-linux-c-v1\","
+            "\"protocol\":\"SAE-J1979\",\"source\":\"LIVE_USB_CU3\","
+            "\"execution_completed\":false,\"capture_integrity_verified\":false,"
+            "\"physical_vehicle_verified\":false,\"permits_programming\":false,"
+            "\"client_proof_sent\":%s,\"terminal_received\":%s,"
+            "\"retained_bytes\":%zu,\"failure\":",
+            transport.client_proof_sent?"true":"false",
+            transport.terminal_received?"true":"false",
+            transport.raw_bytes_received);
+        if (count>0 && (size_t)count<sizeof(failed_report)-3) {
+            size_t position=(size_t)count;
+            /* Do not quote raw path, key, or external error text. */
+            const char *reason=received!=0 ? "USB_CAPTURE_INCOMPLETE" :
+                               "INDEPENDENT_CL1_REPLAY_FAILED";
+            int written=snprintf(failed_report+position,
+                sizeof(failed_report)-position,"\"%s\"}\n",reason);
+            if (written>0 && (size_t)written<sizeof(failed_report)-position){
+                try{output->persist(std::string_view(failed_report,position+(size_t)written));}
+                catch(const std::exception& e){return error(e.what());}
+            }
+        }
+        fprintf(stderr,"CU/3: no qualified complete report; raw capture retained when created (%s)\n",
+                failure[0]?failure:"independent replay failed or output unavailable");
+    }
+    // Transport has closed. A valid negative terminal may still yield a
+    // useful incomplete projection; torn captures require separate inspection.
+    bool exports_complete=true;
+    if(projection->requested()||csv->requested()){
+        exports_complete=false;
+        if(canonical){
+            try{
+                const auto projected=cd::network::history::bind_native_live_projection(
+                    cd::network::history::project_cl1_live({capture.bytes.get(),capture.length},
+                        {o.plan.tx,o.plan.rx},o.plan.vin),capture.digest);
+                const auto numeric=projection->requested()?cd::json::serialize(projected.report)+"\n":std::string{};
+                const auto table=csv->requested()?cd::network::history::native_live_csv(projected):std::string{};
+                input checked{};
+                if(!load_regular(o.capture,CL1_MAX_CAPTURE,&checked)||!same_input(&capture,&checked))
+                    return error("CL/1 source changed before export");
+                projection->check_empty();csv->check_empty();
+                projection->persist(numeric);csv->persist(table);
+                input final{};
+                if(!load_regular(o.capture,CL1_MAX_CAPTURE,&final)||!same_input(&capture,&final))
+                    return error("CL/1 source changed after export");
+                exports_complete=projected.complete;
+            }catch(const std::exception& e){return error(e.what());}
+        }
+    }
+    report.reset();
+    free_input(&capture);free_input(&again);
+    return complete&&exports_complete?0:2;
+}
+
+static int cj1_inspect_cli(const char* capture_path,const char* vin,const char* output) {
+    input original{},again{};
+    try {
+        if(!load_regular(capture_path,cd::cj1::max_capture,&original))return error("CJ/1 input invalid");
+        const auto evidence=cd::cj1::inspect({original.bytes.get(),original.length});
+        const auto report=cd::cj1::report(evidence,vin,original.digest);
+        if(!load_regular(capture_path,cd::cj1::max_capture,&again)||!same_input(&original,&again))
+            return error("CJ/1 source changed during inspection");
+        if(!atomic_create(output,report.data(),report.size()))return error("CJ/1 output already exists or unavailable");
+        return evidence.integrity_verified&&evidence.end==1&&evidence.vin==vin?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int cm1_cli(const char* journal_path,const char* report_path,const char* proof_path,
+                   const char* vin,bool prefix) {
+    input original{},again{},stored{},stored_again{};
+    try {
+        if (!load_regular(journal_path,cd::cm1::max_journal,&original))
+            return error("CM/1 input is not a bounded regular file");
+        const auto evidence=cd::cm1::inspect({original.bytes.get(),original.length},vin,prefix);
+        const auto canonical=cd::cm1::report(evidence,original.digest);
+        if (proof_path) {
+            if (!load_regular(report_path,cd::cm1::max_report,&stored)||!separate(&original,&stored)||
+                stored.length!=canonical.size()||memcmp(stored.bytes.get(),canonical.data(),canonical.size()))
+                return error("CM/1 report differs from canonical independent replay");
+        }
+        if (!load_regular(journal_path,cd::cm1::max_journal,&again)||!same_input(&original,&again))
+            return error("CM/1 original changed");
+        if (proof_path) {
+            if (!load_regular(report_path,cd::cm1::max_report,&stored_again)||!same_input(&stored,&stored_again))
+                return error("CM/1 report changed");
+            const std::string proof=std::string("{\"schema\":\"camarodiag-j1979-native-maintenance-verification-linux-v1\","
+                "\"consistent\":true,\"verification_scope\":\"CANONICAL_OFFLINE_CM1\",\"journal_sha256\":\"")+
+                original.digest+"\",\"report_sha256\":\""+stored.digest+"\",\"recovery_required\":"+
+                (evidence.recovery_required()?"true":"false")+
+                ",\"physical_vehicle_verified\":false,\"permits_automatic_retry\":false,\"replayed\":"+
+                canonical.substr(0,canonical.size()-1)+"}\n";
+            if (proof.size()>cd::cm1::max_report||!atomic_create(proof_path,proof.data(),proof.size()))
+                return error("CM/1 proof path unavailable");
+        } else if (!atomic_create(report_path,canonical.data(),canonical.size())) {
+            return error("CM/1 report path unavailable");
+        }
+        return evidence.recovery_required()?7:0;
+    } catch(const std::exception& e) {
+        return error(e.what());
+    }
+}
+
+struct Cu1Options {
+    cd::cj1::Profile profile{0,0,60000,false};
+    const char *port{},*credential{},*capture{},*output{},*vin{};
+    bool approved{},tx_set{},rx_set{},budget_set{},ext_set{};
+};
+static bool parse_cu1(int argc,char** argv,Cu1Options& o) {
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--extended"){if(o.ext_set)return false;o.ext_set=true;o.profile.extended=true;continue;}
+        if(flag=="--confirm-physical-channel"){if(o.approved)return false;o.approved=true;continue;}
+        if(i+1>=argc||argv[i+1][0]=='-')return false;
+        const char* value=argv[++i];
+        if(flag=="--tx"){if(o.tx_set||!hex_uint32(value,&o.profile.tx))return false;o.tx_set=true;}
+        else if(flag=="--rx"){if(o.rx_set||!hex_uint32(value,&o.profile.rx))return false;o.rx_set=true;}
+        else if(flag=="--budget-ms"){if(o.budget_set||!decimal_uint32(value,&o.profile.budget))return false;o.budget_set=true;}
+        else {
+            const char** target=nullptr;
+            if(flag=="--port")target=&o.port;
+            else if(flag=="--key-file")target=&o.credential;
+            else if(flag=="--capture")target=&o.capture;
+            else if(flag=="--output")target=&o.output;
+            else if(flag=="--vin")target=&o.vin;
+            if(!target||*target||!*value)return false;
+            *target=value;
+        }
+    }
+    return o.approved&&o.tx_set&&o.rx_set&&o.port&&o.credential&&o.capture&&o.output&&o.vin&&
+        cf1_valid_vin(o.vin)&&cd::cj1::valid_profile(o.profile)&&
+        strcmp(o.capture,o.output)&&strcmp(o.credential,o.capture)&&strcmp(o.credential,o.output);
+}
+static int capture_cu1(int argc,char** argv) {
+    Cu1Options options;
+    if(!parse_cu1(argc,argv,options))return error("CU/1 requires explicit physical profile, independent VIN, key, port and separate output paths");
+    if(!isatty(STDIN_FILENO))return error("Local interactive confirmation required");
+    fputs("Read-only CU/1 test: confirm the selected physical ECU and stationary vehicle. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("CU/1 consent refused");
+    struct Key {
+        std::array<uint8_t,32> data{};
+        ~Key(){OPENSSL_cleanse(data.data(),data.size());}
+    } key;
+    if(!read_key_file(options.credential,key.data.data()))return error("Private 32-byte CU/1 key required");
+    // Reserve the report before transmission, and never truncate an existing report.
+    const int fd=open(options.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+    if(fd<0)return error("CU/1 report destination unavailable");
+    struct ReportFile {int fd;~ReportFile(){if(fd>=0)close(fd);}} output{fd};
+    struct sigaction action{},oldint{},oldterm{};
+    action.sa_handler=cancel_handler;
+    sigemptyset(&action.sa_mask);
+    const bool interrupt=sigaction(SIGINT,&action,&oldint)==0;
+    const bool terminate=interrupt&&sigaction(SIGTERM,&action,&oldterm)==0;
+    cf1_usb_capture_result transport{};
+    char failure[256]{};
+    const int status=terminate?cd::cu1::capture(options.port,options.profile,key.data,
+        options.capture,transport,failure,sizeof(failure)):-1;
+    if(terminate)sigaction(SIGTERM,&oldterm,nullptr);
+    if(interrupt)sigaction(SIGINT,&oldint,nullptr);
+    OPENSSL_cleanse(key.data.data(),key.data.size());
+    try {
+        input raw{},again{};
+        cd::cj1::Evidence evidence{};
+        char digest[65]{};
+        const bool available=transport.capture_file_created&&load_regular(options.capture,cd::cj1::max_capture,&raw);
+        if(available){
+            evidence=cd::cj1::inspect({raw.bytes.get(),raw.length});
+            memcpy(digest,raw.digest,sizeof(digest));
+        } else {
+            sha256_hex(reinterpret_cast<const unsigned char*>(""),0,digest);
+        }
+        const bool stable=available&&load_regular(options.capture,cd::cj1::max_capture,&again)&&same_input(&raw,&again);
+        if(status!=0||!stable||!(evidence.profile==options.profile)){
+            evidence.integrity_verified=false;
+            evidence.error=!terminate?"Cannot register cancellation handlers":
+                status!=0?"CU/1 capture interrupted or refused":!stable?"CJ/1 original missing or changed":"CJ/1 scope mismatch";
+        }
+        auto report=cd::cj1::report(evidence,options.vin,digest,true,transport.authenticated,transport.client_proof_sent);
+        report.resize(report.size()-2);
+        report+=",\"capture_file_created\":";
+        report+=transport.capture_file_created?"true":"false";
+        report+=",\"retained_bytes\":"+std::to_string(transport.raw_bytes_received)+
+            ",\"raw_capture_digest_available\":"+(available?std::string("true"):std::string("false"))+"}\n";
+        std::size_t offset=0;
+        while(offset<report.size()){
+            const auto n=write(output.fd,report.data()+offset,report.size()-offset);
+            if(n<0&&errno==EINTR)continue;
+            if(n<=0)return error("CU/1 report write failed");
+            offset+=static_cast<std::size_t>(n);
+        }
+        if(fsync(output.fd)!=0)return error("CU/1 report sync failed");
+        const int close_status=close(output.fd);output.fd=-1;
+        if(close_status)return error("CU/1 report close failed");
+        return evidence.integrity_verified&&evidence.end==1&&evidence.vin==options.vin?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int verify_historical_cf1_cli(int argc,char** argv){
+    const char* capture=nullptr;const char* report=nullptr;const char* output=nullptr;
+    std::optional<std::string> vin;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing verify-native-freeze option value");
+        const char* value=argv[i++];
+        if(key=="--capture"&&!capture)capture=value;
+        else if(key=="--report"&&!report)report=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else return error("Unexpected or duplicate verify-native-freeze option");
+    }
+    if(!capture||!report||!output)return error("verify-native-freeze requires capture, report and output");
+    try{
+        input raw{},stored{},again{},stored_again{};
+        constexpr std::size_t max_report=64u*1024u*1024u;
+        if(!load_regular(capture,CF1_MAX_BYTES,&raw)||!load_regular(report,max_report,&stored)||!separate(&raw,&stored))
+            return error("Distinct bounded CF/1 and report inputs required");
+        const auto saved=cd::json::parse_report({reinterpret_cast<const char*>(stored.bytes.get()),stored.length},max_report);
+        const auto checked=cd::cfhistory::verify({raw.bytes.get(),raw.length},saved,raw.digest,stored.digest,vin);
+        const auto proof=cd::network::history::encode_historical_json(checked.proof)+"\n";
+        if(!load_regular(capture,CF1_MAX_BYTES,&again)||!same_input(&raw,&again)||
+            !load_regular(report,max_report,&stored_again)||!same_input(&stored,&stored_again))
+            return error("CF/1 input changed during historical verification");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Historical CF/1 proof destination unavailable");
+        return checked.verified?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int verify_historical_cj1_cli(int argc,char** argv){
+    const char* capture=nullptr;const char* report=nullptr;const char* output=nullptr;
+    std::optional<std::string> vin;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing verify-j1979-capture option value");
+        const char* value=argv[i++];
+        if(key=="--capture"&&!capture)capture=value;
+        else if(key=="--report"&&!report)report=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else return error("Unexpected or duplicate verify-j1979-capture option");
+    }
+    if(!capture||!report||!output)return error("verify-j1979-capture requires capture, report and output");
+    try{
+        input raw{},stored{},again{},stored_again{};
+        if(!load_regular(capture,cd::cj1::max_capture,&raw)||!load_regular(report,cd::cj1::max_report,&stored)||!separate(&raw,&stored))
+            return error("Distinct bounded CJ/1 and report inputs required");
+        const auto saved=cd::json::parse_report({reinterpret_cast<const char*>(stored.bytes.get()),stored.length},cd::cj1::max_report);
+        const auto checked=cd::cj1::verify_historical({raw.bytes.get(),raw.length},saved,raw.digest,stored.digest,vin);
+        const auto proof=cd::network::history::encode_historical_json(checked.proof)+"\n";
+        if(!load_regular(capture,cd::cj1::max_capture,&again)||!same_input(&raw,&again)||
+            !load_regular(report,cd::cj1::max_report,&stored_again)||!same_input(&stored,&stored_again))
+            return error("CJ/1 input changed during historical verification");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Historical CJ/1 proof destination unavailable");
+        return checked.verified?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int verify_cj1_cli(const char* capture_path,const char* report_path,const char* proof_path,const char* vin){
+    input raw{},stored{},again{},stored_again{};
+    try{
+        if(!cf1_valid_vin(vin)||!load_regular(capture_path,cd::cj1::max_capture,&raw)||
+           !load_regular(report_path,cd::cj1::max_report,&stored)||!separate(&raw,&stored))
+            return error("CJ/1 verification requires independent VIN and distinct regular inputs");
+        const auto evidence=cd::cj1::inspect({raw.bytes.get(),raw.length});
+        if(!evidence.integrity_verified)return error("CJ/1 independent replay failed");
+        const auto canonical=cd::cj1::report(evidence,vin,raw.digest);
+        if(stored.length!=canonical.size()||memcmp(stored.bytes.get(),canonical.data(),canonical.size())||
+           !load_regular(capture_path,cd::cj1::max_capture,&again)||!same_input(&raw,&again)||
+           !load_regular(report_path,cd::cj1::max_report,&stored_again)||!same_input(&stored,&stored_again))
+            return error("CJ/1 canonical report mismatch or input changed");
+        const std::string proof=std::string("{\"schema\":\"camarodiag-j1979-campaign-verification-linux-v1\","
+            "\"verification_scope\":\"CANONICAL_OFFLINE_CJ1\",\"consistent\":true,"
+            "\"physical_vehicle_verified\":false,\"permits_programming\":false,\"capture_sha256\":\"")+
+            raw.digest+"\",\"report_sha256\":\""+stored.digest+"\",\"vin_match\":\""+
+            (evidence.vin.empty()?"UNVERIFIED":evidence.vin==vin?"MATCH":"MISMATCH")+"\"}\n";
+        if(!atomic_create(proof_path,proof.data(),proof.size()))return error("CJ/1 proof path unavailable");
+        return evidence.end==1&&evidence.vin==vin?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static volatile sig_atomic_t legacy_cancelled=0;
+static void legacy_signal(int){legacy_cancelled=1;}
+struct LegacyOptions {
+    const char* port{};
+    const char* output{},*capture{};
+    cd::legacy::Protocol protocol{};
+    uint32_t baud{38400},budget{8000},source{};
+    const char* vin{};bool source_set{};
+    bool confirmed{},protocol_set{},baud_set{},budget_set{};
+};
+static bool parse_legacy(int argc,char** argv,LegacyOptions& o,bool scan){
+    if(scan)o.budget=180000;
+    for(int i=2;i<argc;++i){
+        std::string_view flag=argv[i];
+        if(flag=="--confirm-physical-channel"){
+            if(o.confirmed)return false;
+            o.confirmed=true;continue;
+        }
+        if(i+1>=argc||argv[i+1][0]=='-')return false;
+        const char* value=argv[++i];
+        if(flag=="--port"){if(o.port)return false;o.port=value;}
+        else if(flag=="--output"){if(o.output)return false;o.output=value;}
+        else if(flag=="--capture"&&scan){if(o.capture)return false;o.capture=value;}
+        else if(flag=="--protocol"){
+            uint32_t n=0;if(o.protocol_set||!decimal_uint32(value,&n))return false;
+            o.protocol=static_cast<cd::legacy::Protocol>(n);o.protocol_set=true;
+        }else if(flag=="--source"&&scan){
+            if(o.source_set||strlen(value)!=2||!hex_uint32(value,&o.source)||!cd::legacy::valid_source(o.source))return false;
+            o.source_set=true;
+        }else if(flag=="--vin"&&scan){
+            if(o.vin||!cf1_valid_vin(value))return false;
+            o.vin=value;
+        }else if(flag=="--baud"){
+            if(o.baud_set||!decimal_uint32(value,&o.baud))return false;
+            o.baud_set=true;
+        }else if(flag=="--budget-ms"){
+            if(o.budget_set||!decimal_uint32(value,&o.budget))return false;
+            o.budget_set=true;
+        }else return false;
+    }
+    return o.port&&o.output&&o.confirmed&&o.protocol_set&&cd::legacy::valid_protocol(o.protocol)
+        &&o.budget>0&&o.budget<=(scan?600000u:60000u)&&(!scan||(o.source_set&&o.vin&&(!o.capture||strcmp(o.capture,o.output))));
+}
+static bool journal_matches(const std::string& path,cd::legacy::Protocol protocol,unsigned source,
+    std::string_view vin,cd::legacy::Bytes raw){
+    input original{},again{};
+    if(!load_regular(path.c_str(),cd::legacy::journal_max_bytes,&original))return false;
+    const auto evidence=cd::legacy::inspect_journal({original.bytes.get(),original.length},protocol,source,vin);
+    return evidence.terminal&&evidence.capture.size()==raw.size()&&
+        std::equal(evidence.capture.begin(),evidence.capture.end(),raw.begin())&&
+        load_regular(path.c_str(),cd::legacy::journal_max_bytes,&again)&&same_input(&original,&again);
+}
+static int legacy_discovery_cli(int argc,char** argv,bool scan=false){
+    LegacyOptions o;
+    if(!parse_legacy(argc,argv,o,scan))return error("Legacy requires port, protocol 1..5, output, explicit confirmation and selected source plus VIN for scan");
+    if(!isatty(STDIN_FILENO))return error("Local interactive consent required");
+    fputs(scan?"Confirm selected legacy ECU, documented VIN and stationary vehicle. Type yes: ":
+        "Confirm dedicated adapter and stationary vehicle, read-only PID00 discovery. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
+    const int fd=open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+    if(fd<0)return error("Report destination unavailable");
+    struct Output{int fd;~Output(){if(fd>=0)close(fd);}} output{fd};
+    Output capture{o.capture?open(o.capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600):-1};
+    if(o.capture&&capture.fd<0)return error("Scan capture destination unavailable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool interrupt{},terminate{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            interrupt=sigaction(SIGINT,&act,&oldint)==0;
+            terminate=interrupt&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(terminate)sigaction(SIGTERM,&oldterm,nullptr);if(interrupt)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    cd::legacy::Discovery d{};d.protocol=o.protocol;
+    cd::legacy::Scan s{};s.protocol=o.protocol;s.source=o.source;
+    if(o.vin)s.expected_vin=o.vin;
+    try{
+        if(!signals.terminate)throw cd::legacy::TransportError("Signal handlers unavailable");
+        const auto current=[](){return legacy_cancelled==0;};
+        std::unique_ptr<cd::legacy::CaptureJournal> journal;
+        if(scan){
+            const auto name=std::string(o.capture?o.capture:o.output)+".lj";
+            journal=std::make_unique<cd::legacy::CaptureJournal>(name.c_str(),
+                cd::legacy::ScanCapture{o.protocol,o.source,o.budget,o.vin,{}});
+        }
+        auto link=cd::legacy::serial_link(o.port,o.baud,current);
+        cd::legacy::Elm elm(*link,o.protocol,true,current);
+        elm.configure();
+        if(scan){
+            s=cd::legacy::scan_selected(elm,o.source,o.vin,o.budget,cd::legacy::monotonic_ms,current,
+                [&](const auto& row){journal->append(row);});
+            journal->finish();
+            const auto raw=cd::legacy::encode_scan_capture({s.protocol,s.source,s.budget_ms,s.expected_vin,s.trace});
+            if(!journal_matches(std::string(o.capture?o.capture:o.output)+".lj",o.protocol,o.source,o.vin,raw))
+                throw std::runtime_error("Legacy scan journal differs from capture");
+        }
+        else d=cd::legacy::discover(elm,o.budget,cd::legacy::monotonic_ms,current);
+    }catch(const cd::legacy::Cancelled&){d.error="CANCELLED";s.error=d.error;}
+    catch(const std::exception& e){d.error=e.what();s.error=d.error;s.completed=false;s.trace.clear();}
+    try{
+        if(scan&&o.capture&&!s.trace.empty()){
+            const auto raw=cd::legacy::encode_scan_capture({s.protocol,s.source,s.budget_ms,s.expected_vin,s.trace});
+            std::size_t offset=0;
+            while(offset<raw.size()){
+                const auto n=write(capture.fd,raw.data()+offset,raw.size()-offset);
+                if(n<0&&errno==EINTR)continue;
+                if(n<=0)return error("Scan capture write failed");
+                offset+=static_cast<std::size_t>(n);
+            }
+            if(fsync(capture.fd))return error("Scan capture persistence failed");
+            const int closed=close(capture.fd);capture.fd=-1;
+            if(closed)return error("Scan capture close failed");
+            input original{},again{};
+            if(!load_regular(o.capture,cd::legacy::scan_max_capture,&original)||original.length!=raw.size()||
+                memcmp(original.bytes.get(),raw.data(),raw.size())||
+                !load_regular(o.capture,cd::legacy::scan_max_capture,&again)||!same_input(&original,&again))
+                return error("Persisted scan capture changed");
+            const auto replay=cd::legacy::inspect_scan_capture({original.bytes.get(),original.length},s.protocol,s.source,s.expected_vin);
+            if(cd::legacy::scan_report(s)!=cd::legacy::scan_report(replay))return error("Scan result differs from independent replay");
+        }
+        const auto report=scan?cd::legacy::scan_report(s):cd::legacy::discovery_report(d);
+        size_t written=0;
+        while(written<report.size()){
+            const auto n=write(output.fd,report.data()+written,report.size()-written);
+            if(n<0&&errno==EINTR)continue;
+            if(n<=0)return error("Discovery report write failed");
+            written+=static_cast<size_t>(n);
+        }
+        if(fsync(output.fd))return error("Discovery report sync failed");
+        const int result=close(output.fd);output.fd=-1;
+        if(result)return error("Discovery report close failed");
+        return (scan?s.completed:d.complete)?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int replay_legacy_discovery(const char* protocol,const char* response,const char* probe,const char* output){
+    uint32_t n=0;
+    if(!decimal_uint32(protocol,&n)||!cd::legacy::valid_protocol(static_cast<cd::legacy::Protocol>(n)))
+        return error("Explicit legacy protocol 1..5 required");
+    input r{},p{},r_again{},p_again{};
+    try{
+        if(!load_regular(response,32768,&r)||!load_regular(probe,4096,&p)||!separate(&r,&p))
+            return error("Distinct raw response and ATDPN evidence files required");
+        const auto d=cd::legacy::replay_discovery(static_cast<cd::legacy::Protocol>(n),
+            {reinterpret_cast<const char*>(r.bytes.get()),r.length},{reinterpret_cast<const char*>(p.bytes.get()),p.length});
+        auto report=cd::legacy::discovery_report(d);
+        report.resize(report.size()-2);
+        report+=std::string(",\"source\":\"OFFLINE_REPLAY\",\"raw_response_sha256\":\"")+r.digest+
+            "\",\"raw_probe_sha256\":\""+p.digest+"\"}\n";
+        if(!load_regular(response,32768,&r_again)||!same_input(&r,&r_again)||
+            !load_regular(probe,4096,&p_again)||!same_input(&p,&p_again))return error("Raw evidence changed");
+        if(!atomic_create(output,report.data(),report.size()))return error("Replay report destination unavailable");
+        return d.complete?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+struct Cu45Options{
+    cd::cm1::Scope scope{};
+    const char* port{},*key{},*journal{},*report{};
+    bool operation{},tx{},rx{},budget{},extended{},confirmed{},warning{};
+};
+static bool parse_cu45(int argc,char** argv,Cu45Options& o,cd::cu45::Mode mode){
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--extended"){
+            if(o.extended)return false;
+            o.extended=true;o.scope.extended=true;continue;
+        }
+        if(flag=="--confirm-physical-channel"){
+            if(o.confirmed)return false;
+            o.confirmed=true;continue;
+        }
+        if(flag=="--acknowledge-maintenance-warning"){
+            if(o.warning||mode!=cd::cu45::Mode::maintenance)return false;
+            o.warning=true;continue;
+        }
+        if(i+1>=argc||argv[i+1][0]=='-')return false;
+        const char* value=argv[++i];
+        if(!*value)return false;
+        if(flag=="--operation"){
+            if(o.operation)return false;
+            o.operation=true;
+            if(!strcmp(value,"clear"))o.scope.operation=1;
+            else if(!strcmp(value,"evap"))o.scope.operation=2;
+            else return false;
+        }else if(flag=="--tx"){
+            if(o.tx||!hex_uint32(value,&o.scope.tx))return false;
+            o.tx=true;
+        }else if(flag=="--rx"){
+            if(o.rx||!hex_uint32(value,&o.scope.rx))return false;
+            o.rx=true;
+        }else if(flag=="--budget-ms"){
+            if(o.budget||!decimal_uint32(value,&o.scope.budget))return false;
+            o.budget=true;
+        }else if(flag=="--vin"){
+            if(!o.scope.vin.empty())return false;
+            o.scope.vin=value;
+        }else{
+            const char** slot=nullptr;
+            if(flag=="--port")slot=&o.port;
+            else if(flag=="--key-file")slot=&o.key;
+            else if(flag=="--journal")slot=&o.journal;
+            else if(flag=="--output")slot=&o.report;
+            if(!slot||*slot)return false;
+            *slot=value;
+        }
+    }
+    return o.operation&&o.tx&&o.rx&&o.budget&&o.confirmed&&o.port&&o.key&&o.journal&&o.report&&
+        (mode!=cd::cu45::Mode::maintenance||o.warning)&&cd::cu45::valid_scope(o.scope)&&
+        strcmp(o.key,o.journal)&&strcmp(o.key,o.report)&&strcmp(o.journal,o.report);
+}
+static int capture_cu45(int argc,char** argv,cd::cu45::Mode mode){
+    Cu45Options o;
+    if(!parse_cu45(argc,argv,o,mode))return error("Explicit primary ECM scope, journal, key, report, budget and confirmation required");
+    if(!isatty(STDIN_FILENO))return error("Interactive local approval required");
+    if(mode==cd::cu45::Mode::maintenance){
+        fputs("WARNING: clearing emissions DTCs can erase diagnostic and readiness data; EVAP is an active test. "
+              "Use only the stationary, authorized vehicle, with manufacturer safety conditions verified. "
+              "No automatic retry. Type AUTHORIZE MAINTENANCE: ",stderr);
+    }else fputs("Read-only recovery of an existing journal, no maintenance command. Type READ ARCHIVE: ",stderr);
+    char answer[64]{};
+    const char* expected=mode==cd::cu45::Mode::maintenance?"AUTHORIZE MAINTENANCE\n":"READ ARCHIVE\n";
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,expected))return error("Explicit approval refused");
+    struct Key{
+        std::array<uint8_t,32> data{};
+        ~Key(){OPENSSL_cleanse(data.data(),data.size());}
+    } key;
+    if(!read_key_file(o.key,key.data.data()))return error("Private 32-byte device credential required");
+    // Reserve both destinations before the proof can reach the connector.
+    const int fd=open(o.report,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+    if(fd<0)return error("Report destination unavailable");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}} out{fd};
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    try{
+        cd::cu45::Result r{};r.scope=o.scope;r.mode=mode;
+        if(signals.term)r=cd::cu45::capture_serial(mode,o.scope,key.data,o.port,o.journal,true,[]{return !legacy_cancelled;});
+        else r.error="SIGNAL_HANDLERS_UNAVAILABLE";
+        OPENSSL_cleanse(key.data.data(),key.data.size());
+        input first{},second{};
+        std::string digest;
+        if(r.file_created&&!r.journal.empty()){
+            const bool stable=load_regular(o.journal,cd::cm1::max_journal,&first)&&
+                first.length==r.journal.size()&&!memcmp(first.bytes.get(),r.journal.data(),first.length)&&
+                load_regular(o.journal,cd::cm1::max_journal,&second)&&same_input(&first,&second);
+            if(stable)digest=first.digest;
+            else{
+                r.inspection.reset();
+                if(r.error.empty())r.error="PERSISTED_JOURNAL_MISSING_OR_CHANGED";
+            }
+        }else if(r.verified()){
+            r.inspection.reset();r.error="NO_PERSISTED_JOURNAL";
+        }
+        if(legacy_cancelled){
+            r.cancelled=true;r.inspection.reset();
+            if(r.error.empty())r.error="CONTEXT_REVOKED";
+        }
+        auto report=cd::cu45::report(r,digest);
+        std::size_t offset=0;
+        while(offset<report.size()){
+            const auto n=write(out.fd,report.data()+offset,report.size()-offset);
+            if(n<0&&errno==EINTR)continue;
+            if(n<=0)return error("Report write failed; inspect retained journal, do not retry");
+            offset+=static_cast<std::size_t>(n);
+        }
+        if(fsync(out.fd))return error("Report persistence failed; do not retry");
+        const auto closed=close(out.fd);out.fd=-1;
+        if(closed)return error("Report close failed; do not retry");
+        if(!r.verified()||r.recovery_required())return 2;
+        if(mode==cd::cu45::Mode::maintenance){
+            const auto terminal=r.inspection->terminal;
+            return terminal&&(terminal->outcome==5||terminal->outcome==6)&&terminal->reason==0?0:2;
+        }
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+struct LegacyFreezeOptions{
+    cd::legacy::Protocol protocol{};
+    unsigned source{};
+    uint32_t baud{38400};
+    cd::legacy::FreezePlan plan;
+    const char* port{},*capture{},*output{};
+    bool protocol_set{},source_set{},baud_set{},budget_set{},approved{};
+};
+static bool parse_legacy_freeze(int argc,char** argv,LegacyFreezeOptions& o){
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--confirm-physical-channel"){
+            if(o.approved)return false;
+            o.approved=true;continue;
+        }
+        if(i+1>=argc||argv[i+1][0]=='-')return false;
+        const char* value=argv[++i];
+        if(!*value)return false;
+        if(flag=="--protocol"){
+            uint32_t n=0;
+            if(o.protocol_set||!decimal_uint32(value,&n))return false;
+            o.protocol=static_cast<cd::legacy::Protocol>(n);o.protocol_set=true;
+        }else if(flag=="--source"){
+            uint32_t n=0;
+            if(o.source_set||strlen(value)!=2||!hex_uint32(value,&n)||!cd::legacy::valid_source(n))return false;
+            o.source=n;o.source_set=true;
+        }else if(flag=="--baud"){
+            if(o.baud_set||!decimal_uint32(value,&o.baud))return false;
+            o.baud_set=true;
+        }else if(flag=="--budget-ms"){
+            uint32_t n=0;
+            if(o.budget_set||!decimal_uint32(value,&n))return false;
+            o.plan.budget_ms=n;o.budget_set=true;
+        }else if(flag=="--vin"){
+            if(!o.plan.vin.empty())return false;
+            o.plan.vin=value;
+        }else if(flag=="--frame"||flag=="--pid"){
+            uint32_t n=0;
+            if(strlen(value)!=2||!hex_uint32(value,&n)||n>255)return false;
+            auto& list=flag=="--frame"?o.plan.frames:o.plan.pids;
+            if(list.size()>=(flag=="--frame"?8u:64u))return false;
+            list.push_back(static_cast<uint8_t>(n));
+        }else{
+            const char** slot=nullptr;
+            if(flag=="--port")slot=&o.port;
+            else if(flag=="--capture")slot=&o.capture;
+            else if(flag=="--output")slot=&o.output;
+            if(!slot||*slot)return false;
+            *slot=value;
+        }
+    }
+    return o.approved&&o.protocol_set&&o.source_set&&o.port&&o.capture&&o.output&&
+        strcmp(o.capture,o.output)&&cd::legacy::valid_protocol(o.protocol)&&o.plan.valid();
+}
+static bool write_owned_file(int& fd,const void* bytes,std::size_t size){
+    const auto* data=static_cast<const unsigned char*>(bytes);
+    while(size){
+        const auto n=write(fd,data,size);
+        if(n<0&&errno==EINTR)continue;
+        if(n<=0)return false;
+        data+=n;size-=static_cast<std::size_t>(n);
+    }
+    const bool synced=fsync(fd)==0;
+    const bool closed=close(fd)==0;
+    fd=-1;return synced&&closed;
+}
+static int legacy_freeze_cli(int argc,char** argv){
+    LegacyFreezeOptions o;
+    if(!parse_legacy_freeze(argc,argv,o))return error("Explicit selected legacy ECU, VIN, frames, capture and report required");
+    if(!isatty(STDIN_FILENO))return error("Interactive confirmation required");
+    fputs("Legacy freeze: functional reads only, selected checksum-verified response source, stationary vehicle. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}};
+    File capture{open(o.capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(capture.fd<0)return error("Capture destination unavailable");
+    File output{open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(output.fd<0)return error("Report destination unavailable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    try{
+        if(!signals.term)return error("Cancellation handlers unavailable");
+        const auto current=[](){return legacy_cancelled==0;};
+        const auto journal_path=std::string(o.capture)+".lj";
+        cd::legacy::CaptureJournal journal(journal_path.c_str(),cd::legacy::FreezeCapture{o.protocol,o.source,o.plan,{}});
+        cd::legacy::FreezeResult result;
+        {
+            auto link=cd::legacy::serial_link(o.port,o.baud,current);
+            cd::legacy::Elm elm(*link,o.protocol,true,current);
+            elm.configure();
+            result=cd::legacy::acquire_freeze(elm,o.source,o.plan,cd::legacy::monotonic_ms,current,[&](const auto& row){journal.append(row);});
+        }
+        journal.finish();
+        const auto raw=cd::legacy::encode_freeze_capture({o.protocol,o.source,o.plan,result.trace});
+        if(!journal_matches(journal_path,o.protocol,o.source,o.plan.vin,raw))return error("Legacy journal differs from capture");
+        if(!write_owned_file(capture.fd,raw.data(),raw.size()))return error("Freeze capture persistence failed");
+        input original{},again{};
+        if(!load_regular(o.capture,cd::legacy::freeze_max_capture,&original)||original.length!=raw.size()||
+           memcmp(original.bytes.get(),raw.data(),raw.size())||
+           !load_regular(o.capture,cd::legacy::freeze_max_capture,&again)||!same_input(&original,&again))
+            return error("Persisted legacy freeze capture changed");
+        const auto replay=cd::legacy::inspect_freeze_capture({original.bytes.get(),original.length},o.protocol,o.source,o.plan.vin);
+        const auto report=cd::legacy::freeze_report(replay);
+        if(report!=cd::legacy::freeze_report(result))return error("Live result differs from independent raw replay");
+        if(!write_owned_file(output.fd,report.data(),report.size()))return error("Freeze report persistence failed");
+        return replay.completed&&replay.all_frames_stable?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int legacy_freeze_replay(const char* protocol,const char* source,const char* vin,
+    const char* capture_path,const char* report_path,const char* proof_path){
+    uint32_t p=0,n=0;
+    if(!decimal_uint32(protocol,&p)||!cd::legacy::valid_protocol(static_cast<cd::legacy::Protocol>(p))||
+        strlen(source)!=2||!hex_uint32(source,&n)||!cd::legacy::valid_source(n)||!cf1_valid_vin(vin))
+        return error("Independent protocol, selected source and VIN required");
+    input original{},again{},stored{},stored_again{};
+    try{
+        if(!load_regular(capture_path,cd::legacy::freeze_max_capture,&original))
+            return error("Invalid bounded LFR/1 capture");
+        const auto replay=cd::legacy::inspect_freeze_capture({original.bytes.get(),original.length},
+            static_cast<cd::legacy::Protocol>(p),n,vin);
+        const auto canonical=cd::legacy::freeze_report(replay);
+        if(proof_path){
+            if(!load_regular(report_path,cd::legacy::freeze_max_capture*6,&stored)||!separate(&original,&stored)||
+                stored.length!=canonical.size()||memcmp(stored.bytes.get(),canonical.data(),canonical.size())||
+                !load_regular(report_path,cd::legacy::freeze_max_capture*6,&stored_again)||!same_input(&stored,&stored_again))
+                return error("Legacy freeze report differs from independent replay");
+        }
+        if(!load_regular(capture_path,cd::legacy::freeze_max_capture,&again)||!same_input(&original,&again))
+            return error("Legacy freeze capture changed during replay");
+        if(proof_path){
+            const auto proof=std::string("{\"schema\":\"camarodiag-j1979-legacy-freeze-verification-linux-v1\","
+                "\"consistent\":true,\"physical_vehicle_verified\":false,\"capture_sha256\":\"")+original.digest+
+                "\",\"report_sha256\":\""+stored.digest+"\",\"completed\":"+(replay.completed?"true":"false")+
+                ",\"all_frames_stable\":"+(replay.all_frames_stable?"true":"false")+
+                ",\"permits_programming\":false}\n";
+            if(!atomic_create(proof_path,proof.data(),proof.size()))return error("Legacy freeze proof destination unavailable");
+        }else if(!atomic_create(report_path,canonical.data(),canonical.size()))return error("Legacy freeze report destination unavailable");
+        return replay.completed&&replay.all_frames_stable?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static bool sync_parent(const char* path);
+struct LegacyLiveOptions{
+    cd::legacy::Protocol protocol{};
+    unsigned source{};
+    uint32_t baud{38400};
+    cd::legacy::LivePlan plan;
+    const char* port{},*capture{},*output{},*csv{};
+    bool protocol_set{},source_set{},baud_set{},budget_set{},approved{},cycles_set{},interval_set{},quiet{};
+};
+static bool parse_legacy_live(int argc,char** argv,LegacyLiveOptions& o){
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--quiet"){
+            if(o.quiet)return false;
+            o.quiet=true;continue;
+        }
+        if(flag=="--raw-only"){
+            if(o.plan.raw_only)return false;
+            o.plan.raw_only=true;continue;
+        }
+        if(flag=="--confirm-physical-channel"){
+            if(o.approved)return false;
+            o.approved=true;continue;
+        }
+        if(i+1>=argc||argv[i+1][0]=='-')return false;
+        const char* value=argv[++i];
+        if(!*value)return false;
+        if(flag=="--protocol"){
+            uint32_t n=0;
+            if(o.protocol_set||!decimal_uint32(value,&n))return false;
+            o.protocol=static_cast<cd::legacy::Protocol>(n);o.protocol_set=true;
+        }else if(flag=="--source"){
+            uint32_t n=0;
+            if(o.source_set||strlen(value)!=2||!hex_uint32(value,&n)||!cd::legacy::valid_source(n))return false;
+            o.source=n;o.source_set=true;
+        }else if(flag=="--baud"){
+            if(o.baud_set||!decimal_uint32(value,&o.baud))return false;
+            o.baud_set=true;
+        }else if(flag=="--budget-ms"||flag=="--budget"){
+            uint32_t n=0;
+            if(o.budget_set||(flag=="--budget"?!cd::liveoptions::seconds_ms(value,n):!decimal_uint32(value,&n)))return false;
+            o.plan.budget_ms=n;o.budget_set=true;
+        }else if(flag=="--vin"){
+            if(!o.plan.vin.empty())return false;
+            o.plan.vin=value;
+        }else if(flag=="--cycles"||flag=="--interval-ms"||flag=="--interval"){
+            auto& seen=flag=="--cycles"?o.cycles_set:o.interval_set;
+            uint32_t n=0;if(seen||(flag=="--interval"?!cd::liveoptions::seconds_ms(value,n):!decimal_uint32(value,&n)))return false;
+            seen=true;if(flag=="--cycles")o.plan.cycles=n;else o.plan.interval_ms=n;
+        }else if(flag=="--pid"){
+            uint32_t n=0;
+            if(strlen(value)!=2||!hex_uint32(value,&n)||n>255)return false;
+            auto& list=o.plan.pids;
+            if(list.size()>=32)return false;
+            list.push_back(static_cast<uint8_t>(n));
+        }else{
+            const char** slot=nullptr;
+            if(flag=="--port")slot=&o.port;
+            else if(flag=="--capture")slot=&o.capture;
+            else if(flag=="--output")slot=&o.output;
+            else if(flag=="--csv")slot=&o.csv;
+            if(!slot||*slot)return false;
+            *slot=value;
+        }
+    }
+    return o.approved&&o.protocol_set&&o.source_set&&o.port&&o.capture&&o.output&&
+        strcmp(o.capture,o.output)&&(!o.csv||(strcmp(o.csv,o.capture)&&strcmp(o.csv,o.output)))&&
+        cd::legacy::valid_protocol(o.protocol)&&o.plan.valid();
+}
+static int legacy_live_cli(int argc,char** argv){
+    LegacyLiveOptions o;
+    if(!parse_legacy_live(argc,argv,o))return error("Explicit selected legacy ECU, VIN, PIDs, capture and report required");
+    if(!isatty(STDIN_FILENO))return error("Interactive confirmation required");
+    fputs("Legacy live: functional reads only, selected checksum-verified response source, stationary vehicle. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}};
+    File capture{open(o.capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(capture.fd<0)return error("Capture destination unavailable");
+    File output{open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(output.fd<0)return error("Report destination unavailable");
+    std::unique_ptr<cd::liveexport::Destination> csv;
+    try{csv=std::make_unique<cd::liveexport::Destination>(o.csv);}
+    catch(const std::exception& e){return error(e.what());}
+    if(!sync_parent(o.capture)||!sync_parent(o.output))return error("Legacy output reservation not durable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    try{
+        if(!signals.term)return error("Cancellation handlers unavailable");
+        const auto current=[](){return legacy_cancelled==0;};
+        const auto journal_path=std::string(o.capture)+".lj";
+        cd::legacy::CaptureJournal journal(journal_path.c_str(),cd::legacy::LiveCapture{o.protocol,o.source,o.plan,{}});
+        cd::legacy::LiveResult result;
+        {
+            auto link=cd::legacy::serial_link(o.port,o.baud,current);
+            cd::legacy::Elm elm(*link,o.protocol,true,current);
+            elm.configure();
+            result=cd::legacy::acquire_live(elm,o.source,o.plan,cd::legacy::monotonic_ms,current,[](unsigned ms){
+                struct timespec delay{static_cast<time_t>(ms/1000),static_cast<long>((ms%1000)*1000000)};
+                nanosleep(&delay,nullptr);
+            },[&](const auto& row){
+                journal.append(row);
+                if(!o.quiet&&row.phase==cd::legacy::LivePhase::sample&&row.exchange.command!="WAIT")
+                    fprintf(stderr,"J1979 legacy pending identity: %u ms cycle %u request %s exchange outcome %u\n",
+                        row.ended_ms,row.cycle,row.exchange.command.c_str(),static_cast<unsigned>(row.exchange.outcome));
+            });
+        }
+        journal.finish();
+        const auto raw=cd::legacy::encode_live_capture({o.protocol,o.source,o.plan,result.trace});
+        if(!journal_matches(journal_path,o.protocol,o.source,o.plan.vin,raw))return error("Legacy journal differs from capture");
+        if(!write_owned_file(capture.fd,raw.data(),raw.size()))return error("Live capture persistence failed");
+        input original{},again{};
+        if(!load_regular(o.capture,cd::legacy::live_max_capture,&original)||original.length!=raw.size()||
+           memcmp(original.bytes.get(),raw.data(),raw.size())||
+           !load_regular(o.capture,cd::legacy::live_max_capture,&again)||!same_input(&original,&again))
+            return error("Persisted legacy live capture changed");
+        const auto replay=cd::legacy::inspect_live_capture({original.bytes.get(),original.length},o.protocol,o.source,o.plan.vin);
+        const auto report=cd::legacy::live_report(replay);
+        if(report!=cd::legacy::live_report(result))return error("Live result differs from independent raw replay");
+        if(!write_owned_file(output.fd,report.data(),report.size()))return error("Live report persistence failed");
+        if(csv->requested()){
+            const auto table=cd::legacy::live_csv(replay);
+            input before{},after{};
+            if(!load_regular(o.capture,cd::legacy::live_max_capture,&before)||!same_input(&original,&before))
+                return error("Legacy capture changed before CSV export");
+            csv->persist(table);
+            if(!load_regular(o.capture,cd::legacy::live_max_capture,&after)||!same_input(&original,&after))
+                return error("Legacy capture changed after CSV export");
+        }
+        return replay.completed&&replay.identity_rechecked?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int legacy_live_replay(const char* protocol,const char* source,const char* vin,
+    const char* capture_path,const char* report_path,const char* proof_path){
+    uint32_t p=0,n=0;
+    if(!decimal_uint32(protocol,&p)||!cd::legacy::valid_protocol(static_cast<cd::legacy::Protocol>(p))||
+        strlen(source)!=2||!hex_uint32(source,&n)||!cd::legacy::valid_source(n)||!cf1_valid_vin(vin))
+        return error("Independent protocol, selected source and VIN required");
+    input original{},again{},stored{},stored_again{};
+    try{
+        if(!load_regular(capture_path,cd::legacy::live_max_capture,&original))
+            return error("Invalid bounded LLR/1 capture");
+        const auto replay=cd::legacy::inspect_live_capture({original.bytes.get(),original.length},
+            static_cast<cd::legacy::Protocol>(p),n,vin);
+        const auto canonical=cd::legacy::live_report(replay);
+        if(proof_path){
+            if(!load_regular(report_path,cd::legacy::live_max_capture*6,&stored)||!separate(&original,&stored)||
+                stored.length!=canonical.size()||memcmp(stored.bytes.get(),canonical.data(),canonical.size())||
+                !load_regular(report_path,cd::legacy::live_max_capture*6,&stored_again)||!same_input(&stored,&stored_again))
+                return error("Legacy live report differs from independent replay");
+        }
+        if(!load_regular(capture_path,cd::legacy::live_max_capture,&again)||!same_input(&original,&again))
+            return error("Legacy live capture changed during replay");
+        if(proof_path){
+            const auto proof=std::string("{\"schema\":\"camarodiag-j1979-legacy-live-verification-linux-v1\","
+                "\"consistent\":true,\"physical_vehicle_verified\":false,\"capture_sha256\":\"")+original.digest+
+                "\",\"report_sha256\":\""+stored.digest+"\",\"completed\":"+(replay.completed?"true":"false")+
+                ",\"identity_rechecked\":"+(replay.identity_rechecked?"true":"false")+
+                ",\"permits_programming\":false}\n";
+            if(!atomic_create(proof_path,proof.data(),proof.size()))return error("Legacy live proof destination unavailable");
+        }else if(!atomic_create(report_path,canonical.data(),canonical.size()))return error("Legacy live report destination unavailable");
+        return replay.completed&&replay.identity_rechecked?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int legacy_live_csv_cli(int argc,char** argv){
+    const char* protocol=nullptr;const char* source=nullptr;const char* vin=nullptr;
+    const char* capture=nullptr;const char* output=nullptr;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing legacy CSV option value");
+        const char* value=argv[i++];
+        if(key=="--protocol"&&!protocol)protocol=value;
+        else if(key=="--source"&&!source)source=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else if(key=="--capture"&&!capture)capture=value;
+        else if(key=="--output"&&!output)output=value;
+        else return error("Unexpected or duplicate legacy CSV option");
+    }
+    uint32_t p=0,n=0;
+    if(!protocol||!source||!vin||!capture||!output||!decimal_uint32(protocol,&p)||
+        p<1||p>5||strlen(source)!=2||!hex_uint32(source,&n)||!cd::legacy::valid_source(n)||!cf1_valid_vin(vin))
+        return error("Legacy CSV requires independent protocol, source, VIN and capture");
+    try{
+        input original{},again{};
+        if(!load_regular(capture,cd::legacy::live_max_capture,&original))return error("Bounded LLR/1 capture required");
+        const auto replay=cd::legacy::inspect_live_capture({original.bytes.get(),original.length},
+            static_cast<cd::legacy::Protocol>(p),n,vin);
+        const auto csv=cd::legacy::live_csv(replay);
+        if(!load_regular(capture,cd::legacy::live_max_capture,&again)||!same_input(&original,&again))
+            return error("Legacy CSV source changed");
+        if(!atomic_create(output,csv.data(),csv.size()))return error("Legacy CSV destination unavailable");
+        return replay.completed&&replay.identity_rechecked?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int legacy_scan_replay(const char* protocol,const char* source,const char* vin,
+    const char* capture_path,const char* report_path,const char* proof_path){
+    uint32_t p=0,n=0;
+    if(!decimal_uint32(protocol,&p)||!cd::legacy::valid_protocol(static_cast<cd::legacy::Protocol>(p))||
+        strlen(source)!=2||!hex_uint32(source,&n)||!cd::legacy::valid_source(n)||!cf1_valid_vin(vin))
+        return error("Independent protocol, selected source and VIN required");
+    input original{},again{},stored{},stored_again{};
+    try{
+        if(!load_regular(capture_path,cd::legacy::scan_max_capture,&original))
+            return error("Invalid bounded LSR/1 capture");
+        const auto replay=cd::legacy::inspect_scan_capture({original.bytes.get(),original.length},
+            static_cast<cd::legacy::Protocol>(p),n,vin);
+        const auto canonical=cd::legacy::scan_report(replay);
+        if(proof_path){
+            if(!load_regular(report_path,cd::legacy::scan_max_capture*6,&stored)||!separate(&original,&stored)||
+                stored.length!=canonical.size()||memcmp(stored.bytes.get(),canonical.data(),canonical.size())||
+                !load_regular(report_path,cd::legacy::scan_max_capture*6,&stored_again)||!same_input(&stored,&stored_again))
+                return error("Legacy scan report differs from independent replay");
+        }
+        if(!load_regular(capture_path,cd::legacy::scan_max_capture,&again)||!same_input(&original,&again))
+            return error("Legacy scan capture changed during replay");
+        if(proof_path){
+            const auto proof=std::string("{\"schema\":\"camarodiag-j1979-legacy-scan-verification-linux-v1\","
+                "\"consistent\":true,\"physical_vehicle_verified\":false,\"capture_sha256\":\"")+original.digest+
+                "\",\"report_sha256\":\""+stored.digest+"\",\"completed\":"+(replay.completed?"true":"false")+
+                ",\"identity_rechecked\":"+(replay.identity_rechecked?"true":"false")+
+                ",\"permits_programming\":false}\n";
+            if(!atomic_create(proof_path,proof.data(),proof.size()))return error("Legacy scan proof destination unavailable");
+        }else if(!atomic_create(report_path,canonical.data(),canonical.size()))return error("Legacy scan report destination unavailable");
+        return replay.completed&&replay.identity_rechecked?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+struct LegacyMaintenanceOptions{
+    cd::legacy::MutationPlan plan;
+    const char* port{},*baseline{},*intent{},*output{};
+    uint32_t baud{38400};
+    bool protocol{},operation{},engine{},baud_set{},budget_set{},confirmed{},warning{};
+};
+static bool parse_legacy_maintenance(int argc,char** argv,LegacyMaintenanceOptions& o){
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--confirm-functional-scope"||flag=="--acknowledge-maintenance-warning"){
+            auto& seen=flag=="--confirm-functional-scope"?o.confirmed:o.warning;
+            if(seen)return false;
+            seen=true;continue;
+        }
+        if(i+1>=argc||argv[i+1][0]=='-'||!*argv[i+1])return false;
+        const char* value=argv[++i];
+        if(flag=="--protocol"){
+            uint32_t n=0;if(o.protocol||!decimal_uint32(value,&n)||n<1||n>5)return false;
+            o.protocol=true;o.plan.protocol=static_cast<cd::legacy::Protocol>(n);
+        }else if(flag=="--operation"){
+            if(o.operation)return false;
+            o.operation=true;
+            if(!strcmp(value,"clear"))o.plan.operation=cd::legacy::MutationOperation::clear;
+            else if(!strcmp(value,"evap"))o.plan.operation=cd::legacy::MutationOperation::evap;
+            else return false;
+        }else if(flag=="--engine-source"||flag=="--source"){
+            uint32_t n=0;
+            if(strlen(value)!=2||!hex_uint32(value,&n)||!cd::legacy::valid_source(n))return false;
+            if(flag=="--engine-source"){
+                if(o.engine)return false;
+                o.engine=true;o.plan.engine=n;
+            }else if(o.plan.sources.size()>=32||!o.plan.sources.insert(n).second)return false;
+        }else if(flag=="--vin"){
+            if(!o.plan.vin.empty())return false;
+            o.plan.vin=value;
+        }else if(flag=="--budget-ms"||flag=="--baud"){
+            auto& seen=flag=="--baud"?o.baud_set:o.budget_set;
+            uint32_t n=0;if(seen||!decimal_uint32(value,&n))return false;
+            seen=true;if(flag=="--baud")o.baud=n;else o.plan.budget_ms=n;
+        }else{
+            const char** slot=nullptr;
+            if(flag=="--port")slot=&o.port;
+            else if(flag=="--baseline")slot=&o.baseline;
+            else if(flag=="--intent")slot=&o.intent;
+            else if(flag=="--output")slot=&o.output;
+            if(!slot||*slot)return false;
+            *slot=value;
+        }
+    }
+    return o.protocol&&o.operation&&o.engine&&o.confirmed&&o.warning&&o.port&&o.baseline&&o.intent&&o.output&&
+        strcmp(o.baseline,o.intent)&&strcmp(o.baseline,o.output)&&strcmp(o.intent,o.output)&&o.plan.valid();
+}
+static bool sync_parent(const char* path){
+    const std::string name(path);
+    const auto slash=name.find_last_of('/');
+    const auto dir=slash==std::string::npos?std::string("."):slash==0?std::string("/"):name.substr(0,slash);
+    const int fd=open(dir.c_str(),O_RDONLY|O_DIRECTORY|O_CLOEXEC);
+    if(fd<0)return false;
+    const bool synced=fsync(fd)==0;const bool closed=close(fd)==0;return synced&&closed;
+}
+static int legacy_maintenance_cli(int argc,char** argv){
+    LegacyMaintenanceOptions o;
+    if(!parse_legacy_maintenance(argc,argv,o))return error("Explicit functional scope, documented ECU set, VIN, separate journals and warnings required");
+    if(!isatty(STDIN_FILENO))return error("Interactive local consent required");
+    fputs("WARNING: functional legacy requests may affect ECUs outside the observed set. "
+        "Clearing DTCs can erase diagnostic and readiness data; EVAP is an active test. "
+        "Verify manufacturer safety conditions and authorized stationary vehicle. "
+        "No automatic retry. Type AUTHORIZE VEHICLE WIDE: ",stderr);
+    char answer[64]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"AUTHORIZE VEHICLE WIDE\n"))return error("Consent refused");
+    struct File{
+        const char* path;
+        int fd{-1};
+        explicit File(const char* p):path(p),fd(open(p,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)){}
+        ~File(){if(fd>=0)close(fd);}
+        input saved{};
+        bool unchanged() const {
+            input fresh{};
+            return saved.length&&load_regular(path,saved.length,&fresh)&&same_input(&saved,&fresh);
+        }
+        bool persist(std::string_view text){
+            struct stat identity{};
+            if(fd<0||text.empty()||fstat(fd,&identity)||!S_ISREG(identity.st_mode)||
+                !write_owned_file(fd,text.data(),text.size())||!sync_parent(path))return false;
+            if(!load_regular(path,text.size(),&saved)||saved.length!=text.size()||
+                saved.device!=identity.st_dev||saved.inode!=identity.st_ino||
+                memcmp(saved.bytes.get(),text.data(),text.size()))return false;
+            return unchanged();
+        }
+    };
+    // All three unique destinations must be reserved before adapter access.
+    File baseline(o.baseline),intent(o.intent),output(o.output);
+    if(baseline.fd<0||intent.fd<0||output.fd<0)return error("Maintenance journal paths unavailable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    cd::legacy::MutationResult r{};r.plan=o.plan;
+    try{
+        if(!signals.term)throw cd::legacy::TransportError("SIGNAL_HANDLERS_UNAVAILABLE");
+        const auto current=[](){return legacy_cancelled==0;};
+        auto link=cd::legacy::serial_link(o.port,o.baud,current);
+        cd::legacy::Elm elm(*link,o.plan.protocol,true,current);elm.configure();
+        cd::legacy::MutationSession session(elm);
+        r=session.run(o.plan,true,true,cd::legacy::monotonic_ms,current,
+            [&](std::string_view stage,const cd::legacy::MutationResult& observed){
+                auto snapshot=observed;snapshot.outcome=stage;
+                auto& file=stage=="BASELINE"?baseline:intent;
+                if((stage!="BASELINE"&&!baseline.unchanged())||
+                    !file.persist(cd::legacy::mutation_report(snapshot))||
+                    (stage!="BASELINE"&&!baseline.unchanged()))
+                    throw cd::legacy::TransportError("DURABLE_JOURNAL_WRITE_FAILED");
+            });
+    }catch(const std::exception& e){r.reason=e.what();}
+    try{
+        const auto report=cd::legacy::mutation_report(r);
+        if(!output.persist(report))return error("Final maintenance report failed; retain intent and never retry automatically");
+        return (r.outcome=="ACKNOWLEDGED_READBACK"&&r.reason.empty())||r.outcome=="ACKNOWLEDGED"?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+struct NetworkOptions{
+    const char* interface{},*output{},*vin{},*journal_directory{};
+    unsigned window_ms{1500},budget_ms{180000};
+    bool extended{},confirmed{},window_set{},budget_set{};
+    std::vector<std::uint32_t> ids;
+};
+static bool parse_network(int argc,char** argv,NetworkOptions& o,bool scan){
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--extended"||flag=="--confirm-functional-scope"){
+            auto& seen=flag=="--extended"?o.extended:o.confirmed;
+            if(seen)return false;
+            seen=true;continue;
+        }
+        if(i+1>=argc||argv[i+1][0]=='-'||!*argv[i+1])return false;
+        const char* value=argv[++i];
+        if(flag=="--interface"){if(o.interface)return false;o.interface=value;}
+        else if(flag=="--output"){if(o.output)return false;o.output=value;}
+        else if(flag=="--journal-directory"&&scan){if(o.journal_directory)return false;o.journal_directory=value;}
+        else if(flag=="--vin"&&scan){if(o.vin||!cf1_valid_vin(value))return false;o.vin=value;}
+        else if(flag=="--window-ms"){
+            uint32_t n=0;if(o.window_set||!decimal_uint32(value,&n)||n<1||n>30000)return false;
+            o.window_set=true;o.window_ms=n;
+        }else if(flag=="--budget-ms"&&scan){
+            uint32_t n=0;if(o.budget_set||!decimal_uint32(value,&n)||n<1||n>600000)return false;
+            o.budget_set=true;o.budget_ms=n;
+        }else if(flag=="--rx"&&scan){
+            uint32_t n=0;
+            if(o.ids.size()>=cd::network::max_targets||!hex_uint32(value,&n)||
+               std::find(o.ids.begin(),o.ids.end(),n)!=o.ids.end())return false;
+            o.ids.push_back(n);
+        }else return false;
+    }
+    return o.interface&&j1979_isotp_valid_interface(o.interface)&&o.output&&o.confirmed&&
+        (!scan||(o.vin&&!o.ids.empty()&&std::all_of(o.ids.begin(),o.ids.end(),[&](auto id){
+            return cd::network::response_pair(id,o.extended).has_value();
+        })));
+}
+static int network_cli(int argc,char** argv,bool scan){
+    NetworkOptions o;
+    if(!parse_network(argc,argv,o,scan))return error("Explicit CAN interface, addressing, scope, output and selected responders required");
+    if(!isatty(STDIN_FILENO))return error("Interactive local consent required");
+    fputs(scan?"Confirm stationary authorized vehicle, one functional PID00 discovery and subsequent selected physical read-only scans. Type yes: ":
+        "Confirm stationary authorized vehicle and a single functional PID00 read on selected classic CAN interface. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}} output{
+        open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(output.fd<0)return error("Network evidence destination unavailable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    try{
+        if(!signals.term)return error("Cancellation handlers unavailable");
+        const auto current=[](){return legacy_cancelled==0;};
+        std::unique_ptr<cd::network::JournalDirectory> journals;
+        if(o.journal_directory)journals=std::make_unique<cd::network::JournalDirectory>(o.journal_directory);
+        const auto discovery=cd::network::discover_socket(o.interface,o.extended,o.window_ms,current);
+        if(journals)journals->save_discovery(discovery);
+        std::string json;bool completed=false;
+        if(scan){
+            const auto result=cd::network::scan_selected(discovery,o.ids,o.vin,o.budget_ms,cd::legacy::monotonic_ms,
+                current,[&](cd::network::Pair pair,unsigned budget){
+                    if(journals)return journals->scan(pair,budget,o.interface,o.vin,&legacy_cancelled);
+                    return cd::network::scan_socket(pair,budget,o.interface,o.vin,&legacy_cancelled);
+                });
+            json=cd::network::report(result);completed=result.completed;
+        }else{json=cd::network::report(discovery);completed=discovery.completed;}
+        if(!write_owned_file(output.fd,json.data(),json.size()))return error("Network evidence persistence failed");
+        return completed?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+struct ReferenceStamp{
+    dev_t device{};
+    ino_t inode{};
+    off_t size{};
+    timespec modified{},changed{};
+    std::string digest;
+    bool same(const ReferenceStamp& other)const{
+        return device==other.device&&inode==other.inode&&size==other.size&&digest==other.digest&&
+            modified.tv_sec==other.modified.tv_sec&&modified.tv_nsec==other.modified.tv_nsec&&
+            changed.tv_sec==other.changed.tv_sec&&changed.tv_nsec==other.changed.tv_nsec;
+    }
+    bool separate_from(const input& other)const{return device!=other.device||inode!=other.inode;}
+};
+static ReferenceStamp reference_stamp(const char* path){
+    struct File{int fd;~File(){if(fd>=0)close(fd);}} file{open(path,O_RDONLY|O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK)};
+    struct stat first{},last{};
+    if(file.fd<0||fstat(file.fd,&first)!=0||!S_ISREG(first.st_mode)||first.st_size<=0||
+        static_cast<std::uint64_t>(first.st_size)>cd::catalogue::max_reference)
+        throw std::invalid_argument("Bounded regular reference file required");
+    std::unique_ptr<EVP_MD_CTX,decltype(&EVP_MD_CTX_free)> context(EVP_MD_CTX_new(),EVP_MD_CTX_free);
+    if(!context||EVP_DigestInit_ex(context.get(),EVP_sha256(),nullptr)!=1)
+        throw std::runtime_error("Reference digest unavailable");
+    std::array<unsigned char,65536> block{};
+    std::size_t total=0;
+    for(;;){
+        const auto n=read(file.fd,block.data(),block.size());
+        if(n<0&&errno==EINTR)continue;
+        if(n<0)throw std::runtime_error("Reference read failed");
+        if(!n)break;
+        const auto got=static_cast<std::size_t>(n);
+        if(got>static_cast<std::size_t>(first.st_size)-total||
+            EVP_DigestUpdate(context.get(),block.data(),got)!=1)throw std::runtime_error("Reference changed or digest failed");
+        total+=got;
+    }
+    if(total!=static_cast<std::size_t>(first.st_size)||fstat(file.fd,&last)||first.st_dev!=last.st_dev||
+        first.st_ino!=last.st_ino||first.st_size!=last.st_size||
+        first.st_mtim.tv_sec!=last.st_mtim.tv_sec||first.st_mtim.tv_nsec!=last.st_mtim.tv_nsec||
+        first.st_ctim.tv_sec!=last.st_ctim.tv_sec||first.st_ctim.tv_nsec!=last.st_ctim.tv_nsec)
+        throw std::runtime_error("Reference changed during digest");
+    std::array<unsigned char,EVP_MAX_MD_SIZE> digest{};
+    unsigned size=0;
+    if(EVP_DigestFinal_ex(context.get(),digest.data(),&size)!=1||size!=32)throw std::runtime_error("Reference digest failed");
+    constexpr char alphabet[]="0123456789abcdef";
+    std::string hex;hex.reserve(64);
+    for(unsigned i=0;i<size;++i){hex+=alphabet[digest[i]>>4];hex+=alphabet[digest[i]&15];}
+    return {first.st_dev,first.st_ino,first.st_size,first.st_mtim,first.st_ctim,std::move(hex)};
+}
+static bool recheck_input(const char* path,std::size_t max,const input& original){
+    input again{};return load_regular(path,max,&again)&&same_input(&original,&again);
+}
+static int catalogue_inventory_cli(const char* mode,const char* catalogue_path,const char* reference_path,const char* pin,const char* output){
+    const std::string_view kind=mode;
+    if(kind!="live"&&kind!="freeze")return error("Catalogue mode must be live or freeze");
+    try{
+        if(!cd::catalogue::valid_digest(pin))return error("Independent lowercase reference SHA-256 required");
+        input catalogue{};
+        if(!load_regular(catalogue_path,cd::catalogue::max_catalogue,&catalogue))return error("Invalid catalogue file");
+        const auto ref=reference_stamp(reference_path);
+        if(ref.digest!=pin||!ref.separate_from(catalogue))return error("Reference does not match pin or aliases catalogue");
+        const auto parsed=cd::catalogue::parse_catalogue(
+            {reinterpret_cast<const char*>(catalogue.bytes.get()),catalogue.length},
+            kind=="live"?cd::catalogue::Mode::live:cd::catalogue::Mode::freeze,pin);
+        const auto json=cd::catalogue::inventory(parsed,catalogue.digest);
+        if(!recheck_input(catalogue_path,cd::catalogue::max_catalogue,catalogue)||!ref.same(reference_stamp(reference_path)))
+            return error("Catalogue/reference changed");
+        if(!atomic_create(output,json.data(),json.size()))return error("Catalogue inventory destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int catalogue_projection_cli(int argc,char** argv,bool verify,bool csv=false){
+    const int required=verify?10:9;
+    if(argc!=required&&argc!=required+2)return error("Invalid catalogue projection arguments");
+    const std::string_view kind=argv[2];
+    const bool legacy=kind=="llr1"||kind=="lj1";
+    if((kind!="cl1"&&kind!="cf1"&&!legacy)||legacy!=(argc==required+2))
+        return error("Explicit cl1, cf1, llr1 or lj1 source type required");
+    const char* catalogue_path=argv[3],*reference_path=argv[4],*pin=argv[5],*capture_path=argv[6],
+        *vin=argv[7],*output=argv[8],*proof=verify?argv[9]:nullptr;
+    unsigned protocol=0,source=0;
+    if(legacy){
+        if(!decimal_uint32(argv[required],&protocol)||protocol<1||protocol>5||
+            strlen(argv[required+1])!=2||!hex_uint32(argv[required+1],&source)||!cd::legacy::valid_source(source))
+            return error("Legacy protocol and response source required");
+    }
+    if(!cd::catalogue::valid_digest(pin)||!cf1_valid_vin(vin))return error("Independent reference pin and VIN required");
+    try{
+        input catalogue{},capture{},stored{};
+        const std::size_t capture_max=kind=="cf1"?static_cast<std::size_t>(CF1_MAX_BYTES):
+            kind=="cl1"?static_cast<std::size_t>(CL1_MAX_CAPTURE):
+            kind=="lj1"?cd::legacy::journal_max_bytes:cd::legacy::live_max_capture;
+        if(!load_regular(catalogue_path,cd::catalogue::max_catalogue,&catalogue)||
+            !load_regular(capture_path,capture_max,&capture)||!separate(&catalogue,&capture))
+            return error("Separate bounded catalogue and original capture required");
+        const auto ref=reference_stamp(reference_path);
+        if(ref.digest!=pin||!ref.separate_from(catalogue)||!ref.separate_from(capture))
+            return error("Reference digest mismatch or input alias");
+        const auto parsed=cd::catalogue::parse_catalogue(
+            {reinterpret_cast<const char*>(catalogue.bytes.get()),catalogue.length},
+            kind=="cf1"?cd::catalogue::Mode::freeze:cd::catalogue::Mode::live,pin);
+        const cd::catalogue::Bytes raw{capture.bytes.get(),capture.length};
+        const auto projected=kind=="cf1"?cd::catalogue::project_cf1(raw,vin,parsed,capture.digest,catalogue.digest):
+            kind=="lj1"?cd::catalogue::project_lj1(raw,vin,protocol,source,parsed,capture.digest,catalogue.digest):
+            legacy?cd::catalogue::project_llr1(raw,vin,protocol,source,parsed,capture.digest,catalogue.digest):
+            cd::catalogue::project_cl1(raw,vin,parsed,capture.digest,catalogue.digest);
+        const auto canonical=csv?cd::catalogue::projection_csv(parsed,projected):cd::catalogue::report(parsed,projected);
+        if(verify){
+            if(!load_regular(output,cd::catalogue::max_projection,&stored)||!separate(&stored,&capture)||
+                !separate(&stored,&catalogue)||!ref.separate_from(stored)||stored.length!=canonical.size()||
+                memcmp(stored.bytes.get(),canonical.data(),canonical.size())||
+                !recheck_input(output,cd::catalogue::max_projection,stored))
+                return error("Stored projection differs from independently replayed canonical native report");
+        }
+        if(!recheck_input(catalogue_path,cd::catalogue::max_catalogue,catalogue)||
+            !recheck_input(capture_path,capture_max,capture)||!ref.same(reference_stamp(reference_path)))
+            return error("Projection inputs changed");
+        if(verify){
+            using cd::json::Value;
+            const auto text=[](std::string_view v){return Value{std::string(v)};};
+            Value::Object fields{
+                {"schema",text("camarodiag-j1979-catalogue-verification-linux-v1")},
+                {"verified",Value{true}},
+                {"source_capture_sha256",text(projected.reconstructed_capture_sha256.empty()?
+                    projected.source_sha256:projected.reconstructed_capture_sha256)},
+                {"catalogue_sha256",text(catalogue.digest)},{"reference_sha256",text(ref.digest)},
+                {"projection_sha256",text(stored.digest)},{"projection_format",text(csv?"CSV":"JSON")},
+                {"normative_compliance_verified",Value{false}},{"physical_vehicle_verified",Value{false}},
+                {"authenticated",Value{false}},{"permits_programming",Value{false}}
+            };
+            if(kind=="lj1"){
+                fields.emplace("source_journal_sha256",text(capture.digest));
+                fields.emplace("journal_terminal_verified",Value{true});
+                fields.emplace("reconstructed_capture_sha256",text(projected.reconstructed_capture_sha256));
+            }
+            const auto result=cd::json::serialize(Value{std::move(fields)})+"\n";
+            if(!atomic_create(proof,result.data(),result.size()))return error("Projection proof destination unavailable");
+        }else if(!atomic_create(output,canonical.data(),canonical.size()))return error("Projection destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+class AdapterJournalOutput{
+    int fd_{-1};
+    const char* path_{};
+    std::unique_ptr<cd::elmcan::EvidenceJournal> journal_;
+public:
+    AdapterJournalOutput()=default;
+    AdapterJournalOutput(const AdapterJournalOutput&)=delete;
+    AdapterJournalOutput& operator=(const AdapterJournalOutput&)=delete;
+    ~AdapterJournalOutput(){if(fd_>=0)close(fd_);}
+    void begin(const char* path,cd::elmcan::Scope scope,std::string_view vin,cd::elmcan::TraceOperation op){
+        if(!path)return;
+        if(journal_||fd_>=0)throw std::logic_error("Adapter journal already reserved");
+        path_=path;
+        fd_=open(path,O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+        if(fd_<0||!sync_parent(path))throw std::runtime_error("Adapter journal reservation unavailable");
+        journal_=std::make_unique<cd::elmcan::EvidenceJournal>(fd_,scope,vin,op);
+    }
+    cd::elmcan::EvidenceSink sink(){
+        if(!journal_)return {};
+        return [this](const cd::elmcan::Observation& row){journal_->append(row);};
+    }
+    void finish(const cd::elmcan::Trace& expected){
+        if(!journal_)return;
+        journal_->finish();journal_.reset();
+        const bool closed=close(fd_)==0;fd_=-1;
+        if(!closed)throw std::runtime_error("Adapter journal close failed");
+        input raw{};
+        if(!load_regular(path_,cd::elmcan::journal_max_bytes,&raw))
+            throw std::runtime_error("Persisted adapter journal unavailable");
+        const auto recovered=cd::elmcan::recover_trace({raw.bytes.get(),raw.length});
+        if(recovered!=cd::elmcan::encode_trace(expected)||!recheck_input(path_,cd::elmcan::journal_max_bytes,raw))
+            throw std::runtime_error("Persisted adapter journal differs from session");
+    }
+};
+struct DirectMaintenanceOptions {
+    cd::hostmaint::Scope scope{};
+    const char* interface{},*directory{},*journal{},*output{},*adapter_capture{},*adapter_journal{};
+    unsigned profile{},baud{38400};
+    bool profile_set{},baud_set{};
+    bool operation{},tx{},rx{},budget{},extended{},vin{},confirmed{},warning{};
+};
+static bool parse_direct_maintenance(int argc,char** argv,DirectMaintenanceOptions& o,bool elm){
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--extended"||flag=="--confirm-physical-channel"||flag=="--acknowledge-maintenance-warning"){
+            auto& seen=flag=="--extended"?o.extended:flag=="--confirm-physical-channel"?o.confirmed:o.warning;
+            if(seen)return false;
+            seen=true;continue;
+        }
+        if(i+1>=argc||!*argv[i+1]||argv[i+1][0]=='-')return false;
+        const char* value=argv[++i];
+        if(flag=="--operation"){
+            if(o.operation)return false;
+            o.operation=true;
+            if(!strcmp(value,"clear"))o.scope.operation=cd::hostmaint::Scope::Operation::Clear;
+            else if(!strcmp(value,"evap"))o.scope.operation=cd::hostmaint::Scope::Operation::Evap;
+            else return false;
+        }else if(flag=="--tx"||flag=="--rx"){
+            auto& seen=flag=="--tx"?o.tx:o.rx;
+            auto& id=flag=="--tx"?o.scope.tx:o.scope.rx;
+            if(seen||!hex_uint32(value,&id))return false;
+            seen=true;
+        }else if(elm&&(flag=="--profile"||flag=="--baud")){
+            auto& seen=flag=="--profile"?o.profile_set:o.baud_set;
+            auto& dest=flag=="--profile"?o.profile:o.baud;
+            if(seen||!decimal_uint32(value,&dest))return false;
+            seen=true;
+        }else if(flag=="--budget-ms"){
+            if(o.budget||!decimal_uint32(value,&o.scope.budgetMs))return false;
+            o.budget=true;
+        }else if(flag=="--vin"){
+            if(o.vin||!cf1_valid_vin(value))return false;
+            o.vin=true;memcpy(o.scope.vin,value,17);
+        }else{
+            const char** slot=nullptr;
+            if(flag==(elm?"--port":"--interface"))slot=&o.interface;
+            else if(flag=="--journal-directory")slot=&o.directory;
+            else if(flag=="--journal-name")slot=&o.journal;
+            else if(flag=="--output")slot=&o.output;
+            else if(elm&&flag=="--adapter-capture")slot=&o.adapter_capture;
+            else if(elm&&flag=="--adapter-journal")slot=&o.adapter_journal;
+            if(!slot||*slot)return false;
+            *slot=value;
+        }
+    }
+    o.scope.extended=o.extended;
+    return o.operation&&o.tx&&o.rx&&o.budget&&o.vin&&o.confirmed&&o.warning&&o.directory&&o.journal&&
+        o.output&&o.scope.valid()&&(elm?(o.interface&&o.profile_set&&
+        cd::elmcan::Scope{o.profile,o.scope.tx,o.scope.rx}.valid()&&
+        cd::elmcan::Scope{o.profile,o.scope.tx,o.scope.rx}.extended()==o.scope.extended):
+        j1979_isotp_valid_interface(o.interface));
+}
+static int direct_maintenance_cli(int argc,char** argv,bool elm=false){
+    DirectMaintenanceOptions o;
+    if(!parse_direct_maintenance(argc,argv,o,elm))return error("Dedicated primary ECM, private journal directory, VIN and explicit maintenance authorization required");
+    if(!isatty(STDIN_FILENO))return error("Interactive local approval required");
+    fputs("WARNING: clearing DTCs erases diagnostic data and readiness; EVAP is an active test. "
+        "Use only an authorized stationary vehicle with manufacturer conditions verified. "
+        "Local descriptor closure is not proof of physical transceiver shutdown. "
+        "The recovery marker requires review; never retry automatically. Type AUTHORIZE MAINTENANCE: ",stderr);
+    char answer[64]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"AUTHORIZE MAINTENANCE\n"))return error("Consent refused");
+    struct Output{int fd;~Output(){if(fd>=0)close(fd);}} out{
+        open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(out.fd<0)return error("Report destination unavailable");
+    Output trace_out{o.adapter_capture?open(o.adapter_capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600):-1};
+    if(o.adapter_capture&&(trace_out.fd<0||!sync_parent(o.adapter_capture)))return error("Adapter trace destination unavailable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    cd::hostmaint::Result r{};r.evidence.scope=o.scope;r.elm_transport=elm;
+    std::vector<cd::elmcan::Observation> adapter;
+    AdapterJournalOutput journal;
+    try{
+        if(!signals.term)throw std::runtime_error("SIGNAL_HANDLERS_UNAVAILABLE");
+        if(elm){
+            journal.begin(o.adapter_journal,{o.profile,o.scope.tx,o.scope.rx},{reinterpret_cast<const char*>(o.scope.vin),17},cd::elmcan::TraceOperation::maintenance);
+            const auto current=[](){return legacy_cancelled==0;};
+            auto link=cd::legacy::serial_link(o.interface,o.baud,current);
+            auto result=cd::hostmaint::run_elm(o.scope,{o.profile,o.scope.tx,o.scope.rx},*link,current,
+                o.directory,o.journal,true,true,journal.sink());
+            r=std::move(result.result);adapter=std::move(result.observations);
+        }else r=cd::hostmaint::run_socket(o.scope,o.interface,o.directory,o.journal,true,true,&legacy_cancelled);
+    }catch(const std::exception& e){r.error=e.what();}
+    try{
+        std::string digest,replay;
+        const std::string vin_text(reinterpret_cast<const char*>(o.scope.vin),17);
+        const cd::elmcan::Trace trace{{o.profile,o.scope.tx,o.scope.rx},vin_text,cd::elmcan::TraceOperation::maintenance,adapter};
+        journal.finish(trace);
+        if(o.adapter_capture){
+            const auto bytes=cd::elmcan::encode_trace(trace);
+            if(!write_owned_file(trace_out.fd,bytes.data(),bytes.size()))return error("Adapter trace persistence failed; recovery marker retained");
+        }
+        if(r.journal_created){
+            const auto path=std::string(o.directory)+"/"+o.journal;
+            const std::string vin(reinterpret_cast<const char*>(o.scope.vin),17);
+            input raw{};
+            if(load_regular(path.c_str(),cd::cm1::max_journal,&raw)){
+                digest=raw.digest;
+                try{
+                    const auto evidence=cd::cm1::inspect({raw.bytes.get(),raw.length},vin,!r.evidence.terminalPersisted);
+                    const cd::cm1::Scope expected{static_cast<unsigned>(o.scope.operation),o.scope.extended,o.scope.tx,o.scope.rx,o.scope.budgetMs,vin};
+                    if(evidence.scope!=expected||!recheck_input(path.c_str(),cd::cm1::max_journal,raw))
+                        throw std::runtime_error("JOURNAL_SCOPE_OR_BYTES_CHANGED");
+                    if(r.evidence.terminalPersisted){
+                        const auto& summary=r.evidence.summary;
+                        if(!evidence.terminal||evidence.terminal->outcome!=static_cast<unsigned>(summary.outcome)||
+                            evidence.terminal->reason!=static_cast<unsigned>(summary.reason)||
+                            evidence.terminal->count!=r.evidence.count)
+                            throw std::runtime_error("LIVE_AND_REPLAY_OUTCOME_DIFFER");
+                    }
+                    if(elm&&evidence.terminal&&r.evidence.summary.acknowledged)
+                        (void)cd::elmcan::correlate_maintenance(trace,evidence);
+                    replay=cd::cm1::report(evidence,digest);
+                }catch(const std::exception& e){r.recovery_latched=true;r.error=e.what();}
+            }else{r.recovery_latched=true;r.error="JOURNAL_MISSING_OR_EMPTY";}
+        }
+        auto json=cd::hostmaint::report(r,digest,replay);
+        if(elm)json=cd::elmcan::report({o.profile,o.scope.tx,o.scope.rx},
+            {reinterpret_cast<const char*>(o.scope.vin),17},"MAINTENANCE",json,adapter,r.error,
+            r.error.empty()&&!r.recovery_latched&&r.evidence.terminalPersisted&&!replay.empty()&&r.evidence.summary.acknowledged&&
+            r.evidence.summary.reason==cd::hostmaint::Campaign::Reason::None);
+        if(!write_owned_file(out.fd,json.data(),json.size())||!sync_parent(o.output))
+            return error("Report persistence failed; recovery marker retained");
+        using Outcome=cd::hostmaint::Campaign::Outcome;
+        return r.error.empty()&&!r.recovery_latched&&r.evidence.terminalPersisted&&!replay.empty()&&
+            (r.evidence.summary.outcome==Outcome::AcknowledgedReadback||
+             r.evidence.summary.outcome==Outcome::AcknowledgedEvap)&&
+            r.evidence.summary.reason==cd::hostmaint::Campaign::Reason::None?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+struct ElmCanOptions{
+    cd::elmcan::Scope scope;
+    const char* port{},*vin{},*output{},*adapter_capture{},*adapter_journal{},*campaign_capture{};
+    const char* native_report{},*projection{},*csv{};
+    unsigned baud{38400},budget{180000},cycles{30},interval{1000};
+    std::vector<uint8_t> pids;
+    bool profile{},tx{},rx{},confirmed{},baud_set{},budget_set{},cycles_set{},interval_set{},quiet{};
+};
+static bool parse_elm_can(int argc,char** argv,ElmCanOptions& o,bool live){
+    for(int i=2;i<argc;++i){
+        std::string_view flag=argv[i];
+        if(flag=="--quiet"&&live){
+            if(o.quiet)return false;
+            o.quiet=true;continue;
+        }
+        if(flag=="--confirm-physical-channel"){
+            if(o.confirmed)return false;
+            o.confirmed=true;continue;
+        }
+        if(i+1>=argc||!*argv[i+1]||argv[i+1][0]=='-')return false;
+        const char* value=argv[++i];
+        if(flag=="--tx"||flag=="--rx"){
+            auto& seen=flag=="--tx"?o.tx:o.rx;
+            auto& id=flag=="--tx"?o.scope.tx:o.scope.rx;
+            if(seen||!hex_uint32(value,&id))return false;
+            seen=true;
+        }else if(flag=="--pid"&&live){
+            uint32_t pid=0;
+            if(o.pids.size()>=J1979_LIVE_MAX_PIDS||!hex_uint32(value,&pid)||!pid||pid>255||pid%32==0||
+                std::find(o.pids.begin(),o.pids.end(),pid)!=o.pids.end())return false;
+            o.pids.push_back(static_cast<uint8_t>(pid));
+        }else if(flag=="--profile"||flag=="--baud"||flag=="--budget-ms"||
+                 (live&&(flag=="--cycles"||flag=="--interval-ms"||flag=="--interval"||flag=="--budget"))){
+            bool* seen=nullptr;unsigned* dest=nullptr;
+            if(flag=="--profile"){seen=&o.profile;dest=&o.scope.profile;}
+            else if(flag=="--baud"){seen=&o.baud_set;dest=&o.baud;}
+            else if(flag=="--budget-ms"||flag=="--budget"){seen=&o.budget_set;dest=&o.budget;}
+            else if(flag=="--cycles"){seen=&o.cycles_set;dest=&o.cycles;}
+            else{seen=&o.interval_set;dest=&o.interval;}
+            uint32_t n=0;if(*seen||((flag=="--interval"||flag=="--budget")?
+                !cd::liveoptions::seconds_ms(value,n):!decimal_uint32(value,&n)))return false;
+            *seen=true;*dest=n;
+        }else{
+            const char** dest=nullptr;
+            if(flag=="--port")dest=&o.port;
+            else if(flag=="--vin")dest=&o.vin;
+            else if(flag=="--output")dest=&o.output;
+            else if(flag=="--adapter-capture")dest=&o.adapter_capture;
+            else if(flag=="--adapter-journal")dest=&o.adapter_journal;
+            else if(flag=="--campaign-capture")dest=&o.campaign_capture;
+            else if(live&&flag=="--native-report-output")dest=&o.native_report;
+            else if(live&&flag=="--projection-output")dest=&o.projection;
+            else if(live&&flag=="--csv")dest=&o.csv;
+            if(!dest||*dest)return false;
+            *dest=value;
+        }
+    }
+    if((o.projection||o.csv)&&!o.native_report)return false;
+    if(o.native_report&&(!o.campaign_capture||!o.adapter_journal))return false;
+    const std::array<const char*,7> destinations{o.output,o.adapter_capture,o.adapter_journal,
+        o.campaign_capture,o.native_report,o.projection,o.csv};
+    for(std::size_t i=0;i<destinations.size();++i)
+        for(std::size_t j=i+1;j<destinations.size();++j)
+            if(destinations[i]&&destinations[j]&&!strcmp(destinations[i],destinations[j]))return false;
+    return o.profile&&o.tx&&o.rx&&o.confirmed&&o.port&&o.vin&&cf1_valid_vin(o.vin)&&o.output&&o.scope.valid()&&
+        o.budget>=1000&&o.budget<=600000&&(!live||(!o.pids.empty()&&o.cycles>=1&&o.cycles<=1000&&
+        o.interval>=100&&o.interval<=60000&&o.pids.size()*o.cycles<=J1979_LIVE_MAX_SAMPLES));
+}
+static int elm_can_cli(int argc,char** argv,bool live){
+    ElmCanOptions o;
+    if(!parse_elm_can(argc,argv,o,live))return error("Explicit fixed ELM CAN profile, port, physical ECU, VIN and output required");
+    if(!isatty(STDIN_FILENO))return error("Interactive local consent required");
+    fputs("Confirm dedicated ELM adapter, documented physical ECU and stationary vehicle. Read only. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}} out{open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(out.fd<0)return error("ELM CAN report destination unavailable");
+    File trace_out{o.adapter_capture?open(o.adapter_capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600):-1};
+    if(o.adapter_capture&&(trace_out.fd<0||!sync_parent(o.adapter_capture)))return error("Adapter transcript destination unavailable");
+    File campaign_out{o.campaign_capture?open(o.campaign_capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600):-1};
+    if(o.campaign_capture&&(campaign_out.fd<0||!sync_parent(o.campaign_capture)))return error("Campaign capture destination unavailable");
+    std::unique_ptr<cd::liveexport::Destination> raw_output,projection,csv;
+    try{
+        raw_output=std::make_unique<cd::liveexport::Destination>(o.native_report);
+        projection=std::make_unique<cd::liveexport::Destination>(o.projection);
+        csv=std::make_unique<cd::liveexport::Destination>(o.csv);
+    }catch(const std::exception& e){return error(e.what());}
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    std::unique_ptr<cd::legacy::Link> link;
+    std::unique_ptr<cd::elmcan::Session> session;
+    std::string native_report,reason,campaign_digest;
+    AdapterJournalOutput journal;
+    bool completed=false;
+    try{
+        if(!signals.term)throw std::runtime_error("SIGNAL_HANDLERS_UNAVAILABLE");
+        const auto current=[](){return legacy_cancelled==0;};
+        journal.begin(o.adapter_journal,o.scope,o.vin,live?cd::elmcan::TraceOperation::live:cd::elmcan::TraceOperation::scan);
+        link=cd::legacy::serial_link(o.port,o.baud,current);
+        session=std::make_unique<cd::elmcan::Session>(*link,o.scope,current,journal.sink());
+        session->configure();
+        const cd::elmcan::CampaignPlan plan{o.scope,o.vin,o.port,
+            live?cd::elmcan::TraceOperation::live:cd::elmcan::TraceOperation::scan,
+            o.budget,live?o.cycles:0,live?o.interval:0,live?o.pids:cd::elmcan::Data{}};
+        cd::elmcan::CampaignCapture captured;
+        auto result=cd::elmcan::record_campaign(*session,plan,cd::legacy::monotonic_ms,[&](unsigned ms){
+            timespec delay{static_cast<time_t>(ms/1000),static_cast<long>((ms%1000)*1000000)};
+            while(nanosleep(&delay,&delay)){
+                if(errno!=EINTR||!current())return false;
+            }
+            return current();
+        },captured,live&&!o.quiet?cd::liveoptions::show_sample:nullptr);
+        if(o.campaign_capture){
+            const auto bytes=cd::elmcan::encode_campaign(captured);
+            if(!write_owned_file(campaign_out.fd,bytes.data(),bytes.size()))
+                throw std::runtime_error("Campaign capture persistence failed");
+            input persisted{};
+            if(!load_regular(o.campaign_capture,cd::elmcan::campaign_max_bytes,&persisted)||
+                persisted.length!=bytes.size()||memcmp(persisted.bytes.get(),bytes.data(),bytes.size()))
+                throw std::runtime_error("Campaign capture readback differs");
+            const auto replay=cd::elmcan::replay_campaign(cd::elmcan::decode_campaign({persisted.bytes.get(),persisted.length}));
+            if(replay.native_report!=result.native_report||!recheck_input(o.campaign_capture,cd::elmcan::campaign_max_bytes,persisted))
+                throw std::runtime_error("Persisted campaign replay differs");
+            campaign_digest=persisted.digest;
+        }
+        native_report=std::move(result.native_report);reason=std::move(result.stop);completed=result.completed;
+    }catch(const std::exception& e){reason=e.what();completed=false;}
+    if(legacy_cancelled){completed=false;reason="CANCELLED";}
+    try{
+        const std::span<const cd::elmcan::Observation> evidence=session?
+            std::span<const cd::elmcan::Observation>(session->evidence()):std::span<const cd::elmcan::Observation>{};
+        const cd::elmcan::Trace trace{o.scope,o.vin,live?cd::elmcan::TraceOperation::live:cd::elmcan::TraceOperation::scan,
+            std::vector<cd::elmcan::Observation>(evidence.begin(),evidence.end())};
+        journal.finish(trace);
+        const auto replay=cd::elmcan::replay_trace(trace);
+        if(completed&&(!replay.configured||replay.terminal_fault))return error("Adapter raw evidence does not support completion");
+        if(o.adapter_capture){
+            const auto bytes=cd::elmcan::encode_trace(trace);
+            if(!write_owned_file(trace_out.fd,bytes.data(),bytes.size()))return error("Adapter transcript persistence failed");
+        }
+        const auto json=cd::elmcan::report(o.scope,o.vin,live?"LIVE":"SCAN",native_report,evidence,reason,completed);
+        if(!write_owned_file(out.fd,json.data(),json.size())||!sync_parent(o.output))return error("ELM CAN report persistence failed");
+        // Release the serial channel before any offline interpretation.
+        session.reset();link.reset();
+        if(raw_output->requested()){
+            if(native_report.empty())return error("No replayed ELM live report available");
+            raw_output->persist(native_report);
+            if(projection->requested()||csv->requested()){
+                if(campaign_digest.empty())return error("No independently replayed ECP capture available");
+                File original{open(o.campaign_capture,O_RDONLY|O_NOFOLLOW|O_CLOEXEC)};
+                if(original.fd<0)return error("Persisted ECP capture unavailable");
+                const auto exported=cd::liveexport::publish_recorded(original.fd,o.campaign_capture,
+                    cd::network::history::LiveEvidenceKind::elm_campaign,campaign_digest,
+                    raw_output->descriptor(),raw_output->path(),native_report,
+                    {o.scope.tx,o.scope.rx},o.vin,o.scope.profile,*projection,*csv);
+                completed=completed&&exported.complete;
+                fprintf(stderr,"J1979 ELM live export: %zu samples, source SHA-256 %s, %s\n",
+                    exported.samples,exported.source_sha256.c_str(),exported.complete?"complete":"incomplete");
+            }
+        }
+        return completed?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int socket_freeze_cli(int argc,char** argv){
+    capture_options o{};
+    if(!parse_capture_options(argc,argv,&o,true))return error("Explicit physical SocketCAN, VIN, frame list and output required");
+    if(!isatty(STDIN_FILENO))return error("Interactive local consent required");
+    fputs("Confirm dedicated SocketCAN interface and documented stationary vehicle. Read-only Mode 02. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}};
+    File capture{open(o.capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(capture.fd<0)return error("Capture destination unavailable");
+    File report{open(o.report,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(report.fd<0)return error("Report destination unavailable");
+    if(!sync_parent(o.capture)||!sync_parent(o.report))return error("Output reservation not durable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    try{
+        if(!signals.term)return error("Signal handlers unavailable");
+        const auto result=cd::hostfreeze::run_socket(o.plan,o.port,capture.fd,&legacy_cancelled);
+        const bool synced=fsync(capture.fd)==0;
+        const bool closed=close(capture.fd)==0;capture.fd=-1;
+        if(!synced||!closed||!result.capture_started)return error("CF/1 capture incomplete or unavailable");
+        input raw{},again{};
+        if(!load_regular(o.capture,CF1_MAX_BYTES,&raw))return error("No persisted CF/1 evidence");
+        struct Evidence{cf1_evidence value{};~Evidence(){cf1_evidence_free(&value);}} e;
+        char failure[256]{};
+        const int status=result.terminal_written?
+            cf1_inspect_complete(raw.bytes.get(),raw.length,o.plan.vin,&e.value,failure,sizeof(failure)):
+            cf1_inspect_prefix(raw.bytes.get(),raw.length,o.plan.vin,&e.value,failure,sizeof(failure));
+        if(status)return error(failure);
+        const auto& p=e.value.plan;
+        if(p.tx!=o.plan.tx||p.rx!=o.plan.rx||p.extended!=o.plan.extended||p.budget_ms!=o.plan.budget_ms||
+            p.frame_count!=o.plan.frame_count||p.pid_count!=o.plan.pid_count||
+            memcmp(p.frames,o.plan.frames,p.frame_count)||memcmp(p.pids,o.plan.pids,p.pid_count))
+            return error("Replayed CF/1 scope differs from approved plan");
+        if(!load_regular(o.capture,CF1_MAX_BYTES,&again)||!same_input(&raw,&again))
+            return error("Persisted CF/1 capture changed");
+        json_writer writer{65536};
+        writer.bytes.reset(new (std::nothrow) char[writer.capacity]{});
+        if(!writer.bytes)return error("Report allocation failed");
+        // Canonical offline report: never claim USB authentication for a
+        // local SocketCAN recording. Existing verification command applies.
+        if(result.terminal_written)write_complete(&writer,&e.value,raw.digest,false,false,false);
+        else write_prefix(&writer,&e.value,raw.digest);
+        if(writer.failed||!write_owned_file(report.fd,writer.bytes.get(),writer.used)||!sync_parent(o.report))
+            return error("CF/1 report not persisted");
+        return result.terminal_written&&e.value.execution_completed&&result.summary.allFramesStable&&!legacy_cancelled?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int elm_freeze_cli(int argc,char** argv){
+    capture_options o{};
+    unsigned profile=0,baud=38400;
+    bool profile_set=false,baud_set=false;
+    const char* adapter_path=nullptr,*journal_path=nullptr;
+    std::vector<char*> args{argv[0],argv[1]};
+    // Consume the two adapter options; the common parser handles all
+    // physical scope and capture options without replacing the serial path.
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--adapter-capture"||flag=="--adapter-journal"){
+            auto& path=flag=="--adapter-capture"?adapter_path:journal_path;
+            if(path||i+1>=argc||!*argv[i+1]||argv[i+1][0]=='-')return error("Invalid adapter evidence destination");
+            path=argv[++i];continue;
+        }
+        if(flag=="--profile"||flag=="--baud"){
+            auto& seen=flag=="--profile"?profile_set:baud_set;
+            auto& dest=flag=="--profile"?profile:baud;
+            if(seen||i+1>=argc||!decimal_uint32(argv[++i],&dest))return error("Invalid fixed ELM profile or baud");
+            seen=true;continue;
+        }
+        args.push_back(argv[i]);
+        if(flag!="--extended"&&flag!="--confirm-physical-channel"){
+            if(i+1>=argc)return error("Missing freeze option value");
+            args.push_back(argv[++i]);
+        }
+    }
+    if(!profile_set||!parse_capture_options(static_cast<int>(args.size()),args.data(),&o,true,true))
+        return error("Explicit fixed ELM profile, serial port, VIN, frames and output required");
+    const char* port=o.port;
+    const cd::elmcan::Scope target{profile,o.plan.tx,o.plan.rx};
+    if(!target.valid()||target.extended()!=o.plan.extended)return error("CAN profile and addressing disagree");
+    if(!isatty(STDIN_FILENO))return error("Interactive local consent required");
+    fputs("Confirm dedicated ELM CAN serial adapter and documented stationary vehicle. Read-only Mode 02. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}};
+    File capture{open(o.capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(capture.fd<0)return error("Capture destination unavailable");
+    File report{open(o.report,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(report.fd<0)return error("Report destination unavailable");
+    File adapter{adapter_path?open(adapter_path,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600):-1};
+    if(adapter_path&&(adapter.fd<0||!sync_parent(adapter_path)))return error("Adapter transcript destination unavailable");
+    if(!sync_parent(o.capture)||!sync_parent(o.report))return error("Output reservation not durable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    try{
+        if(!signals.term)return error("Signal handlers unavailable");
+        const auto current=[](){return legacy_cancelled==0;};
+        AdapterJournalOutput journal;
+        journal.begin(journal_path,target,o.plan.vin,cd::elmcan::TraceOperation::freeze);
+        auto serial=cd::legacy::serial_link(port,baud,current);
+        const auto acquired=cd::hostfreeze::run_elm(o.plan,target,*serial,current,capture.fd,journal.sink());
+        serial.reset();
+        const auto& result=acquired.capture;
+        const cd::elmcan::Trace trace{target,o.plan.vin,cd::elmcan::TraceOperation::freeze,acquired.observations};
+        journal.finish(trace);
+        if(adapter_path){
+            const auto bytes=cd::elmcan::encode_trace(trace);
+            if(!write_owned_file(adapter.fd,bytes.data(),bytes.size()))return error("Adapter transcript persistence failed");
+        }
+        const bool synced=fsync(capture.fd)==0;
+        const bool closed=close(capture.fd)==0;capture.fd=-1;
+        if(!synced||!closed||!result.capture_started)return error("CF/1 capture incomplete or unavailable");
+        input raw{},again{};
+        if(!load_regular(o.capture,CF1_MAX_BYTES,&raw))return error("No persisted CF/1 evidence");
+        struct Evidence{cf1_evidence value{};~Evidence(){cf1_evidence_free(&value);}} e;
+        char failure[256]{};
+        const int status=result.terminal_written?
+            cf1_inspect_complete(raw.bytes.get(),raw.length,o.plan.vin,&e.value,failure,sizeof(failure)):
+            cf1_inspect_prefix(raw.bytes.get(),raw.length,o.plan.vin,&e.value,failure,sizeof(failure));
+        if(status)return error(failure);
+        if(result.terminal_written&&e.value.execution_completed)(void)cd::elmcan::correlate_freeze(trace,e.value);
+        const auto& p=e.value.plan;
+        if(p.tx!=o.plan.tx||p.rx!=o.plan.rx||p.extended!=o.plan.extended||p.budget_ms!=o.plan.budget_ms||
+            p.frame_count!=o.plan.frame_count||p.pid_count!=o.plan.pid_count||
+            memcmp(p.frames,o.plan.frames,p.frame_count)||memcmp(p.pids,o.plan.pids,p.pid_count))
+            return error("Replayed CF/1 scope differs from approved plan");
+        if(!load_regular(o.capture,CF1_MAX_BYTES,&again)||!same_input(&raw,&again))
+            return error("Persisted CF/1 capture changed");
+        json_writer writer{65536};
+        writer.bytes.reset(new (std::nothrow) char[writer.capacity]{});
+        if(!writer.bytes)return error("Report allocation failed");
+        // Canonical offline report: never claim USB authentication for a
+        // local SocketCAN recording. Existing verification command applies.
+        if(result.terminal_written)write_complete(&writer,&e.value,raw.digest,false,false,false);
+        else write_prefix(&writer,&e.value,raw.digest);
+        if(writer.failed)return error("CF/1 report not serialized");
+        const bool completed=result.terminal_written&&e.value.execution_completed&&result.summary.allFramesStable&&!legacy_cancelled;
+        const auto reason=legacy_cancelled?std::string("CANCELLED"):acquired.error;
+        const auto json=cd::elmcan::report(target,o.plan.vin,"FREEZE",
+            {writer.bytes.get(),writer.used},acquired.observations,reason,completed);
+        if(!write_owned_file(report.fd,json.data(),json.size())||!sync_parent(o.report))
+            return error("ELM CAN CF/1 report not persisted");
+        return completed?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int legacy_live_journal_cli(int argc,char** argv,std::string_view command){
+    const bool verify=command=="--verify-j1979-legacy-live-journal";
+    const bool csv=command=="--export-j1979-legacy-live-journal-csv";
+    uint32_t p=0,n=0;
+    if(argc!=(verify?8:7)||!decimal_uint32(argv[2],&p)||p<1||p>5||
+        strlen(argv[3])!=2||!hex_uint32(argv[3],&n)||!cd::legacy::valid_source(n)||!cf1_valid_vin(argv[4]))
+        return error("Independent legacy protocol, response source, VIN, sealed LJ/1 and output required");
+    const char* path=argv[5];const char* output=argv[verify?7:6];
+    try{
+        constexpr std::size_t max_report=64u*1024u*1024u;
+        input journal{},candidate{};
+        if(!load_regular(path,cd::legacy::journal_max_bytes,&journal))return error("Invalid bounded legacy live journal");
+        const auto result=cd::legacy::project_live_journal({journal.bytes.get(),journal.length},
+            static_cast<cd::legacy::Protocol>(p),n,argv[4]);
+        if(result.journal_sha256!=journal.digest)return error("Legacy journal digest differs");
+        std::string bytes;bool consistent=true;
+        if(verify){
+            if(!load_regular(argv[6],max_report,&candidate)||!separate(&journal,&candidate))
+                return error("Distinct bounded legacy live report required");
+            const auto proof=cd::legacy::verify_live_journal(result,cd::json::parse_report(
+                {reinterpret_cast<const char*>(candidate.bytes.get()),candidate.length},max_report),candidate.digest);
+            consistent=proof.at("consistent").boolean();
+            bytes=cd::json::serialize(proof)+"\n";
+            if(!recheck_input(argv[6],max_report,candidate))return error("Legacy live report changed");
+        }else bytes=csv?result.csv:cd::json::serialize(result.report)+"\n";
+        if(!recheck_input(path,cd::legacy::journal_max_bytes,journal))return error("Legacy live journal changed");
+        if(!atomic_create(output,bytes.data(),bytes.size()))return error("Legacy live journal output unavailable");
+        return consistent&&result.completed?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int legacy_journal_cli(const char* protocol,const char* source,const char* vin,const char* path,const char* output,bool recover){
+    uint32_t p=0,n=0;
+    if(!decimal_uint32(protocol,&p)||!cd::legacy::valid_protocol(static_cast<cd::legacy::Protocol>(p))||
+        strlen(source)!=2||!hex_uint32(source,&n)||!cd::legacy::valid_source(n)||!cf1_valid_vin(vin))
+        return error("Independent protocol, selected source and VIN required");
+    input original{},again{};
+    try{
+        if(!load_regular(path,cd::legacy::journal_max_bytes,&original))return error("Invalid bounded LJ/1 journal");
+        const auto evidence=cd::legacy::inspect_journal({original.bytes.get(),original.length},
+            static_cast<cd::legacy::Protocol>(p),n,vin);
+        if(!load_regular(path,cd::legacy::journal_max_bytes,&again)||!same_input(&original,&again))
+            return error("Legacy journal changed during inspection");
+        if(recover){
+            if(!evidence.terminal||evidence.capture.empty())return error("Interrupted journal cannot become a completed capture");
+            if(!atomic_create(output,reinterpret_cast<const char*>(evidence.capture.data()),evidence.capture.size()))
+                return error("Recovery output unavailable");
+        }else{
+            const std::string json=std::string("{\"schema\":\"camarodiag-j1979-legacy-journal-v1\",\"journal_sha256\":\"")+
+                original.digest+"\",\"kind\":"+std::to_string(static_cast<unsigned>(evidence.kind))+
+                ",\"observations\":"+std::to_string(evidence.observations)+
+                ",\"verified_bytes\":"+std::to_string(evidence.verified_bytes)+
+                ",\"unverified_tail_bytes\":"+std::to_string(evidence.torn_bytes)+
+                ",\"terminal_present\":"+(evidence.terminal?"true":"false")+
+                ",\"physical_vehicle_verified\":false,\"permits_programming\":false}\n";
+            if(!atomic_create(output,json.data(),json.size()))return error("Journal report unavailable");
+        }
+        return evidence.terminal?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int elm_trace_cli(int argc,char** argv,bool correlate){
+    if((!correlate&&argc!=8)||(correlate&&argc!=9))
+        return error("Independent ELM profile, TX, RX, VIN, ECR/1 and output required; correlation also takes CF/1 or CM/1");
+    uint32_t profile=0,tx=0,rx=0;
+    if(!decimal_uint32(argv[2],&profile)||!hex_uint32(argv[3],&tx)||!hex_uint32(argv[4],&rx)||
+        !cf1_valid_vin(argv[5]))return error("Invalid independent ELM scope");
+    const cd::elmcan::Scope target{profile,tx,rx};
+    if(!target.valid())return error("Invalid ELM CAN physical profile");
+    input raw{},capture{};
+    try{
+        if(!load_regular(argv[6],cd::elmcan::trace_max_bytes,&raw))return error("Invalid bounded ECR/1 transcript");
+        const auto trace=cd::elmcan::decode_trace({raw.bytes.get(),raw.length});
+        if(trace.target.profile!=profile||trace.target.tx!=tx||trace.target.rx!=rx||trace.vin!=argv[5])
+            return error("ECR/1 differs from independently selected target");
+        auto replay=cd::elmcan::replay_trace(trace);
+        std::string capture_digest;
+        if(correlate){
+            if(trace.operation==cd::elmcan::TraceOperation::freeze){
+                if(!load_regular(argv[7],CF1_MAX_BYTES,&capture)||!separate(&raw,&capture))return error("Distinct CF/1 capture required");
+                struct Evidence{cf1_evidence value{};~Evidence(){cf1_evidence_free(&value);}} e;
+                char failure[256]{};
+                if(cf1_inspect_complete(capture.bytes.get(),capture.length,argv[5],&e.value,failure,sizeof(failure)))
+                    return error(failure);
+                replay=cd::elmcan::correlate_freeze(trace,e.value);
+            }else if(trace.operation==cd::elmcan::TraceOperation::maintenance){
+                if(!load_regular(argv[7],cd::cm1::max_journal,&capture)||!separate(&raw,&capture))
+                    return error("Distinct CM/1 journal required");
+                const auto e=cd::cm1::inspect({capture.bytes.get(),capture.length},argv[5],false);
+                if(!e.terminal)return error("Complete CM/1 terminal required for correlation");
+                replay=cd::elmcan::correlate_maintenance(trace,e);
+            }else return error("Independent recipe correlation currently supports CF/1 and CM/1");
+            if(!recheck_input(argv[7],trace.operation==cd::elmcan::TraceOperation::freeze?
+                static_cast<size_t>(CF1_MAX_BYTES):cd::cm1::max_journal,capture))return error("Original capture changed");
+            capture_digest=capture.digest;
+        }
+        if(!recheck_input(argv[6],cd::elmcan::trace_max_bytes,raw))return error("ECR/1 changed during replay");
+        const auto json=std::string("{\"schema\":\"camarodiag-j1979-elm-adapter-replay-v1\",\"transcript_consistent\":true,")+
+            "\"physical_vehicle_verified\":false,\"evidence_authenticated\":false,\"permits_programming\":false,"
+            "\"permits_automatic_retry\":false,\"adapter_configuration_replayed\":"+(replay.configured?"true":"false")+
+            ",\"recipe_correlated\":"+(correlate?"true":"false")+",\"setup_rows\":"+std::to_string(replay.setup_rows)+
+            ",\"diagnostic_rows\":"+std::to_string(replay.diagnostic_rows)+",\"positive\":"+std::to_string(replay.positive)+
+            ",\"negative\":"+std::to_string(replay.negative)+",\"no_data\":"+std::to_string(replay.no_data)+
+            ",\"faults\":"+std::to_string(replay.faults)+",\"transcript_sha256\":\""+raw.digest+
+            "\",\"capture_sha256\":"+(capture_digest.empty()?std::string("null"):"\""+capture_digest+"\"")+"}\n";
+        if(!atomic_create(argv[correlate?8:7],json.data(),json.size()))return error("Replay proof destination unavailable");
+        return replay.configured&&!replay.terminal_fault?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int elm_journal_cli(int argc,char** argv,bool recover){
+    if(argc!=8)return error("Independent ELM profile, TX, RX, VIN, EJR/1 and destination required");
+    uint32_t profile=0,tx=0,rx=0;
+    if(!decimal_uint32(argv[2],&profile)||!hex_uint32(argv[3],&tx)||!hex_uint32(argv[4],&rx)||
+        !cf1_valid_vin(argv[5])||!cd::elmcan::Scope{profile,tx,rx}.valid())
+        return error("Invalid independent ELM CAN target");
+    try{
+        input raw{};
+        if(!load_regular(argv[6],cd::elmcan::journal_max_bytes,&raw))
+            return error("Invalid bounded EJR/1 journal");
+        const cd::elmcan::Bytes bytes{raw.bytes.get(),raw.length};
+        const auto e=cd::elmcan::inspect_journal(bytes,!recover);
+        if(e.trace.target.profile!=profile||e.trace.target.tx!=tx||e.trace.target.rx!=rx||e.trace.vin!=argv[5])
+            return error("EJR/1 differs from independently selected target");
+        if(!recheck_input(argv[6],cd::elmcan::journal_max_bytes,raw))return error("EJR/1 changed during replay");
+        if(recover){
+            const auto canonical=cd::elmcan::encode_trace(e.trace);
+            if(!atomic_create(argv[7],canonical.data(),canonical.size()))
+                return error("ECR/1 destination unavailable");
+            return 0;
+        }
+        const auto json=std::string("{\"schema\":\"camarodiag-j1979-elm-journal-replay-v1\","
+            "\"verified_prefix\":true,\"physical_vehicle_verified\":false,\"evidence_authenticated\":false,"
+            "\"recipe_correlated\":false,\"permits_programming\":false,\"permits_automatic_retry\":false,"
+            "\"terminal_present\":")+(e.terminal?"true":"false")+
+            ",\"torn_tail\":"+(e.torn?"true":"false")+
+            ",\"verified_bytes\":"+std::to_string(e.verified_bytes)+
+            ",\"total_bytes\":"+std::to_string(e.total_bytes)+
+            ",\"adapter_configuration_replayed\":"+(e.replay.configured?"true":"false")+
+            ",\"setup_rows\":"+std::to_string(e.replay.setup_rows)+
+            ",\"diagnostic_rows\":"+std::to_string(e.replay.diagnostic_rows)+
+            ",\"positive\":"+std::to_string(e.replay.positive)+
+            ",\"negative\":"+std::to_string(e.replay.negative)+
+            ",\"no_data\":"+std::to_string(e.replay.no_data)+
+            ",\"faults\":"+std::to_string(e.replay.faults)+
+            ",\"journal_sha256\":\""+raw.digest+"\"}\n";
+        if(!atomic_create(argv[7],json.data(),json.size()))return error("Journal inspection destination unavailable");
+        return e.terminal&&e.replay.configured&&!e.replay.terminal_fault?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int elm_campaign_cli(int argc,char** argv,bool verify){
+    if(argc!=(verify?9:8))return error("Independent ELM profile, TX, RX, VIN, ECP/1 and output required");
+    uint32_t profile=0,tx=0,rx=0;
+    if(!decimal_uint32(argv[2],&profile)||!hex_uint32(argv[3],&tx)||!hex_uint32(argv[4],&rx)||
+        !cf1_valid_vin(argv[5])||!cd::elmcan::Scope{profile,tx,rx}.valid())return error("Invalid independent ELM target");
+    try{
+        input raw{},stored{};
+        if(!load_regular(argv[6],cd::elmcan::campaign_max_bytes,&raw))
+            return error("Invalid ECP/1 campaign");
+        const auto capture=cd::elmcan::decode_campaign({raw.bytes.get(),raw.length});
+        if(capture.plan.target.profile!=profile||capture.plan.target.tx!=tx||capture.plan.target.rx!=rx||capture.plan.vin!=argv[5])
+            return error("ECP/1 differs from independently selected target");
+        const auto result=cd::elmcan::replay_campaign(capture);
+        if(verify){
+            if(!load_regular(argv[7],64*1024*1024,&stored)||!separate(&stored,&raw)||
+                stored.length!=result.native_report.size()||memcmp(stored.bytes.get(),result.native_report.data(),stored.length)||
+                !recheck_input(argv[7],64*1024*1024,stored))return error("Stored native report differs from replay");
+        }
+        if(!recheck_input(argv[6],cd::elmcan::campaign_max_bytes,raw))return error("Campaign capture changed during replay");
+        if(verify){
+            const auto proof=std::string("{\"schema\":\"camarodiag-j1979-elm-campaign-replay-v1\","
+                "\"recipe_replayed\":true,\"physical_vehicle_verified\":false,\"evidence_authenticated\":false,"
+                "\"permits_programming\":false,\"completed\":")+(result.completed?"true":"false")+
+                ",\"steps\":"+std::to_string(result.steps)+",\"capture_sha256\":\""+raw.digest+
+                "\",\"report_sha256\":\""+stored.digest+"\"}\n";
+            if(!atomic_create(argv[8],proof.data(),proof.size()))return error("Campaign proof destination unavailable");
+        }else if(!atomic_create(argv[7],result.native_report.data(),result.native_report.size()))
+            return error("Campaign report destination unavailable");
+        return result.completed?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int legacy_mutation_inspect_cli(int argc,char** argv){
+    if(argc!=7||!cf1_valid_vin(argv[2]))return error("Independent VIN, final report, baseline, intent and proof required (use - for absent unattempted evidence)");
+    try{
+        input final{},baseline{},intent{};
+        if(!load_regular(argv[3],cd::legacy::mutation_report_max,&final))
+            return error("Invalid native legacy maintenance report");
+        const bool has_baseline=strcmp(argv[4],"-")!=0,has_intent=strcmp(argv[5],"-")!=0;
+        if(has_baseline&&(!load_regular(argv[4],cd::legacy::mutation_report_max,&baseline)||!separate(&final,&baseline)))
+            return error("Distinct baseline report required");
+        if(has_intent&&(!load_regular(argv[5],cd::legacy::mutation_report_max,&intent)||!separate(&final,&intent)||
+            (has_baseline&&!separate(&baseline,&intent))))return error("Distinct intent report required");
+        const auto view=[](const input& file){
+            return file.length?std::string_view(reinterpret_cast<const char*>(file.bytes.get()),file.length):std::string_view{};
+        };
+        const auto e=cd::legacy::inspect_mutation(view(final),view(baseline),view(intent),argv[2]);
+        if(!recheck_input(argv[3],cd::legacy::mutation_report_max,final)||
+            (has_baseline&&!recheck_input(argv[4],cd::legacy::mutation_report_max,baseline))||
+            (has_intent&&!recheck_input(argv[5],cd::legacy::mutation_report_max,intent)))return error("Maintenance evidence changed");
+        const auto json=cd::legacy::inspection_report(e,final.digest,has_baseline?baseline.digest:"",has_intent?intent.digest:"");
+        if(!atomic_create(argv[6],json.data(),json.size()))return error("Maintenance proof destination unavailable");
+        return e.sequence_complete&&e.result.complete_ack&&e.baseline_correlated&&e.intent_correlated?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int historical_can_mutation_cli(int argc,char** argv){
+    if(argc!=6||!cf1_valid_vin(argv[2]))return error("Independent VIN, historical CAN report, baseline or -, and output required");
+    try{
+        input original{},base{};
+        if(!load_regular(argv[3],cd::canhistory::max_report,&original))return error("Invalid historical CAN report");
+        const bool has_base=strcmp(argv[4],"-")!=0;
+        if(has_base&&(!load_regular(argv[4],cd::canhistory::max_report,&base)||!separate(&original,&base)))
+            return error("Independent historical baseline file required");
+        const auto view=[](const input& f){return f.length?std::string_view(reinterpret_cast<const char*>(f.bytes.get()),f.length):std::string_view{};};
+        const auto replay=cd::canhistory::inspect(view(original),view(base),argv[2]);
+        if(!recheck_input(argv[3],cd::canhistory::max_report,original)||
+            (has_base&&!recheck_input(argv[4],cd::canhistory::max_report,base)))return error("Historical CAN report changed");
+        const auto json=cd::canhistory::report(replay,original.digest,has_base?base.digest:"");
+        if(!atomic_create(argv[5],json.data(),json.size()))return error("Inspection output unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int historical_maintenance_compat_cli(int argc,char** argv,bool can){
+    const char* path=nullptr;const char* baseline=nullptr;const char* output=nullptr;
+    std::optional<std::string> vin;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing historical maintenance option value");
+        const char* value=argv[i++];
+        if(key=="--report"&&!path)path=value;
+        else if(key=="--baseline"&&!baseline)baseline=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else return error("Unexpected or duplicate historical maintenance option");
+    }
+    if(!path||!output)return error("Historical maintenance report and output required");
+    try{
+        constexpr std::size_t maximum=8u*1024u*1024u;
+        input original{},base{};
+        if(!load_regular(path,maximum,&original)||(baseline&&(!load_regular(baseline,maximum,&base)||!separate(&original,&base))))
+            return error("Historical maintenance inputs must be distinct bounded files");
+        const auto view=[](const input& f){return f.length?std::string_view(reinterpret_cast<const char*>(f.bytes.get()),f.length):std::string_view{};};
+        const auto root=cd::json::parse_report(view(original),maximum);
+        std::string proof;
+        if(can){
+            // Historical CAN inspection requires a VIN in scope, not
+            // necessarily a separately supplied VIN; never attest provenance.
+            if(!vin){
+                const auto* v=root.find("expected_vin");if(!v)v=root.find("expectedVin");
+                if(!v)v=root.find("selected_vin");if(!v)v=root.find("selectedVin");
+                if(!v)return error("Historical CAN report lacks declared VIN");
+                vin=v->string();
+            }
+            if(!cf1_valid_vin(vin->c_str()))return error("Invalid historical CAN VIN");
+            const auto checked=cd::canhistory::inspect(view(original),view(base),*vin);
+            proof=cd::canhistory::report(checked,original.digest,baseline?base.digest:"");
+        }else{
+            const auto b=baseline?std::optional{cd::json::parse_report(view(base),maximum)}:std::nullopt;
+            const auto checked=cd::legacy::history::inspect_historical_maintenance(root,b?&*b:nullptr,vin,
+                original.digest,baseline?base.digest:"");
+            proof=cd::network::history::encode_historical_json(checked.proof)+"\n";
+        }
+        if(!recheck_input(path,maximum,original)||(baseline&&!recheck_input(baseline,maximum,base)))
+            return error("Historical maintenance input changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Historical maintenance proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static void usage(FILE *stream) {
+    fprintf(stream,
+        "CamaroDiag Linux native C++20 — SAE J1979\n"
+        "Usage:\n"
+        "  camarodiag-native --j1979-can-discover --interface can0 --window-ms 1500 --output responders.json --confirm-functional-scope [--extended]\n"
+        "  camarodiag-native --inspect-j1979-elm-campaign PROFILE TX RX VIN CAPTURE.ecp REPORT.json\n"
+        "  camarodiag-native --verify-j1979-elm-campaign PROFILE TX RX VIN CAPTURE.ecp REPORT.json PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-elm-journal PROFILE TX RX VIN TRACE.ejr PROOF.json\n"
+        "  camarodiag-native --recover-j1979-elm-journal PROFILE TX RX VIN TRACE.ejr TRACE.ecr\n"
+        "  camarodiag-native --inspect-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr PROOF.json\n"
+        "  camarodiag-native --verify-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr CAPTURE PROOF.json\n"
+        "  camarodiag-native --j1979-elm-can-freeze --port /dev/ttyUSB0 --profile 6 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture freeze.cf --output freeze.json --confirm-physical-channel [--extended] [--adapter-capture trace.ecr] [--adapter-journal trace.ejr]\n"
+        "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr] [--campaign-capture capture.ecp]\n"
+        "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr] [--campaign-capture capture.ecp] [--native-report-output RAW.json] [--projection-output NUMERIC.json] [--csv SAMPLES.csv]\n"
+        "    Numeric ELM exports require --native-report-output, --campaign-capture and --adapter-journal.\n"
+        "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended] [--journal-directory NEW_DIR]\n"
+        "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel [--journal capture.scj]\n"
+        "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel [--projection-output NUMERIC.json] [--csv SAMPLES.csv]\n"
+        "  camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --output live.json --confirm-physical-channel [--journal capture.scj] [--projection-output NUMERIC.json] [--csv SAMPLES.csv]\n"
+        "    Live SocketCAN, ELM CAN and legacy: --interval SECONDS and --budget SECONDS are exact aliases; do not combine with their millisecond variants. --quiet suppresses provisional sample progress.\n"
+        "    Numeric SocketCAN exports require --journal. Raw evidence is never overwritten.\n"
+        "  camarodiag-native --inspect-j1979-live-native-prefix CAPTURE.cl VIN PREFIX.json\n"
+        "  camarodiag-native --inspect-j1979-live-native CAPTURE.cl VIN REPORT.json\n"
+        "  camarodiag-native --verify-j1979-live-native-prefix CAPTURE.cl PREFIX.json PROOF.json VIN\n"
+        "  camarodiag-native --verify-j1979-live-native CAPTURE.cl REPORT.json PROOF.json VIN\n"
+        "  camarodiag-native --j1979-freeze-can --interface can0 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture capture.cf --output report.json --confirm-physical-channel\n"
+        "  camarodiag-native --j1979-freeze-native --port /dev/ttyACM0 --key-file key.bin --capture capture.cf --output rapport.json --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --budget-ms 60000 --confirm-physical-channel\n"
+        "  camarodiag-native --inspect-j1979-freeze-native-prefix CAPTURE.cf VIN PREFIX.json\n"
+        "  camarodiag-native --inspect-j1979-freeze-native CAPTURE.cf VIN REPORT.json\n"
+        "  camarodiag-native --verify-j1979-freeze-native-prefix CAPTURE.cf PREFIX.json PROOF.json VIN\n"
+        "  camarodiag-native --verify-j1979-freeze-native CAPTURE.cf REPORT.json PROOF.json VIN\n"
+        "  camarodiag-native --j1979-elm-can-maintenance --profile 6 --port /dev/ttyUSB0 --operation clear --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --journal-directory DIR --journal-name operation.cm --output report.json --confirm-physical-channel --acknowledge-maintenance-warning [--extended] [--adapter-capture trace.ecr] [--adapter-journal trace.ejr]\n"
+        "  camarodiag-native --j1979-maintenance-can --operation clear --interface can0 --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --journal-directory PRIVATE_DIR --journal-name session.cm --output report.json --confirm-physical-channel --acknowledge-maintenance-warning\n"
+        "  camarodiag-native --j1979-maintenance-usb --operation clear --port /dev/ttyACM0 --key-file key.bin --journal session.cm --output report.json --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --confirm-physical-channel --acknowledge-maintenance-warning\n"
+        "  camarodiag-native --j1979-maintenance-archive --operation clear --port /dev/ttyACM0 --key-file key.bin --journal recovered.cm --output recovery.json --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --confirm-physical-channel\n"
+        "  camarodiag-native --inspect-j1979-maintenance JOURNAL.cm VIN REPORT.json\n"
+        "  camarodiag-native --inspect-j1979-maintenance-prefix JOURNAL.cm VIN REPORT.json\n"
+        "  camarodiag-native --verify-j1979-maintenance JOURNAL.cm REPORT.json PROOF.json VIN\n"
+        "  camarodiag-native --verify-j1979-maintenance-prefix JOURNAL.cm REPORT.json PROOF.json VIN\n"
+        "  camarodiag-native --j1979-usb --port /dev/ttyACM0 --key-file key.bin --capture session.cj --output report.json --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --confirm-physical-channel\n"
+        "  camarodiag-native --inspect-j1979-campaign CAPTURE.cj VIN REPORT.json\n"
+        "  camarodiag-native --verify-j1979-campaign CAPTURE.cj REPORT.json PROOF.json VIN\n"
+        "  camarodiag-native --j1979-legacy-discover --port /dev/ttyUSB0 --protocol 2 --baud 38400 --output responders.json --confirm-physical-channel\n"
+        "  camarodiag-native --j1979-legacy --port /dev/ttyUSB0 --protocol 2 --source 10 --vin VIN --capture scan.lsr --output scan.json --confirm-physical-channel\n"
+        "  camarodiag-native --j1979-legacy-freeze --port /dev/ttyUSB0 --protocol 2 --source 10 --vin VIN --frame 00 --pid 0C --capture freeze.lfr --output freeze.json --confirm-physical-channel\n"
+        "  camarodiag-native --inspect-j1979-legacy-freeze PROTOCOL SOURCE VIN CAPTURE.lfr REPORT.json\n"
+        "  camarodiag-native --verify-j1979-legacy-freeze PROTOCOL SOURCE VIN CAPTURE.lfr REPORT.json PROOF.json\n"
+        "  camarodiag-native --j1979-legacy-live --port /dev/ttyUSB0 --protocol 2 --source 10 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --capture session.llr --output live.json --confirm-physical-channel [--raw-only] [--csv SAMPLES.csv]\n"
+        "  camarodiag-native --inspect-j1979-legacy-live PROTOCOL SOURCE VIN CAPTURE.llr REPORT.json\n"
+        "  camarodiag-native --verify-j1979-legacy-live PROTOCOL SOURCE VIN CAPTURE.llr REPORT.json PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-legacy-journal PROTOCOL SOURCE VIN JOURNAL.lj REPORT.json\n"
+        "  camarodiag-native --project-j1979-legacy-live-journal 2 10 VIN SESSION.lj NUMERIC.json\n"
+        "  camarodiag-native --export-j1979-legacy-live-journal-csv 2 10 VIN SESSION.lj SAMPLES.csv\n"
+        "  camarodiag-native --verify-j1979-legacy-live-journal 2 10 VIN SESSION.lj NUMERIC.json PROOF.json\n"
+        "  camarodiag-native --recover-j1979-legacy-journal PROTOCOL SOURCE VIN JOURNAL.lj CAPTURE\n"
+        "  camarodiag-native --inspect-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json\n"
+        "  camarodiag-native --verify-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-historical-can-maintenance VIN REPORT.json BASELINE.json|- PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-legacy-maintenance VIN FINAL.json BASELINE.json INTENT.json PROOF.json\n"
+        "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
+        "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
+        "  camarodiag-native inspect-socketcan-journal --journal CAPTURE.scj --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "  camarodiag-native recover-socketcan-report --journal CAPTURE.scj --tx 7E0 --rx 7E8 --vin VIN --output REPORT.json\n"
+        "  camarodiag-native verify-socketcan-journal --journal CAPTURE.scj --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-native-live TX RX VIN REPORT.json PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-native-can-plan TX RX VIN REPORT.json PROOF.json\n"
+        "  camarodiag-native verify-legacy-discovery --report REPORT.json --output PROOF.json\n"
+        "  camarodiag-native compare-legacy-discovery-scan --discovery DISCOVERY.json --scan SCAN.json --output PROOF.json\n"
+        "  camarodiag-native verify-native-live-projection --report RAW.json --projection NUMERIC.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "  camarodiag-native project-native-live --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output PROJECTION.json\n"
+        "  camarodiag-native project-live-evidence --scj SESSION.scj --tx 7E0 --rx 7E8 --vin VIN --output NUMERIC.json\n"
+        "  camarodiag-native export-live-evidence-csv --ecp SESSION.ecp --profile 6 --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
+        "  camarodiag-native verify-live-evidence --scj SESSION.scj --projection NUMERIC.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "    Select exactly one of --scj, --ecp, --cl1, --report; --profile is required only for ECP.\n"
+        "  camarodiag-native project-cl1-live --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output NUMERIC.json\n"
+        "  camarodiag-native export-cl1-live-csv --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
+        "  camarodiag-native verify-cl1-live-projection --capture CAPTURE.cl --projection NUMERIC.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "  camarodiag-native project-cl1-scalar --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output SCALAR.json\n"
+        "  camarodiag-native export-cl1-scalar-csv --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output SCALAR.csv\n"
+        "  camarodiag-native verify-cl1-scalar --capture CAPTURE.cl --projection SCALAR.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "  camarodiag-native --project-j1979-live-native CAPTURE.cl VIN SCALAR.json\n"
+        "  camarodiag-native --export-j1979-live-native-values-csv CAPTURE.cl VIN SCALAR.csv\n"
+        "  camarodiag-native --verify-j1979-live-native-projection CAPTURE.cl VIN SCALAR.json [PROOF.json]\n"
+        "    Shared offline Windows/Linux CLI: pair replayed from original plan, 0 complete, 7 incomplete, 2 rejected.\n"
+        "    Scalar JSON is the portable Android/Windows contract. The enriched native projection is separate.\n"
+        "  camarodiag-native export-native-live-csv --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
+        "  camarodiag-native export-legacy-live-csv --capture CAPTURE.llr --protocol 2 --source 10 --vin VIN --output SAMPLES.csv\n"
+        "  camarodiag-native compare-native-live --report A.json --report B.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "    Sources: --cl1 CAPTURE.cl, --scj JOURNAL.scj, --ecp CAMPAIGN.ecp or --report RAW.json; 2 to 16 sources.\n"
+        "    Specify --profile 6/7/8/9 for all ECP sources. Identical replayed raw reports cannot count twice.\n"
+        "  camarodiag-native compare-live --report A.json --report B.json [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-native-freeze --capture CAPTURE.cf --report REPORT.json [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-j1979-capture --capture CAPTURE.cj1 --report REPORT.json [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-can-mutation --report REPORT.json [--baseline BASE.json] [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-legacy-mutation --report REPORT.json [--baseline BASE.json] [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-live --report REPORT.json [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-freeze --report REPORT.json [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-legacy-freeze --report REPORT.json [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-legacy --report REPORT.json [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-network-journals --report NETWORK.json --journal-directory DIR --interface can0 --vin VIN --output PROOF.json\n"
+        "  camarodiag-native verify-network --report REPORT.json [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-historical-can-network VIN|- REPORT.json PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-historical-can-plan historical|android VIN|- REPORT.json PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-can-discovery-report REPORT.json PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-historical-legacy-discovery REPORT.json PROOF.json\n"
+        "  camarodiag-native --bind-j1979-historical-legacy-discovery PROTOCOL SOURCE VIN DISCOVERY.json CAPTURE.lsr PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-catalogue live|freeze CATALOGUE REFERENCE SHA256 OUTPUT\n"
+        "  camarodiag-native --project-j1979-catalogue cl1|cf1|llr1|lj1 CATALOGUE REFERENCE SHA256 CAPTURE VIN OUTPUT [PROTOCOL SOURCE]\n"
+        "  camarodiag-native --verify-j1979-catalogue cl1|cf1|llr1|lj1 CATALOGUE REFERENCE SHA256 CAPTURE VIN PROJECTION PROOF [PROTOCOL SOURCE]\n"
+        "  camarodiag-native --export-j1979-catalogue-csv cl1|cf1|llr1|lj1 CATALOGUE REFERENCE SHA256 CAPTURE VIN OUTPUT [PROTOCOL SOURCE]\n"
+        "  camarodiag-native --verify-j1979-catalogue-csv cl1|cf1|llr1|lj1 CATALOGUE REFERENCE SHA256 CAPTURE VIN CSV PROOF [PROTOCOL SOURCE]\n"
+        "  camarodiag-native --help\n"
+        "Examples:\n"
+        "  camarodiag-native --inspect-j1979-freeze-native-prefix incomplete.cf 2G1FA1E30D7654321 partial.json\n"
+        "  camarodiag-native --verify-j1979-freeze-native-prefix incomplete.cf partial.json proof.json 2G1FA1E30D7654321\n"
+        "Live acquisition: explicit CU/2 proof and local confirmation; offline commands send nothing.\n"
+        "Never treats a CRC as cryptographic ECU proof. No automatic retry or write service.\n");
+}
+static int historical_legacy_discovery_cli(const char* path,const char* output){
+    try{
+        input original{},again{};
+        constexpr std::size_t max_size=4*1024*1024;
+        if(!load_regular(path,max_size,&original))return error("Bounded historical discovery report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const auto result=cd::legacy::history::inspect(cd::json::parse(raw,max_size));
+        const auto proof=cd::legacy::history::report(result,original.digest);
+        if(!load_regular(path,max_size,&again)||!same_input(&original,&again))return error("Historical report changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Discovery proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int bind_legacy_discovery_cli(const char* protocol_arg,const char* source_arg,const char* vin,
+    const char* discovery_path,const char* capture_path,const char* output){
+    try{
+        uint32_t protocol_num=0;
+        if(!decimal_uint32(protocol_arg,&protocol_num)||protocol_num<1||protocol_num>5)
+            return error("Explicit protocol 1..5 required");
+        const auto p=static_cast<cd::legacy::Protocol>(protocol_num);
+        const auto source_bytes=cd::legacy::unhex(source_arg);
+        if(source_bytes.size()!=1||!cd::legacy::valid_source(source_bytes[0]))
+            return error("Explicit two-digit source required");
+        input discovery{},capture{},d_again{},c_again{};
+        constexpr std::size_t json_max=4*1024*1024;
+        if(!load_regular(discovery_path,json_max,&discovery)||
+            !load_regular(capture_path,cd::legacy::scan_max_capture,&capture))
+            return error("Bounded regular discovery report and LSR/1 capture required");
+        const std::string_view raw(reinterpret_cast<const char*>(discovery.bytes.get()),discovery.length);
+        const auto verified=cd::legacy::history::inspect(cd::json::parse(raw,json_max));
+        const auto result=cd::legacy::history::bind_capture(verified,
+            cd::legacy::Bytes(capture.bytes.get(),capture.length),p,source_bytes[0],vin);
+        const auto proof=cd::legacy::history::binding_report(result,discovery.digest,capture.digest);
+        if(!load_regular(discovery_path,json_max,&d_again)||!same_input(&discovery,&d_again)||
+            !load_regular(capture_path,cd::legacy::scan_max_capture,&c_again)||!same_input(&capture,&c_again))
+            return error("Discovery or capture changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Binding proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int historical_can_discovery_cli(const char* path,const char* output){
+    try{
+        constexpr std::size_t maximum=4*1024*1024;
+        input original{},again{};
+        if(!load_regular(path,maximum,&original))return error("Bounded CAN discovery report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const auto inspected=cd::network::history::inspect_discovery(cd::json::parse(raw,maximum));
+        const auto proof=cd::network::history::report(inspected,original.digest);
+        if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("CAN discovery report changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("CAN discovery proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int historical_can_plan_cli(const char* order,const char* vin,const char* path,const char* output){
+    try{
+        const std::string_view mode(order);
+        if(mode!="historical"&&mode!="android")return error("Explicit historical or android order required");
+        std::optional<std::string> expected;
+        if(std::string_view(vin)!="-")expected=vin;
+        constexpr std::size_t maximum=16*1024*1024;
+        input original{},again{};
+        if(!load_regular(path,maximum,&original))return error("Bounded physical report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const auto result=cd::network::history::inspect_plan(cd::json::parse_report(raw,maximum),
+            mode=="android"?cd::network::history::PlanOrder::android:cd::network::history::PlanOrder::historical,expected);
+        const auto proof=cd::network::history::plan_report(result,original.digest);
+        if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Physical report changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Physical plan proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int historical_can_network_cli(const char* vin,const char* path,const char* output){
+    try{
+        std::optional<std::string> expected;
+        if(std::string_view(vin)!="-")expected=vin;
+        constexpr std::size_t maximum=32*1024*1024;
+        input original{},again{};
+        if(!load_regular(path,maximum,&original))return error("Bounded CAN network report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const auto result=cd::network::history::inspect_network(cd::json::parse_report(raw,maximum),expected);
+        const auto proof=cd::network::history::report(result,original.digest);
+        if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Network report changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Network proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int native_can_plan_cli(const char* tx_text,const char* rx_text,const char* vin,const char* path,const char* output,bool live=false){
+    try{
+        auto parse_id=[](std::string_view s){
+            std::uint32_t n{};
+            const auto [end,ec]=std::from_chars(s.data(),s.data()+s.size(),n,16);
+            if(s.empty()||s.size()>8||ec!=std::errc{}||end!=s.data()+s.size()||n>0x1fffffffu)
+                throw std::invalid_argument("Explicit hexadecimal CAN identifier required");
+            return n;
+        };
+        const std::size_t maximum=live?64u*1024u*1024u:32u*1024u*1024u;
+        input original{},again{};
+        if(!load_regular(path,maximum,&original))return error("Bounded native physical report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const cd::network::Pair pair{parse_id(tx_text),parse_id(rx_text)};
+        const auto root=cd::json::parse_report(raw,maximum);
+        const auto inspection=live?cd::network::history::native_live_report(
+            cd::network::history::inspect_native_live(root,pair,vin)):
+            cd::network::history::native_plan_report(cd::network::history::inspect_native_plan(root,pair,vin));
+        const auto proof="{\"source_sha256\":"+cd::json::quote(original.digest)+",\"inspection\":"+inspection+"}\n";
+        if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Native physical report changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Native physical proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int verify_network_journal_cli(int argc,char** argv){
+    const char* report=nullptr;const char* directory=nullptr;const char* vin=nullptr;const char* interface=nullptr;const char* output=nullptr;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing network journal option value");
+        const char* value=argv[i++];
+        if(key=="--report"&&!report)report=value;
+        else if(key=="--journal-directory"&&!directory)directory=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else if(key=="--interface"&&!interface)interface=value;
+        else if(key=="--output"&&!output)output=value;
+        else return error("Unexpected or duplicate network journal option");
+    }
+    if(!report||!directory||!vin||!interface||!output)return error("Network report, directory, independent interface/VIN and output required");
+    try{
+        constexpr std::size_t maximum=64u*1024u*1024u;
+        input original{},again{};
+        if(!load_regular(report,maximum,&original))return error("Bounded native network report required");
+        const auto root=cd::json::parse_report({reinterpret_cast<const char*>(original.bytes.get()),original.length},maximum);
+        const auto scope=cd::network::history::inspect_network(root,std::string(vin));
+        auto journals=cd::network::history::load_network_journals(directory,scope.selected);
+        const auto proof=cd::network::history::verify_network_journals(root,journals,vin,interface,original.digest);
+        const auto encoded=cd::json::serialize(proof)+"\n";
+        if(!load_regular(report,maximum,&again)||!same_input(&original,&again))return error("Network report changed");
+        if(!atomic_create(output,encoded.data(),encoded.size()))return error("Network journal proof destination unavailable");
+        return proof.at("completed").boolean()?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int socket_campaign_cli(int argc,char** argv,std::string_view command){
+    const char* path=nullptr;const char* report=nullptr;const char* output=nullptr;
+    const char* vin=nullptr;const char* tx=nullptr;const char* rx=nullptr;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing SocketCAN journal argument");
+        const char* value=argv[i++];
+        if(key=="--journal"&&!path)path=value;
+        else if(key=="--report"&&!report&&command=="verify-socketcan-journal")report=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else if(key=="--tx"&&!tx)tx=value;
+        else if(key=="--rx"&&!rx)rx=value;
+        else return error("Unexpected or duplicate SocketCAN journal option");
+    }
+    if(!path||!output||!vin||!tx||!rx||(command=="verify-socketcan-journal"&&!report))
+        return error("SocketCAN journal, independent TX/RX/VIN and new output required");
+    try{
+        const auto id=[](std::string_view s){
+            std::uint32_t n{};const auto [end,ec]=std::from_chars(s.data(),s.data()+s.size(),n,16);
+            if(s.empty()||s.size()>8||ec!=std::errc{}||end!=s.data()+s.size()||n>0x1fffffffu)
+                throw std::invalid_argument("Invalid independent CAN ID");
+            return n;
+        };
+        input original{},again{},saved{},saved_again{};
+        if(!load_regular(path,cd::socketcampaign::max_journal,&original))return error("Invalid bounded SCJ file");
+        const bool prefix=command=="inspect-socketcan-journal";
+        const auto journal=cd::socketcampaign::decode({original.bytes.get(),original.length},prefix);
+        if(journal.plan.vin!=vin||journal.plan.tx!=id(tx)||journal.plan.rx!=id(rx))
+            return error("SocketCAN journal differs from independent selected scope");
+        const auto replay=cd::socketcampaign::replay(journal);
+        std::string result;
+        if(command=="recover-socketcan-report"){
+            if(!journal.terminal||replay.prefix||replay.report.empty())return error("Cannot recover a report from a prefix");
+            result=replay.report;
+        }else{
+            auto proof=cd::socketcampaign::proof(journal,replay,original.digest).object();
+            if(report){
+                if(!load_regular(report,cd::socketcampaign::max_report,&saved)||!separate(&original,&saved))
+                    return error("Distinct bounded SCJ report required");
+                const bool equal=saved.length==replay.report.size()&&
+                    !memcmp(saved.bytes.get(),replay.report.data(),saved.length);
+                proof.emplace("source_report_sha256",cd::json::Value{std::string(saved.digest)});
+                proof.emplace("report_consistent",cd::json::Value{equal});
+                if(!equal)return error("SCJ report differs from callback replay");
+                if(!load_regular(report,cd::socketcampaign::max_report,&saved_again)||!same_input(&saved,&saved_again))
+                    return error("SCJ report changed during verification");
+            }
+            result=cd::json::serialize(cd::json::Value{std::move(proof)})+"\n";
+        }
+        if(!load_regular(path,cd::socketcampaign::max_journal,&again)||!same_input(&original,&again))
+            return error("SCJ changed during inspection");
+        if(!atomic_create(output,result.data(),result.size()))return error("SCJ output unavailable");
+        return replay.completed&&!replay.prefix?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+// Shared positional CL/1 CLI used by the Windows bridge. The CAN pair is
+// replayed from the capture plan; the caller still supplies an independent
+// VIN. This compatibility path is offline only and does not open an ECU.
+static int cl1_scalar_compat_cli(int argc,char** argv,std::string_view op){
+    const bool verify=op=="--verify-j1979-live-native-projection";
+    const bool csv=op=="--export-j1979-live-native-values-csv";
+    if((verify&&(argc!=5&&argc!=6))||(!verify&&argc!=5))
+        return error("Expected original CL/1 capture, independent VIN, JSON/CSV destination or projection and optional proof");
+    const char* source=argv[2];const char* vin=argv[3];const char* target=argv[4];
+    if(!cf1_valid_vin(vin)||!*source||!*target)return error("Independent CL/1 VIN and distinct files required");
+    try{
+        constexpr std::size_t maximum=64u*1024u*1024u;
+        input raw{},stored{};
+        if(!load_regular(source,CL1_MAX_CAPTURE,&raw))return error("Invalid bounded CL/1 source");
+        cl1_result checked{};std::array<char,256> failure{};
+        if(cl1_inspect_complete(raw.bytes.get(),raw.length,vin,&checked,failure.data(),failure.size()))
+            return error(failure.data());
+        const auto projected=cd::network::history::project_cl1_scalar(
+            {raw.bytes.get(),raw.length},{checked.plan.tx,checked.plan.rx},vin,raw.digest);
+        if(verify){
+            if(!load_regular(target,maximum,&stored)||!separate(&raw,&stored))
+                return error("Separate original capture and portable JSON report required");
+            const auto candidate=cd::json::parse_report({reinterpret_cast<const char*>(stored.bytes.get()),stored.length},maximum);
+            if(!cd::network::history::verify_cl1_scalar(projected,candidate))
+                return error("Portable projection differs from independent CL/1 replay");
+            if(!recheck_input(source,CL1_MAX_CAPTURE,raw)||!recheck_input(target,maximum,stored))
+                return error("CL/1 capture or report changed during verification");
+            const auto proof=std::string("{\"schema\":\"camarodiag-j1979-cl1-projection-verification-v1\","
+                "\"consistent\":true,\"capture_sha256\":\"")+raw.digest+"\",\"projection_sha256\":\""+stored.digest+
+                "\",\"numeric_projection_complete\":"+(projected.complete?"true":"false")+
+                ",\"physical_vehicle_verified\":false,\"authenticated\":false,\"permits_programming\":false}\n";
+            if(argc==6&&!atomic_create(argv[5],proof.data(),proof.size()))return error("New proof destination unavailable");
+            fputs(proof.c_str(),stdout);
+        }else{
+            const auto data=csv?cd::network::history::cl1_scalar_csv(projected):cd::json::serialize(projected.report)+"\n";
+            if(!recheck_input(source,CL1_MAX_CAPTURE,raw))return error("CL/1 source changed");
+            if(!atomic_create(target,data.data(),data.size()))return error("New scalar destination unavailable");
+            printf("{\"identity_rechecked\":%s,\"numeric_projection_complete\":%s}\n",
+                projected.report.at("identity_rechecked").boolean()?"true":"false",projected.complete?"true":"false");
+        }
+        return projected.complete?0:7;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int cl1_numeric_cli(int argc,char** argv,std::string_view operation){
+    const char *capture=nullptr,*vin=nullptr,*tx=nullptr,*rx=nullptr,*output=nullptr,*projection=nullptr;
+    const bool scalar=operation=="project-cl1-scalar"||operation=="export-cl1-scalar-csv"||
+        operation=="verify-cl1-scalar";
+    const bool verify=operation=="verify-cl1-live-projection"||operation=="verify-cl1-scalar";
+    const bool csv=operation=="export-cl1-live-csv"||operation=="export-cl1-scalar-csv";
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||!*argv[i]||std::string_view(argv[i]).starts_with("--"))
+            return error("Missing CL/1 numeric option value");
+        const char* value=argv[i++];
+        const char** slot=nullptr;
+        if(key=="--capture")slot=&capture;
+        else if(key=="--vin")slot=&vin;
+        else if(key=="--tx")slot=&tx;
+        else if(key=="--rx")slot=&rx;
+        else if(key=="--output")slot=&output;
+        else if(key=="--projection"&&verify)slot=&projection;
+        if(!slot||*slot)return error("Unexpected or duplicate CL/1 numeric option");
+        *slot=value;
+    }
+    if(!capture||!vin||!tx||!rx||!output||(verify&&!projection))
+        return error("CL/1 numeric replay requires capture, VIN, TX, RX, output and projection when verifying");
+    const auto address=[](std::string_view value){
+        std::uint32_t n{};
+        const auto [end,ec]=std::from_chars(value.data(),value.data()+value.size(),n,16);
+        if(value.empty()||value.size()>8||ec!=std::errc{}||end!=value.data()+value.size()||n>0x1fffffffu)
+            throw std::invalid_argument("Explicit hexadecimal CAN address required");
+        return n;
+    };
+    try{
+        constexpr std::size_t max_report=64u*1024u*1024u;
+        input raw{},stored{};
+        if(!load_regular(capture,CL1_MAX_CAPTURE,&raw))return error("Invalid bounded CL/1 capture");
+        const cd::network::Pair pair{address(tx),address(rx)};
+        const std::span<const std::uint8_t> original{raw.bytes.get(),raw.length};
+        auto result=scalar?cd::network::history::project_cl1_scalar(original,pair,vin,raw.digest):
+            cd::network::history::bind_native_live_projection(
+                cd::network::history::project_cl1_live(original,pair,vin),raw.digest);
+        const auto canonical=cd::json::serialize(result.report)+"\n";
+        if(verify){
+            if(!load_regular(projection,max_report,&stored)||!separate(&raw,&stored))
+                return error("Distinct bounded CL/1 projection required");
+            const bool matches=scalar?cd::network::history::verify_cl1_scalar(result,
+                cd::json::parse_report({reinterpret_cast<const char*>(stored.bytes.get()),stored.length},max_report)):
+                stored.length==canonical.size()&&!memcmp(stored.bytes.get(),canonical.data(),canonical.size());
+            if(!matches)return error("Stored CL/1 projection differs from independent replay");
+            if(!recheck_input(projection,max_report,stored)||!recheck_input(capture,CL1_MAX_CAPTURE,raw))
+                return error("CL/1 projection or capture changed during replay");
+            const auto proof=std::string("{\"schema\":\"camarodiag-j1979-cl1-projection-verification-v1\","
+                "\"consistent\":true,\"capture_sha256\":\"")+raw.digest+"\",\"projection_sha256\":\""+stored.digest+
+                "\",\"numeric_projection_complete\":"+(result.complete?"true":"false")+
+                ",\"physical_vehicle_verified\":false,\"authenticated\":false,\"permits_programming\":false}\n";
+            if(!atomic_create(output,proof.data(),proof.size()))return error("CL/1 proof destination unavailable");
+            return 0;
+        }
+        const auto data=csv?(scalar?cd::network::history::cl1_scalar_csv(result):
+            cd::network::history::native_live_csv(result)):canonical;
+        if(!recheck_input(capture,CL1_MAX_CAPTURE,raw))return error("CL/1 source changed during numeric replay");
+        if(!atomic_create(output,data.data(),data.size()))return error("CL/1 numeric destination unavailable");
+        return result.complete?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int project_native_live_cli(int argc,char** argv,bool csv,bool verify=false){
+    const char* path=nullptr;const char* output=nullptr;const char* vin=nullptr;const char* tx=nullptr;const char* rx=nullptr;const char* projection=nullptr;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing native live projection option value");
+        const char* value=argv[i++];
+        if(key=="--report"&&!path)path=value;
+        else if(key=="--projection"&&verify&&!projection)projection=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else if(key=="--tx"&&!tx)tx=value;
+        else if(key=="--rx"&&!rx)rx=value;
+        else return error("Unexpected or duplicate native live projection option");
+    }
+    if(!path||!output||!vin||!tx||!rx||(verify&&!projection))return error("Native live projection requires report, TX, RX, VIN, output and projection for verification");
+    try{
+        const auto id=[](std::string_view s){
+            std::uint32_t n{};const auto [end,ec]=std::from_chars(s.data(),s.data()+s.size(),n,16);
+            if(s.empty()||s.size()>8||ec!=std::errc{}||end!=s.data()+s.size()||n>0x1fffffffu)
+                throw std::invalid_argument("Explicit hexadecimal CAN identifier required");
+            return n;
+        };
+        constexpr std::size_t maximum=64u*1024u*1024u;
+        input original{},again{};
+        if(!load_regular(path,maximum,&original))return error("Bounded native live report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const auto root=cd::json::parse_report(raw,maximum);
+        if(verify){
+            input stored{},stored_again{};
+            if(!load_regular(projection,maximum,&stored)||!separate(&original,&stored))
+                return error("Distinct bounded native live projection required");
+            const auto saved=cd::json::parse_report({reinterpret_cast<const char*>(stored.bytes.get()),stored.length},maximum);
+            const auto checked=cd::network::history::verify_native_live_projection(root,saved,{id(tx),id(rx)},vin,original.digest,stored.digest);
+            const auto proof=cd::json::serialize(checked)+"\n";
+            if(!load_regular(path,maximum,&again)||!same_input(&original,&again)||
+                !load_regular(projection,maximum,&stored_again)||!same_input(&stored,&stored_again))
+                return error("Native projection or source changed");
+            if(!atomic_create(output,proof.data(),proof.size()))return error("Native projection proof destination unavailable");
+            return checked.at("verified").boolean()?0:2;
+        }
+        auto projected=cd::network::history::bind_native_live_projection(
+            cd::network::history::project_native_live(root,{id(tx),id(rx)},vin),original.digest);
+        const auto output_data=csv?cd::network::history::native_live_csv(projected):cd::json::serialize(projected.report)+"\n";
+        if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Native live source changed");
+        if(!atomic_create(output,output_data.data(),output_data.size()))return error("Native live projection output unavailable");
+        return projected.complete?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int live_evidence_cli(int argc,char** argv,std::string_view command){
+    using namespace cd::network::history;
+    const bool verify=command=="verify-live-evidence";
+    const bool csv=command=="export-live-evidence-csv";
+    const char *source=nullptr,*target=nullptr,*saved=nullptr,*vin=nullptr,*tx=nullptr,*rx=nullptr,*profile=nullptr;
+    LiveEvidenceKind kind{};
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||!*argv[i]||std::string_view(argv[i]).starts_with("--"))
+            return error("Missing live evidence option");
+        const char* value=argv[i++];
+        if(key=="--scj"||key=="--ecp"||key=="--cl1"||key=="--report"){
+            if(source)return error("Exactly one original live evidence source required");
+            source=value;
+            kind=key=="--scj"?LiveEvidenceKind::socket_journal:key=="--ecp"?LiveEvidenceKind::elm_campaign:
+                key=="--cl1"?LiveEvidenceKind::cl1:LiveEvidenceKind::report;
+            continue;
+        }
+        const char** slot=nullptr;
+        if(key=="--output")slot=&target;
+        else if(key=="--projection"&&verify)slot=&saved;
+        else if(key=="--tx")slot=&tx;
+        else if(key=="--rx")slot=&rx;
+        else if(key=="--vin")slot=&vin;
+        else if(key=="--profile")slot=&profile;
+        if(!slot||*slot)return error("Unexpected or duplicate live evidence option");
+        *slot=value;
+    }
+    uint32_t t=0,r=0,p=0;
+    if(!source||!target||!vin||!tx||!rx||!cf1_valid_vin(vin)||!hex_uint32(tx,&t)||
+        !hex_uint32(rx,&r)||!j1979_can_physical_pair(t,r)||(verify&&!saved)||
+        ((kind==LiveEvidenceKind::elm_campaign)!=bool(profile))||
+        (profile&&(!decimal_uint32(profile,&p)||p<6||p>9)))
+        return error("Explicit VIN, CAN pair, original evidence and matching ELM profile required");
+    try{
+        constexpr std::size_t maximum=64u*1024u*1024u;
+        input original{},candidate{};
+        if(!load_regular(source,maximum,&original))return error("Invalid bounded original live evidence");
+        const auto result=project_live_evidence(kind,{original.bytes.get(),original.length},{t,r},vin,p);
+        if(result.source_sha256!=original.digest)return error("Live evidence digest differs");
+        std::string bytes;
+        bool consistent=true;
+        if(verify){
+            if(!load_regular(saved,maximum,&candidate)||!separate(&original,&candidate))
+                return error("Distinct bounded saved projection required");
+            const auto document=cd::json::parse_report(
+                {reinterpret_cast<const char*>(candidate.bytes.get()),candidate.length},maximum);
+            const auto proof=verify_live_evidence(result,document,candidate.digest);
+            consistent=proof.at("consistent").boolean();
+            bytes=cd::json::serialize(proof)+"\n";
+            if(!recheck_input(saved,maximum,candidate))return error("Saved projection changed");
+        }else{
+            bytes=csv?native_live_csv(result.projection):cd::json::serialize(result.projection.report)+"\n";
+        }
+        if(!recheck_input(source,maximum,original))return error("Original live evidence changed");
+        if(!atomic_create(target,bytes.data(),bytes.size()))return error("New live evidence destination unavailable");
+        return consistent&&result.projection.complete?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+static int compare_native_live_cli(int argc,char** argv){
+    using namespace cd::network::history;
+    struct Source {const char* path;LiveEvidenceKind kind;};
+    std::vector<Source> paths;
+    const char* output=nullptr;const char* vin=nullptr;const char* tx=nullptr;const char* rx=nullptr;
+    const char* profile=nullptr;bool ecp=false;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing native comparison option");
+        const char* value=argv[i++];
+        if((key=="--report"||key=="--cl1"||key=="--scj"||key=="--ecp")&&paths.size()<16){
+            const auto kind=key=="--report"?LiveEvidenceKind::report:key=="--cl1"?LiveEvidenceKind::cl1:
+                key=="--scj"?LiveEvidenceKind::socket_journal:LiveEvidenceKind::elm_campaign;
+            paths.push_back({value,kind});ecp=ecp||kind==LiveEvidenceKind::elm_campaign;
+        }
+        else if(key=="--profile"&&!profile)profile=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else if(key=="--tx"&&!tx)tx=value;
+        else if(key=="--rx"&&!rx)rx=value;
+        else return error("Unexpected or duplicate native comparison option");
+    }
+    uint32_t selected_profile=0;
+    if(paths.size()<2||!output||!vin||!tx||!rx||ecp!=bool(profile)||
+        (profile&&(!decimal_uint32(profile,&selected_profile)||selected_profile<6||selected_profile>9)))
+        return error("Comparison requires 2 to 16 original sources, independent TX/RX/VIN and ELM profile for ECP");
+    try{
+        auto id=[](std::string_view s){
+            std::uint32_t n{};
+            const auto [end,ec]=std::from_chars(s.data(),s.data()+s.size(),n,16);
+            if(s.empty()||s.size()>8||ec!=std::errc{}||end!=s.data()+s.size()||n>0x1fffffffu)
+                throw std::invalid_argument("Invalid explicit hexadecimal CAN identifier");
+            return n;
+        };
+        const cd::network::Pair pair{id(tx),id(rx)};
+        constexpr std::size_t maximum=64u*1024u*1024u,total_limit=128u*1024u*1024u;
+        std::size_t total=0;
+        std::vector<input> snapshots(paths.size());
+        std::vector<cd::network::history::NativeLiveProjection> projections;
+        std::vector<std::string> digests;
+        for(std::size_t i=0;i<paths.size();++i){
+            auto& in=snapshots[i];
+            const auto& source=paths[i];
+            const auto bound=source.kind==LiveEvidenceKind::cl1?static_cast<std::size_t>(CL1_MAX_CAPTURE):maximum;
+            if(!load_regular(source.path,bound,&in)||in.length>total_limit-total)
+                return error("Bounded native comparison inputs required");
+            for(std::size_t previous=0;previous<i;++previous)
+                if(!separate(&in,&snapshots[previous]))return error("Comparison inputs alias the same evidence");
+            total+=in.length;
+            auto evidence=project_live_evidence(source.kind,{in.bytes.get(),in.length},pair,vin,
+                source.kind==LiveEvidenceKind::elm_campaign?selected_profile:0);
+            if(evidence.source_sha256!=in.digest)return error("Comparison source digest differs");
+            digests.push_back(evidence.source_sha256);
+            projections.push_back(std::move(evidence.projection));
+        }
+        const auto result=cd::network::history::compare_native_live(projections,digests);
+        const auto proof=cd::json::serialize(result)+"\n";
+        for(std::size_t i=0;i<paths.size();++i){
+            input again{};
+            if(!load_regular(paths[i].path,paths[i].kind==LiveEvidenceKind::cl1?static_cast<std::size_t>(CL1_MAX_CAPTURE):maximum,&again)||!same_input(&snapshots[i],&again))
+                return error("Native comparison input changed");
+        }
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Native comparison output unavailable");
+        return result.at("all_identities_rechecked").boolean()?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int compare_live_compat_cli(int argc,char** argv){
+    std::vector<const char*> paths;
+    const char* output=nullptr;std::optional<std::string> vin;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing compare-live option value");
+        const char* value=argv[i++];
+        if(key=="--report"&&paths.size()<16)paths.push_back(value);
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else return error("Unexpected or duplicate compare-live option");
+    }
+    if(paths.size()<2||!output)return error("compare-live requires 2 to 16 --report arguments and --output");
+    try{
+        constexpr std::size_t maximum=64u*1024u*1024u,total_maximum=128u*1024u*1024u;
+        std::size_t total=0;
+        std::vector<input> snapshots(paths.size());
+        std::vector<cd::network::history::HistoricalLive> checked;
+        std::vector<std::string> digests;
+        checked.reserve(paths.size());digests.reserve(paths.size());
+        for(std::size_t i=0;i<paths.size();++i){
+            auto& original=snapshots[i];
+            if(!load_regular(paths[i],maximum,&original)||original.length>total_maximum-total)
+                return error("Bounded historical live inputs required");
+            total+=original.length;
+            const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+            checked.push_back(cd::network::history::inspect_historical_live(cd::json::parse_report(raw,maximum),vin));
+            digests.emplace_back(original.digest);
+        }
+        const auto proof=cd::network::history::encode_historical_json(
+            cd::network::history::compare_historical_live(checked,digests))+"\n";
+        for(std::size_t i=0;i<paths.size();++i){
+            input again{};
+            if(!load_regular(paths[i],maximum,&again)||!same_input(&snapshots[i],&again))
+                return error("Historical live recording changed during comparison");
+        }
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Comparison proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int verify_legacy_compat_cli(int argc,char** argv,bool freeze=false,bool can_freeze=false,bool live=false){
+    const char* path=nullptr;const char* output=nullptr;std::optional<std::string> vin;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing verify-legacy option value");
+        const char* value=argv[i++];
+        if(key=="--report"&&!path)path=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else return error("Unexpected or duplicate verify-legacy option");
+    }
+    if(!path||!output)return error("verify-legacy requires --report and --output");
+    try{
+        constexpr std::size_t maximum=64u*1024u*1024u;
+        input original{},again{};
+        if(!load_regular(path,maximum,&original))return error("Bounded selected-source legacy report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const auto root=cd::json::parse_report(raw,maximum);
+        const auto proof=live?cd::network::history::historical_live_report(cd::network::history::inspect_historical_live(root,vin),original.digest):
+            can_freeze?cd::network::history::historical_can_freeze_report(
+            cd::network::history::inspect_historical_can_freeze(root,vin),original.digest):
+            freeze?cd::legacy::history::historical_freeze_report(
+            cd::legacy::history::inspect_historical_freeze(root,vin),original.digest):
+            cd::legacy::history::historical_scan_report(cd::legacy::history::inspect_historical_scan(root,vin),original.digest);
+        if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Legacy report changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Legacy proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int verify_network_compat_cli(int argc,char** argv){
+    const char* path=nullptr;const char* vin="-";const char* output=nullptr;
+    bool vin_seen=false;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing verify-network option value");
+        const char* value=argv[i++];
+        if(key=="--report"&&!path)path=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin_seen){vin=value;vin_seen=true;}
+        else return error("Unexpected or duplicate verify-network option");
+    }
+    if(!path||!output)return error("verify-network requires --report and --output");
+    if(vin_seen&&std::string_view(vin)=="-")return error("Explicit VIN must be a VIN");
+    return historical_can_network_cli(vin,path,output);
+}
+static int historical_discovery_compat_cli(int argc,char** argv,bool bind){
+    const char* discovery=nullptr;const char* scan=nullptr;const char* output=nullptr;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing discovery option value");
+        const char* value=argv[i++];
+        if(key==(bind?"--discovery":"--report")&&!discovery)discovery=value;
+        else if(bind&&key=="--scan"&&!scan)scan=value;
+        else if(key=="--output"&&!output)output=value;
+        else return error("Unexpected or duplicate discovery option");
+    }
+    if(!discovery||!output||(bind&&!scan))return error("Discovery input and distinct proof destination required");
+    if(!bind)return historical_legacy_discovery_cli(discovery,output);
+    try{
+        constexpr std::size_t discovery_limit=4u*1024u*1024u,scan_limit=64u*1024u*1024u;
+        input d{},s{},da{},sa{};
+        if(!load_regular(discovery,discovery_limit,&d)||!load_regular(scan,scan_limit,&s))
+            return error("Bounded discovery and historical scan inputs required");
+        const auto dv=cd::legacy::history::inspect(cd::json::parse_report(
+            std::string_view(reinterpret_cast<const char*>(d.bytes.get()),d.length)));
+        const auto sv=cd::legacy::history::inspect_historical_scan(cd::json::parse_report(
+            std::string_view(reinterpret_cast<const char*>(s.bytes.get()),s.length)));
+        const auto result=cd::legacy::history::compare_historical_discovery_scan(dv,sv,d.digest,s.digest);
+        const auto proof=cd::network::history::encode_historical_json(result)+"\n";
+        if(!load_regular(discovery,discovery_limit,&da)||!same_input(&d,&da)||
+            !load_regular(scan,scan_limit,&sa)||!same_input(&s,&sa))return error("Historical discovery or scan changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Binding proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
+int main(int argc, char **argv) {
+    if(argc>=2&&!strcmp(argv[1],"verify-legacy-discovery"))return historical_discovery_compat_cli(argc,argv,false);
+    if(argc>=2&&!strcmp(argv[1],"compare-legacy-discovery-scan"))return historical_discovery_compat_cli(argc,argv,true);
+    if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-live"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
+    if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-can-plan"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
+    if(argc>=2&&!strcmp(argv[1],"verify-native-live-projection"))return project_native_live_cli(argc,argv,false,true);
+    if(argc>=2&&!strcmp(argv[1],"verify-network-journals"))return verify_network_journal_cli(argc,argv);
+    if(argc>=2&&(!strcmp(argv[1],"inspect-socketcan-journal")||!strcmp(argv[1],"recover-socketcan-report")||!strcmp(argv[1],"verify-socketcan-journal")))return socket_campaign_cli(argc,argv,argv[1]);
+    if(argc>=2&&(!strcmp(argv[1],"--project-j1979-live-native")||
+        !strcmp(argv[1],"--export-j1979-live-native-values-csv")||!strcmp(argv[1],"--verify-j1979-live-native-projection")))
+        return cl1_scalar_compat_cli(argc,argv,argv[1]);
+    if(argc>=2&&(!strcmp(argv[1],"project-cl1-live")||!strcmp(argv[1],"export-cl1-live-csv")||
+        !strcmp(argv[1],"verify-cl1-live-projection")||!strcmp(argv[1],"project-cl1-scalar")||
+        !strcmp(argv[1],"export-cl1-scalar-csv")||!strcmp(argv[1],"verify-cl1-scalar")))
+        return cl1_numeric_cli(argc,argv,argv[1]);
+    if(argc>=2&&!strcmp(argv[1],"project-native-live"))return project_native_live_cli(argc,argv,false);
+    if(argc>=2&&!strcmp(argv[1],"export-native-live-csv"))return project_native_live_cli(argc,argv,true);
+    if(argc>=2&&!strcmp(argv[1],"export-legacy-live-csv"))return legacy_live_csv_cli(argc,argv);
+    if(argc>=2&&(!strcmp(argv[1],"project-live-evidence")||!strcmp(argv[1],"export-live-evidence-csv")||
+        !strcmp(argv[1],"verify-live-evidence")))return live_evidence_cli(argc,argv,argv[1]);
+    if(argc>=2&&!strcmp(argv[1],"compare-native-live"))return compare_native_live_cli(argc,argv);
+    if(argc>=2&&!strcmp(argv[1],"compare-live"))return compare_live_compat_cli(argc,argv);
+    if(argc>=2&&!strcmp(argv[1],"verify-can-mutation"))return historical_maintenance_compat_cli(argc,argv,true);
+    if(argc>=2&&!strcmp(argv[1],"verify-legacy-mutation"))return historical_maintenance_compat_cli(argc,argv,false);
+    if(argc>=2&&!strcmp(argv[1],"verify-live"))return verify_legacy_compat_cli(argc,argv,false,false,true);
+    if(argc>=2&&!strcmp(argv[1],"verify-freeze"))return verify_legacy_compat_cli(argc,argv,false,true);
+    if(argc>=2&&!strcmp(argv[1],"verify-legacy-freeze"))return verify_legacy_compat_cli(argc,argv,true);
+    if(argc>=2&&!strcmp(argv[1],"verify-legacy"))return verify_legacy_compat_cli(argc,argv);
+    if(argc>=2&&!strcmp(argv[1],"verify-network"))return verify_network_compat_cli(argc,argv);
+    if(argc==5&&!strcmp(argv[1],"--inspect-j1979-historical-can-network"))return historical_can_network_cli(argv[2],argv[3],argv[4]);
+    if(argc==6&&!strcmp(argv[1],"--inspect-j1979-historical-can-plan"))return historical_can_plan_cli(argv[2],argv[3],argv[4],argv[5]);
+    if(argc==4&&!strcmp(argv[1],"--inspect-j1979-can-discovery-report"))return historical_can_discovery_cli(argv[2],argv[3]);
+    if(argc==8&&!strcmp(argv[1],"--bind-j1979-historical-legacy-discovery"))return bind_legacy_discovery_cli(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
+    if(argc==4&&!strcmp(argv[1],"--inspect-j1979-historical-legacy-discovery"))return historical_legacy_discovery_cli(argv[2],argv[3]);
+    if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
+        usage(stdout); return 0;
+    }
+    if (argc==7 && !strcmp(argv[1],"--inspect-j1979-catalogue"))return catalogue_inventory_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
+    if (argc>=3 && !strcmp(argv[1],"--project-j1979-catalogue"))return catalogue_projection_cli(argc,argv,false);
+    if (argc>=3 && !strcmp(argv[1],"--verify-j1979-catalogue"))return catalogue_projection_cli(argc,argv,true);
+    if (argc>=3 && !strcmp(argv[1],"--export-j1979-catalogue-csv"))return catalogue_projection_cli(argc,argv,false,true);
+    if (argc>=3 && !strcmp(argv[1],"--verify-j1979-catalogue-csv"))return catalogue_projection_cli(argc,argv,true,true);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-live"))return legacy_live_cli(argc,argv);
+    if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-live"))return legacy_live_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);
+    if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-live"))return legacy_live_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-freeze"))return legacy_freeze_cli(argc,argv);
+    if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-freeze"))return legacy_freeze_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);
+    if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-freeze"))return legacy_freeze_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
+    if(argc>=2&&(!strcmp(argv[1],"--project-j1979-legacy-live-journal")||
+        !strcmp(argv[1],"--export-j1979-legacy-live-journal-csv")||!strcmp(argv[1],"--verify-j1979-legacy-live-journal")))
+        return legacy_live_journal_cli(argc,argv,argv[1]);
+    if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-journal"))return legacy_journal_cli(argv[2],argv[3],argv[4],argv[5],argv[6],false);
+    if (argc==7 && !strcmp(argv[1],"--recover-j1979-legacy-journal"))return legacy_journal_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
+    if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-scan"))return legacy_scan_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);
+    if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-scan"))return legacy_scan_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
+    if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-historical-can-maintenance"))return historical_can_mutation_cli(argc,argv);
+    if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-legacy-maintenance"))return legacy_mutation_inspect_cli(argc,argv);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-maintenance"))return legacy_maintenance_cli(argc,argv);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-legacy"))return legacy_discovery_cli(argc,argv,true);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-discover"))return legacy_discovery_cli(argc,argv);
+    if (argc==6 && !strcmp(argv[1],"--inspect-j1979-legacy-discovery"))return replay_legacy_discovery(argv[2],argv[3],argv[4],argv[5]);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-usb"))return capture_cu1(argc,argv);
+    if(argc>=2&&!strcmp(argv[1],"verify-native-freeze"))return verify_historical_cf1_cli(argc,argv);
+    if(argc>=2&&!strcmp(argv[1],"verify-j1979-capture"))return verify_historical_cj1_cli(argc,argv);
+    if (argc==6 && !strcmp(argv[1],"--verify-j1979-campaign"))return verify_cj1_cli(argv[2],argv[3],argv[4],argv[5]);
+    if (argc==5 && !strcmp(argv[1],"--inspect-j1979-campaign"))
+        return cj1_inspect_cli(argv[2],argv[3],argv[4]);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-elm-can-maintenance"))return direct_maintenance_cli(argc,argv,true);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-maintenance-can"))return direct_maintenance_cli(argc,argv);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-maintenance-usb"))return capture_cu45(argc,argv,cd::cu45::Mode::maintenance);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-maintenance-archive"))return capture_cu45(argc,argv,cd::cu45::Mode::archive);
+    if (argc==5 && !strcmp(argv[1],"--inspect-j1979-maintenance"))
+        return cm1_cli(argv[2],argv[4],nullptr,argv[3],false);
+    if (argc==5 && !strcmp(argv[1],"--inspect-j1979-maintenance-prefix"))
+        return cm1_cli(argv[2],argv[4],nullptr,argv[3],true);
+    if (argc==6 && !strcmp(argv[1],"--verify-j1979-maintenance"))
+        return cm1_cli(argv[2],argv[3],argv[4],argv[5],false);
+    if (argc==6 && !strcmp(argv[1],"--verify-j1979-maintenance-prefix"))
+        return cm1_cli(argv[2],argv[3],argv[4],argv[5],true);
+    if (argc >= 3 && (!strcmp(argv[1], "--j1979-live-usb-native")||!strcmp(argv[1],"--j1979-live-native")))
+        return capture_cl1_native(argc,argv);
+    if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-elm-campaign"))return elm_campaign_cli(argc,argv,false);
+    if (argc>=3 && !strcmp(argv[1],"--verify-j1979-elm-campaign"))return elm_campaign_cli(argc,argv,true);
+    if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-elm-journal"))return elm_journal_cli(argc,argv,false);
+    if (argc>=3 && !strcmp(argv[1],"--recover-j1979-elm-journal"))return elm_journal_cli(argc,argv,true);
+    if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-elm-trace"))return elm_trace_cli(argc,argv,false);
+    if (argc>=3 && !strcmp(argv[1],"--verify-j1979-elm-trace"))return elm_trace_cli(argc,argv,true);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-elm-can-freeze"))return elm_freeze_cli(argc,argv);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-elm-can"))return elm_can_cli(argc,argv,false);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-elm-live"))return elm_can_cli(argc,argv,true);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-can-discover"))return network_cli(argc,argv,false);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-can-network"))return network_cli(argc,argv,true);
+    if (argc >= 3 && (!strcmp(argv[1], "--j1979-can") ||
+                      !strcmp(argv[1], "--j1979-live")))
+        return j1979_can_cli(argc, argv);
+    if (argc >= 3 && !strcmp(argv[1], "--j1979-freeze-can"))return socket_freeze_cli(argc,argv);
+    if (argc >= 3 && !strcmp(argv[1], "--j1979-freeze-native"))
+        return capture_native(argc, argv);
+    if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-live-native-prefix"))
+        return cl1_inspect_cli(argv[2],argv[3],argv[4],true);
+    if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-live-native"))
+        return cl1_inspect_cli(argv[2],argv[3],argv[4],false);
+    if (argc == 6 && !strcmp(argv[1], "--verify-j1979-live-native-prefix"))
+        return cl1_verify_cli(argv[2],argv[3],argv[4],argv[5],true);
+    if (argc == 6 && !strcmp(argv[1], "--verify-j1979-live-native"))
+        return cl1_verify_cli(argv[2],argv[3],argv[4],argv[5],false);
+    if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-freeze-native"))
+        return inspect_complete(argv[2], argv[3], argv[4]);
+    if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-freeze-native-prefix"))
+        return inspect(argv[2], argv[3], argv[4]);
+    if (argc == 6 && !strcmp(argv[1], "--verify-j1979-freeze-native"))
+        return verify_complete(argv[2], argv[3], argv[4], argv[5]);
+    if (argc == 6 && !strcmp(argv[1], "--verify-j1979-freeze-native-prefix"))
+        return verify(argv[2], argv[3], argv[4], argv[5]);
+    usage(stderr);
+    return 2;
+}

@@ -7,4 +7,26 @@
     <string name="license_activation_help">La licence est activée après confirmation du paiement par le serveur. Revenez ici et choisissez Actualiser. Une redirection seule ne délivre jamais de licence.</string>
     <string name="license_required_for_feature">Pour utiliser cette fonction, activez une licence sur le compte connecté.</string>
     <string name="license_checkout_not_open">L\'achat des licences n\'est pas encore ouvert. Les comptes vérifiés reçoivent actuellement une licence offerte, sauf révocation administrative.</string>
+    <string name="admin_table_title">Gestion des utilisateurs</string>
+    <string name="admin_table_refresh">Actualiser</string>
+    <string name="admin_table_close">Fermer</string>
+    <string name="admin_table_error">Échec. Reconnectez-vous si nécessaire.</string>
+    <string name="admin_table_email">Utilisateur</string>
+    <string name="admin_table_license">Licence</string>
+    <string name="admin_table_admin">Administrateur</string>
+    <string name="admin_table_active">Actif</string>
+    <string name="admin_table_verified">Vérifié</string>
+    <string name="admin_table_owner">Propriétaire</string>
+    <string name="admin_table_more">Autres utilisateurs</string>
+    <string name="admin_table_empty">Aucun utilisateur</string>
+    <string name="admin_table_revoke">Révoquer les sessions</string>
+    <string name="admin_table_reset">Réinitialiser le mot de passe</string>
+    <string name="admin_table_confirm">Confirmer</string>
+    <string name="admin_table_cancel">Annuler</string>
+    <string name="admin_table_yes">Oui</string>
+    <string name="admin_table_no">Non</string>
+    <string name="admin_table_unknown">Inconnu</string>
+    <string name="admin_table_actions">Actions</string>
+    <string name="admin_table_delete">Supprimer</string>
+    <string name="admin_table_delete_warning">Supprimer définitivement le compte %1$s ? Son accès sera supprimé. Cette opération est irréversible.</string>
 </resources>

@@ -41,6 +41,10 @@ internal sealed partial class J2534Device
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(policy);
         ArgumentNullException.ThrowIfNull(journal);
+        // Reserve the installed J2534 driver BEFORE any ECU identity, power,
+        // physical backup or programming I/O. Separate ITransport objects alone
+        // do not protect a device opened again by another local process.
+        using var exclusiveDriver = NativeE39PhysicalBenchGate.Acquire(adapter);
         using var verifiedDriver = NativeE39PhysicalAdmission.OpenVerifiedDriverLease(adapter, scope, channel);
         NativeE39BackupQualification.RequireFullScope(scope);
         if (scope.ExpectedVin != policy.Session.ExpectedVin || scope.ProtocolNumber is not (33 or 34))
@@ -62,11 +66,15 @@ internal sealed partial class J2534Device
         // Exercise the exact driver ABI before any programming session.
         device.ClearNativeReceiveQueue();
         var measured = device.ReadBatteryMillivolts();
+        // J2534 native calls are synchronous and cannot be interrupted in
+        // place; cancellation immediately after their return wins.
+        token.ThrowIfCancellationRequested();
         if (!measured.HasValue || measured.Value < policy.Session.MinimumSupplyMillivolts ||
             measured.Value > policy.Session.MaximumSupplyMillivolts)
             throw new IOException("Bench voltage could not be verified by the selected J2534 adapter.");
 
         var first = device.ReadGmlanIdentification();
+        token.ThrowIfCancellationRequested();
         if (first.Vin != policy.Session.ExpectedVin ||
             first.OperatingSystemId != policy.Session.ExpectedOsId)
             throw new UnauthorizedAccessException("Physical ECU identity differs from qualified policy.");
@@ -74,6 +82,7 @@ internal sealed partial class J2534Device
         var capture = await NativeScopedMemoryReader.ReadWithSessionAsync(readOnly, scope, null, token);
         token.ThrowIfCancellationRequested();
         var second = device.ReadGmlanIdentification();
+        token.ThrowIfCancellationRequested();
         var backup = NativeE39BackupQualification.Compare(scope, original, capture, first, second);
         token.ThrowIfCancellationRequested();
 
@@ -117,7 +126,9 @@ internal sealed partial class J2534Device
         {
             token.ThrowIfCancellationRequested();
             if (failed) throw new IOException("Native bench session failed.");
-            return Task.FromResult(device.ReadBatteryMillivolts());
+            var value = device.ReadBatteryMillivolts();
+            token.ThrowIfCancellationRequested();
+            return Task.FromResult(value);
         }
 
         public Task DelayAsync(TimeSpan duration, CancellationToken token) =>

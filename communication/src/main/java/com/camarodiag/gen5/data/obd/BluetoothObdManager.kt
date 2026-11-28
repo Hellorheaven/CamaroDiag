@@ -18,16 +18,28 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
 
+/** A functional Mode 04 ACK is distinct from the subsequent observed DTC state. */
+class ObdStationaryEvidenceRequiredException :
+    IllegalStateException("Stop the vehicle and engine; fresh zero speed and RPM evidence required.")
+
+data class StandardObdClearResult(
+    val rawResponse: String,
+    val snapshot: PhysicalObdDtcSnapshot?
+)
+
 class BluetoothObdManager(context: Context) {
 
-    private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
-    private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager?.adapter
+    // Do not query the Bluetooth service while constructing the startup ViewModel.
+    private val bluetoothContext = context.applicationContext
+    private val bluetoothAdapter: BluetoothAdapter?
+        get() = (bluetoothContext.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
     private val sppUuid: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
     private var socket: BluetoothSocket? = null
@@ -51,8 +63,7 @@ class BluetoothObdManager(context: Context) {
     }
 
     private val supportedMode01PidsMutex = Mutex()
-    @Volatile private var cachedSupportedMode01Pids: Set<Int>? = null
-    @Volatile private var cachedSupportedMode01PidsAtMillis: Long = 0L
+    private val mode01SupportCache = ObdPidSupportCache()
     private val usbTransport = ElmUsbTransport(context)
     private val connectorUsbContext = context.applicationContext
     private val connectorDiscoveryMutex = Mutex()
@@ -66,6 +77,7 @@ class BluetoothObdManager(context: Context) {
     /** Atomic, testable identity for transport work across disconnect/reconnect. */
     private val transportSessionEpoch = ObdTransportSessionEpoch()
     private var activeAdapterCapabilities: AdapterCapabilities? = null
+    @Volatile private var standardElmProfile = ElmObdSessionProfile.AUTO
 
     /** Capture the active transport before disconnect() resets its identity. */
     val currentTransportKind: String
@@ -76,6 +88,61 @@ class BluetoothObdManager(context: Context) {
         get() = StnUdsSessionAdmission.allowsRead(
             activeAdapterCapabilities, isObdCommandChannelAvailable
         )
+
+    /** ELM command capability is a candidate, not proof of target UDS support.
+     * Configuration acknowledgements and the correlated ECU reply are mandatory.
+     */
+    val isElmUdsReadCandidate: Boolean
+        get() = isObdCommandChannelAvailable &&
+            activeAdapterCapabilities?.let {
+                it.supportsCanHeaders
+            } == true
+
+    val isElmEvapCandidate: Boolean
+        get() = !isDemoMode && !isSimulationActive && !isJ2534BridgeConnected() &&
+            isElmUdsReadCandidate && standardElmProfile.protocol in 6..9 &&
+            standardElmProfile.protocol in availableRawCanProfiles()
+
+    /** Accepted physical configurations for the implemented classical CAN console.
+     * Other adapter capabilities are not silently converted to classical CAN. */
+    fun availableRawCanProfiles(): Set<Int> {
+        val adapter = activeAdapterCapabilities ?: return emptySet()
+        if (!isObdCommandChannelAvailable || !adapter.supportsCanHeaders) return emptySet()
+        val classical = adapter.acceptedElmProtocols.intersect(setOf(6, 7, 8, 9))
+        val singleWire = if (adapter.supportsSwCan && adapter.tier == AdapterTier.PRO_STN &&
+            StnUdsPayloadTransport.hardwareModel(adapter.hardwareId) in setOf("MX", "MX+"))
+            adapter.acceptedStnProtocols.intersect(setOf(61, 62)) else emptySet()
+        return classical + singleWire
+    }
+
+    /** A candidate is a configured software path, not proof of ECU response. */
+    fun availableUdsReadProfiles(request: Int? = null, response: Int? = null): Set<Int> {
+        if (request != null && response != null && request == response) return emptySet()
+        val possible = if (isJ2534BridgeConnected()) {
+            if ((request != null && request != j2534BridgeRequestCanId) ||
+                (response != null && response != j2534BridgeResponseCanId)) return emptySet()
+            setOfNotNull(j2534BridgeProtocolNumber)
+        } else {
+            val adapter = activeAdapterCapabilities ?: return emptySet()
+            if (!isObdCommandChannelAvailable) return emptySet()
+            setOf(33, 34, 35, 36, 63, 64).filterTo(linkedSetOf()) { profile ->
+                if (StnUdsSessionAdmission.allowsReadCandidate(adapter, true, profile)) true
+                else if (isElmUdsReadCandidate && profile in setOf(33, 34, 35, 36)) {
+                    val elm = DiagnosticRouteSelector.elmCanProtocol(profile in setOf(34, 36),
+                        if (profile in setOf(35, 36)) 250_000 else 500_000)
+                    elm in adapter.acceptedElmProtocols
+                } else false
+            }
+        }
+        return possible.filterTo(linkedSetOf()) { profile ->
+            val maximum = if (profile in setOf(34, 36, 64)) 0x1FFFFFFF else 0x7FF
+            (request == null || request in 0..maximum) &&
+                (response == null || response in 0..maximum)
+        }
+    }
+
+    val isEnhancedUdsReadAvailable: Boolean
+        get() = availableUdsReadProfiles().isNotEmpty()
 
     fun getUsbDevices(): List<String> = usbTransport.availableDevices()
 
@@ -142,10 +209,11 @@ class BluetoothObdManager(context: Context) {
         val epoch = beginAdapterConnection()
         var ownClassicSocket: BluetoothSocket? = null
         try {
-            val device: BluetoothDevice = bluetoothAdapter?.getRemoteDevice(macAddress)
+            val adapter = bluetoothAdapter
                 ?: return@withContext Result.failure(IllegalStateException("Bluetooth adapter unavailable"))
+            val device: BluetoothDevice = adapter.getRemoteDevice(macAddress)
 
-            bluetoothAdapter.cancelDiscovery()
+            adapter.cancelDiscovery()
             val useBle = device.type == BluetoothDevice.DEVICE_TYPE_LE ||
                 (device.name ?: "").contains("OBDLink CX", ignoreCase = true)
             if (useBle) {
@@ -167,7 +235,10 @@ class BluetoothObdManager(context: Context) {
                     transportSessionEpoch.requireQueuedCurrent(epoch)
                     socket = btSocket
                 }
-                btSocket.connect()
+                BoundedBluetoothConnect.open(
+                    connect = { btSocket.connect() },
+                    close = { btSocket.close() }
+                )
                 val connectedInput = btSocket.inputStream
                 val connectedOutput = btSocket.outputStream
                 synchronized(adapterLifecycleLock) {
@@ -335,41 +406,27 @@ class BluetoothObdManager(context: Context) {
         // Every probe request is tied to the original adapter generation,
         // including the last 0100. A newer selection must never receive the
         // remaining AT commands of the cancelled probe.
-        suspend fun probeCommand(command: String, timeoutMs: Long = 1200L): String =
-            commandSessionMutex.withLock {
-                transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
-                sendAtCommandInternal(command, timeoutMs, expectedEpoch = expectedEpoch)
-            }
+        suspend fun probeCommand(command: String, timeoutMs: Long = 1200L): String {
+            transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+            return sendAtCommandInternal(command, timeoutMs, expectedEpoch = expectedEpoch, preserveLines = true)
+        }
         return try {
-            val atz = probeCommand("ATZ")
-            probeCommand("ATE0")
-            probeCommand("ATL0")
-            val headersResp = probeCommand("ATH1")
-            val sti = probeCommand("STI")
-            val atal = probeCommand("ATAL")
-            val stp61 = probeCommand("STP 61")
-            val protocolResp = probeCommand("ATSP 6")
-            // A real 0100 response proves that the connected physical command path
-            // transmitted a request and received an ECU reply; AT header support alone does not.
-            val transmitProbeResp = probeCommand("0100", 2_500L)
-
-            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
-                deviceName = deviceName,
-                macAddress = address,
-                atzResp = atz,
-                stiResp = sti,
-                atalResp = atal,
-                stp61Resp = stp61,
-                headersResp = headersResp,
-                protocolResp = protocolResp,
-                transmitProbeResp = transmitProbeResp
-            )
+            // Keep all adapter configuration in one exclusive session. No
+            // telemetry or console operation may interleave ATTP/ATSP setup.
+            val capabilities = withTimeoutOrNull(45_000L) {
+                commandSessionMutex.withLock {
+                    transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                    probeConnectedAdapterLocked(deviceName, address, expectedEpoch, ::probeCommand)
+                }
+            } ?: throw java.net.SocketTimeoutException("ELM adapter initialization timed out")
+            currentCoroutineContext().ensureActive()
             synchronized(adapterLifecycleLock) {
                 transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                standardElmProfile = capabilities.profile
+                activeAdapterCapabilities = capabilities.capabilities
                 isDemoMode = false
-                activeAdapterCapabilities = capabilities
             }
-            Result.success(capabilities)
+            Result.success(capabilities.capabilities)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             disconnectIfCurrent(expectedEpoch)
             throw cancelled
@@ -377,6 +434,96 @@ class BluetoothObdManager(context: Context) {
             disconnectIfCurrent(expectedEpoch)
             Result.failure(error)
         }
+    }
+
+    private data class ProbeResult(val capabilities: AdapterCapabilities, val profile: ElmObdSessionProfile)
+
+    private suspend fun probeConnectedAdapterLocked(
+        deviceName: String, address: String, expectedEpoch: Long,
+        command: suspend (String, Long) -> String
+    ): ProbeResult {
+        suspend fun probeCommand(value: String, timeoutMs: Long = 1200L) = command(value, timeoutMs)
+        if (activeTransport == "BLUETOOTH") {
+            val ownedSocket = checkNotNull(socket)
+            val input = checkNotNull(inputStream)
+            val output = checkNotNull(outputStream)
+            val context = currentCoroutineContext()
+            ElmStartupSynchronization.synchronize(
+                available = { input.available() },
+                read = { size ->
+                    val buffer = ByteArray(size)
+                    val count = input.read(buffer)
+                    if (count <= 0) ByteArray(0) else buffer.copyOf(count)
+                },
+                interrupt = {
+                    BoundedBluetoothConnect.write(1500L, write = {
+                        context.ensureActive()
+                        transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                        if (socket !== ownedSocket || !ownedSocket.isConnected)
+                            throw ObdTransportDisconnectedException("Bluetooth startup socket was replaced")
+                        output.write(ElmResponseCompletion.wireBytes("\u001B"))
+                        output.flush()
+                    }, close = { ownedSocket.close() })
+                },
+                ensureCurrent = {
+                    context.ensureActive()
+                    transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                    if (socket !== ownedSocket || !ownedSocket.isConnected)
+                        throw ObdTransportDisconnectedException("Bluetooth startup socket was replaced")
+                }
+            )
+        }
+        val atz = probeCommand("ATZ", 3500L)
+        probeCommand("ATE0")
+        probeCommand("ATL0")
+        val headersResp = probeCommand("ATH1")
+        val sti = probeCommand("STI")
+        val hardware = probeCommand("STDI")
+        val atal = probeCommand("ATAL")
+        val stp61 = probeCommand("STP 61")
+        val stp62 = probeCommand("STP 62")
+        // ATTP selects a trial configuration without sending a vehicle request.
+        // Keep acceptance separate from physical wiring and ECU evidence.
+        val protocolProbe = linkedMapOf<Int, String>()
+        for (number in 1..10) {
+            protocolProbe[number] = probeCommand("ATTP" + number.toString(16).uppercase(java.util.Locale.ROOT))
+        }
+        // Let the adapter discover the vehicle protocol instead of assuming HS-CAN.
+        val protocolResp = probeCommand("ATSP 0")
+        check(CanConsoleAdapterRestorationPolicy.accepted(protocolResp)) {
+            "The adapter did not accept automatic OBD protocol selection."
+        }
+        val transmitProbeResp = probeCommand("0100", 12_000L)
+        val protocolNumberResponse = probeCommand("ATDPN")
+        val reportedProtocol = ElmObdSessionProfile.parseProtocolNumber(protocolNumberResponse)
+        val positivePid00 = if (reportedProtocol != null && reportedProtocol in 1..5) {
+            // Headered legacy replies carry a three-byte network header and
+            // checksum, not CAN framing. Verify before retaining the route.
+            runCatching {
+                ElmLegacyResponseFrames.decode(reportedProtocol,"0100",transmitProbeResp)
+                    .any { it.payload.size == 6 && it.payload.take(2) == listOf(0x41,0) }
+            }.getOrDefault(false)
+        } else CamaroUdsProtocol.parsePidBytes(transmitProbeResp,"00")?.size == 4
+        val selectedProfile = ElmObdSessionProfile.fromObservation(reportedProtocol,positivePid00)
+
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = deviceName,
+            macAddress = address,
+            atzResp = atz,
+            stiResp = sti,
+            atalResp = atal,
+            stp61Resp = stp61,
+            headersResp = headersResp,
+            protocolResp = protocolResp,
+            transmitProbeResp = transmitProbeResp,
+            hardwareResp = hardware,
+            elmProtocolProbe = protocolProbe,
+            stnProtocolProbe = mapOf(61 to stp61, 62 to stp62),
+            selectedElmProtocol = 0,
+            reportedElmProtocol = reportedProtocol,
+            protocolNumberResponse = protocolNumberResponse
+        )
+        return ProbeResult(capabilities, selectedProfile)
     }
 
     suspend fun activateSimulatedAdapter(preset: String): AdapterCapabilities = withContext(Dispatchers.Default) {
@@ -396,6 +543,7 @@ class BluetoothObdManager(context: Context) {
                 macAddress = "00:04:3E:8A:12:9F",
                 atzResp = "ELM327 v1.4b",
                 stiResp = "STN2255 v5.6.5",
+                hardwareResp = "OBDLink MX+",
                 atalResp = "OK",
                 stp61Resp = "OK"
             )
@@ -422,7 +570,13 @@ class BluetoothObdManager(context: Context) {
      * Runs a multi-command OBD transaction without allowing live telemetry or
      * another diagnostic action to interleave adapter setup and response parsing.
      */
-    suspend fun <T> withObdCommandSession(block: suspend (Obd2FeatureEngine) -> T): T {
+    suspend fun <T> withObdCommandSession(block: suspend (Obd2FeatureEngine) -> T): T =
+        withGuardedObdCommandSession({}) { engine, _ -> block(engine) }
+
+    private suspend fun <T> withGuardedObdCommandSession(
+        beforeCommand: (String) -> Unit,
+        block: suspend (Obd2FeatureEngine, ObdCommandChannel) -> T
+    ): T {
         val requestedEpoch = transportSessionEpoch.capture()
         check(isObdCommandChannelAvailable) {
             "No ELM/OBD-II command channel is available on the active transport."
@@ -433,12 +587,20 @@ class BluetoothObdManager(context: Context) {
             check(isObdCommandChannelAvailable) {
                 "OBD command channel disconnected while waiting for the previous operation."
             }
-            val engine = Obd2FeatureEngine(
-                ObdCommandChannel { command, timeoutMs ->
-                    sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch)
-                }
-            )
-            return block(engine)
+            val channel = ObdCommandChannel { command, timeoutMs ->
+                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, preserveLines = true,
+                    beforeTransmit = { beforeCommand(command) })
+            }
+            val engine = Obd2FeatureEngine(channel, physicalElmHeaders = true)
+            return try {
+                block(engine, channel)
+            } catch (formatting: ObdElmFormattingException) {
+                if (!transportSessionEpoch.isCurrent(requestedEpoch))
+                    throw ObdSupersededSessionException(formatting)
+                val transportKind = activeTransport
+                disconnectIfCurrent(requestedEpoch)
+                throw CanAdapterRestorationException(transportKind)
+            }
         } finally {
             commandSessionMutex.unlock()
         }
@@ -450,27 +612,56 @@ class BluetoothObdManager(context: Context) {
      */
     suspend fun readMode01PidIfSupported(pid: Int): String? {
         if (isJ2534StandardObdAvailable()) return readJ2534PidIfSupported(pid)
+        return readElmPidWithInventory(pid) { response, _ -> response }
+    }
+
+    /** Live telemetry must respect the responder's own advertised bitmap,
+     * not merely the union of every ECU's supported PIDs. The validation
+     * and parsing run inside the same transport/cache generation as the read. */
+    suspend fun readMode01PidObservationsIfSupported(pid: Int): List<CamaroUdsProtocol.PidObservation> {
+        require(pid in 1..255)
+        val pidHex = "%02X".format(java.util.Locale.ROOT, pid)
+        if (isJ2534StandardObdAvailable()) {
+            val raw = readJ2534PidIfSupported(pid) ?: return emptyList()
+            return CamaroUdsProtocol.parsePidObservations(raw, pidHex)
+        }
+        return readElmPidWithInventory(pid) { response, inventory ->
+            if (response.equals("NO_SOCKET", ignoreCase = true) ||
+                response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
+                throw ObdTransportDisconnectedException("Live OBD transport is disconnected")
+            }
+            inventory.accept(pid, CamaroUdsProtocol.parsePidObservations(response, pidHex))
+        }.orEmpty()
+    }
+
+    private suspend fun <T> readElmPidWithInventory(pid: Int,
+        decode: (String, ObdPidSupportCache.Inventory) -> T): T? {
+        require(pid in 1..255)
         check(isObdCommandChannelAvailable) {
             "No ELM/OBD-II command channel is available on the active transport."
         }
-        val supported = supportedMode01PidsMutex.withLock {
-            val cached = cachedSupportedMode01Pids
-            val cacheAgeMs = System.currentTimeMillis() - cachedSupportedMode01PidsAtMillis
-            if (cached != null && (cached.isNotEmpty() || cacheAgeMs < 10_000L)) {
-                cached
-            } else {
-                withObdCommandSession { engine ->
-                    engine.discoverSupportedPids()
-                }.also { discovered ->
-                    // Keep an empty result briefly to avoid repeating a slow bitmap timeout
-                    // for every live PID; retry after 10 seconds if the ECU/clone was not ready.
-                    cachedSupportedMode01Pids = discovered
-                    cachedSupportedMode01PidsAtMillis = System.currentTimeMillis()
-                }
+        val epoch = transportSessionEpoch.capture()
+        val generation = mode01SupportCache.generation()
+        return supportedMode01PidsMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            mode01SupportCache.requireCurrent(generation)
+            withObdCommandSession { engine ->
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                mode01SupportCache.requireCurrent(generation)
+                val inventory = mode01SupportCache.getInventory(generation, android.os.SystemClock.elapsedRealtime())
+                    ?: engine.discoverPidAvailability().let { discovery ->
+                        transportSessionEpoch.requireQueuedCurrent(epoch)
+                        mode01SupportCache.publish(generation, discovery.supported,
+                            discovery.firstUnresolvedPid == null, android.os.SystemClock.elapsedRealtime(),
+                            discovery.byResponder)
+                        checkNotNull(mode01SupportCache.getInventory(generation, android.os.SystemClock.elapsedRealtime()))
+                    }
+                mode01SupportCache.requireCurrent(generation)
+                val response = engine.readMode01PidIfSupported(pid, inventory.pids)
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                mode01SupportCache.requireCurrent(generation)
+                response?.let { decode(it, inventory) }
             }
-        }
-        return withObdCommandSession { engine ->
-            engine.readMode01PidIfSupported(pid, supported)
         }
     }
 
@@ -490,8 +681,10 @@ class BluetoothObdManager(context: Context) {
             }
             return commandSessionMutex.withLock {
                 transportSessionEpoch.requireQueuedCurrent(epoch)
-                check(isJ2534StandardObdAvailable()) {
-                    "The connected J2534 channel cannot read standard OBD fuel PIDs."
+                check(isJ2534StandardObdAvailable() && J2534StandardObd.supportsPrimaryChannel(
+                    checkNotNull(j2534BridgeRequestCanId), checkNotNull(j2534BridgeResponseCanId),
+                    checkNotNull(j2534BridgeProtocolNumber))) {
+                    "The connected J2534 channel is not the primary powertrain fuel channel."
                 }
                 val bridge = checkNotNull(j2534BridgeTransport)
                 val supported = bridge.discoverStandardObdPids()
@@ -538,10 +731,11 @@ class BluetoothObdManager(context: Context) {
         if (!isJ2534BridgeConnected()) {
             check(isObdCommandChannelAvailable) { "No connected OBD read channel." }
             val epoch = transportSessionEpoch.capture()
-            return commandSessionMutex.withLock {
+            return withObdCommandSession { engine ->
                 transportSessionEpoch.requireQueuedCurrent(epoch)
-                check(isObdCommandChannelAvailable) { "OBD channel disconnected." }
-                sendAtCommandInternal(request.elmCommand, 4_000L, expectedEpoch = epoch)
+                engine.readConsoleRequest(request).also {
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                }
             }
         }
         val epoch = transportSessionEpoch.capture()
@@ -561,40 +755,60 @@ class BluetoothObdManager(context: Context) {
     fun isStandardObdReadAvailable(): Boolean =
         isObdCommandChannelAvailable || isJ2534StandardObdAvailable()
 
+    /** Only a correlated physical J2534 channel has a known single responder.
+     * Headerless functional ELM DTC records cannot be assigned to an ECM. */
+    fun standardObdDtcModule(): String {
+        if (isSimulationActive) return "ECM"
+        if (!isJ2534StandardObdAvailable()) return "OBD"
+        val address = j2534BridgeResponseCanId ?: return "OBD"
+        val width = if (j2534BridgeProtocolNumber in setOf(34,36)) 8 else 3
+        return "OBD 0x" + address.toString(16).uppercase(java.util.Locale.ROOT).padStart(width, '0')
+    }
+
     private suspend fun readJ2534PidIfSupported(pid: Int): String? {
         require(pid in 1..255)
         val epoch = transportSessionEpoch.capture()
+        val generation = mode01SupportCache.generation()
         return supportedMode01PidsMutex.withLock {
             commandSessionMutex.withLock session@{
                 transportSessionEpoch.requireQueuedCurrent(epoch)
+                mode01SupportCache.requireCurrent(generation)
                 check(isJ2534StandardObdAvailable())
                 val bridge = checkNotNull(j2534BridgeTransport)
-                val age = System.currentTimeMillis() - cachedSupportedMode01PidsAtMillis
-                val cached = cachedSupportedMode01Pids
-                val supported = if (cached != null && (cached.isNotEmpty() || age < 10_000L)) {
-                    cached
-                } else {
-                    bridge.discoverStandardObdPids().also {
+                val supported = mode01SupportCache.get(generation, android.os.SystemClock.elapsedRealtime())
+                    ?: bridge.discoverStandardObdPids().also {
                         transportSessionEpoch.requireQueuedCurrent(epoch)
-                        cachedSupportedMode01Pids = it
-                        cachedSupportedMode01PidsAtMillis = System.currentTimeMillis()
+                        mode01SupportCache.publish(generation, it, true, android.os.SystemClock.elapsedRealtime())
                     }
-                }
+                mode01SupportCache.requireCurrent(generation)
                 if (pid !in supported) return@session null
                 val result = bridge.readStandardObdPid(pid)
                 transportSessionEpoch.requireQueuedCurrent(epoch)
-                result
+                mode01SupportCache.requireCurrent(generation)
+                val responseId = checkNotNull(j2534BridgeResponseCanId)
+                val width = if (checkNotNull(j2534BridgeProtocolNumber) in setOf(34, 36)) 8 else 3
+                // The bridge already validated the physical responder; expose
+                // its exact configured ID to the shared live source selector.
+                responseId.toString(16).uppercase(java.util.Locale.ROOT).padStart(width, '0') + " " + result
             }
         }
     }
 
-    /** Read both available odometer PIDs from the same physical connection. */
-    suspend fun readJ2534OdometerPids(): Pair<String?, String?> {
+    data class J2534OdometerObservation(val a6: String?, val d3: String?, val verifiedVin: String?)
+
+    /** Compatibility accessor; acquisition also verifies the physical VIN. */
+    suspend fun readJ2534OdometerPids(): Pair<String?, String?> =
+        readJ2534OdometerObservation().let { it.a6 to it.d3 }
+
+    /** The VIN and odometer values use one negotiated channel and manager lock. */
+    suspend fun readJ2534OdometerObservation(): J2534OdometerObservation {
         val epoch = transportSessionEpoch.capture()
         return commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
             check(isJ2534StandardObdAvailable())
             val bridge = checkNotNull(j2534BridgeTransport)
+            val before = bridge.readStandardObdVin()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
             val supported = bridge.discoverStandardObdPids()
             transportSessionEpoch.requireQueuedCurrent(epoch)
             suspend fun read(pid: Int): String? {
@@ -603,7 +817,11 @@ class BluetoothObdManager(context: Context) {
                 transportSessionEpoch.requireQueuedCurrent(epoch)
                 return value
             }
-            read(0xA6) to read(0xD3)
+            val a6 = read(0xA6)
+            val d3 = read(0xD3)
+            val after = bridge.readStandardObdVin()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            J2534OdometerObservation(a6, d3, J2534StandardObd.stableOdometerVin(before, after))
         }
     }
 
@@ -662,27 +880,576 @@ class BluetoothObdManager(context: Context) {
     suspend fun clearJ2534StandardDtcs(
         approval: EcuWriteConsentFlow.Approval,
         beforeTransmit: () -> Unit
-    ) {
+    ): PhysicalObdDtcSnapshot {
         require(approval.warningAcknowledged && approval.confirmedYes) {
             "Risk notice OK and separate YES are required before clearing ECU DTCs."
         }
         val epoch = transportSessionEpoch.capture()
         check(isJ2534StandardObdClearAvailable())
-        commandSessionMutex.withLock {
+        return commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
             check(isJ2534StandardObdClearAvailable())
-            checkNotNull(j2534BridgeTransport).clearStandardObdDtcs(approval) {
+            val bridge = checkNotNull(j2534BridgeTransport)
+            bridge.clearStandardObdDtcs(approval) {
                 transportSessionEpoch.requireQueuedCurrent(epoch)
                 beforeTransmit()
             }
             transportSessionEpoch.requireQueuedCurrent(epoch)
+            beforeTransmit()
+            val snapshot = bridge.readStandardObdDtcs()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            snapshot
+        }
+    }
+
+    /** Mode 04 is never retried. The ACK and fresh DTC reads use one reserved
+     * adapter session; only the actual command boundary consumes consent. */
+    suspend fun clearElmStandardDtcs(
+        approval: EcuWriteConsentFlow.Approval,
+        requireCurrent: () -> Unit
+    ): StandardObdClearResult {
+        require(approval.warningAcknowledged && approval.confirmedYes)
+        return withGuardedObdCommandSession({ command ->
+            // Adapter restoration must still run after cancellation or a
+            // changed profile. Only the mutation needs live operator consent.
+            if (command == "04") requireCurrent()
+        }) { engine, channel ->
+            requireCurrent()
+            if (!engine.hasFreshStationaryEvidence())
+                throw ObdStationaryEvidenceRequiredException()
+            requireCurrent()
+            val raw = channel.command("04", 2500L)
+            if (!StandardObdClearEvidence.acknowledged(raw)) {
+                StandardObdClearResult(raw, null)
+            } else {
+                requireCurrent()
+                val modes = engine.readDtcModeEvidence()
+                StandardObdClearResult(raw, PhysicalObdDtcSnapshot(modes[3], modes[7], modes[10]))
+            }
+        }
+    }
+
+    /** Dedicated EVAP recipe only, using the negotiated CAN profile and
+     * explicitly pinned primary ECM. No functional addressing or fallback. */
+    suspend fun runElmEvapTest(expectedVin: String, approval: EcuWriteConsentFlow.Approval,
+        isCurrent: () -> Boolean): ObdEvapResult =
+        withPrimaryObdMutationSession(expectedVin, approval, isCurrent, "0801") { protocol, guard, exchange ->
+            ElmJ1979EvapTest.run(protocol, expectedVin, guard, exchange)
+        }
+
+    suspend fun runElmClearRecipe(expectedVin: String, approval: EcuWriteConsentFlow.Approval,
+        isCurrent: () -> Boolean, saveBaseline: suspend (ObdClearRecipeResult) -> Unit): ObdClearRecipeResult =
+        withPrimaryObdMutationSession(expectedVin, approval, isCurrent, "04") { protocol, guard, exchange ->
+            ElmJ1979ClearRecipe.run(protocol, expectedVin, guard, saveBaseline, exchange)
+        }
+
+    val legacyMutationProtocol: Int?
+        get() = standardElmProfile.protocol.takeIf { it in 1..5 &&
+            isObdCommandChannelAvailable && !isDemoMode && !isSimulationActive && !isJ2534BridgeConnected() }
+        // A verified legacy PID00 profile does not require a CAN-capable adapter.
+        // ATH1 and the checksum-verified legacy records are checked in the
+        // exclusive recipe before any potentially modifying command.
+
+    /** Read-only discovery of legacy emissions sources. Does not select an
+     * engine ECU or establish exhaustive vehicle coverage. */
+    suspend fun discoverElmLegacySources(protocol: Int, isCurrent: () -> Boolean): LegacySourceDiscovery {
+        require(protocol in 1..5)
+        val epoch = transportSessionEpoch.capture()
+        val original = standardElmProfile
+        fun guard() {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isCurrent()) { "Legacy discovery context changed." }
+        }
+        return commandSessionMutex.withLock {
+            guard()
+            check(legacyMutationProtocol == protocol && standardElmProfile == original)
+            try {
+                val header = when (protocol) {
+                    1 -> "616AF1"
+                    4,5 -> "C033F1"
+                    else -> "686AF1"
+                }
+                for (command in listOf("ATSP$protocol","ATE0","ATL0","ATH1","ATS1","ATSH $header")) {
+                    val response = sendAtCommandInternal(command,1500L,expectedEpoch=epoch,
+                        preserveLines=true,beforeTransmit=::guard)
+                    check(CanConsoleAdapterRestorationPolicy.accepted(response))
+                }
+                val raw = sendAtCommandInternal("0100",4000L,expectedEpoch=epoch,
+                    preserveLines=true,beforeTransmit=::guard)
+                val observed = sendAtCommandInternal("ATDPN",1500L,expectedEpoch=epoch,
+                    preserveLines=true,beforeTransmit=::guard)
+                guard()
+                ElmLegacyResponseFrames.discover(protocol,raw,observed)
+            } finally {
+                withContext(NonCancellable) {
+                    if (transportSessionEpoch.isCurrent(epoch)) {
+                        var restored = true
+                        for (command in original.restoreCommands()) {
+                            val reply = runCatching {
+                                sendAtCommandInternal(command,1500L,expectedEpoch=epoch)
+                            }.getOrNull()
+                            if (reply == null || !CanConsoleAdapterRestorationPolicy.accepted(reply))
+                                restored = false
+                        }
+                        if (!restored) {
+                            disconnectIfCurrent(epoch)
+                            throw CanAdapterRestorationException(activeTransport)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Exclusive, header-verified read-only legacy session. Restore the
+     * original negotiated ELM configuration even when the owner cancels. */
+    suspend fun runElmLegacyRead(target: LegacyReadTarget, isCurrent: () -> Boolean): LegacyReadReport {
+        require(target.valid)
+        val epoch=transportSessionEpoch.capture()
+        val original=standardElmProfile
+        fun guard() {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isCurrent()) { "Legacy read context changed." }
+        }
+        return commandSessionMutex.withLock {
+            guard()
+            check(legacyMutationProtocol==target.protocol && standardElmProfile==original)
+            try {
+                val header=when(target.protocol) { 1 -> "616AF1"; 4,5 -> "C033F1"; else -> "686AF1" }
+                for(command in listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATSH $header")) {
+                    guard()
+                    val reply=sendAtCommandInternal(command,1500L,expectedEpoch=epoch,
+                        preserveLines=true,beforeTransmit=::guard)
+                    check(CanConsoleAdapterRestorationPolicy.accepted(reply))
+                }
+                ElmJ1979LegacyRead.run(target,
+                    exchange={command,timeout ->
+                        check(ElmJ1979LegacyRead.allowsRead(command))
+                        sendAtCommandInternal(command,timeout,expectedEpoch=epoch,
+                            preserveLines=true,beforeTransmit=::guard)
+                    },
+                    protocolCheck={timeout ->
+                        sendAtCommandInternal("ATDPN",timeout,expectedEpoch=epoch,
+                            preserveLines=true,beforeTransmit=::guard)
+                    },requireCurrent=::guard)
+            } finally {
+                withContext(NonCancellable) {
+                    if(transportSessionEpoch.isCurrent(epoch)) {
+                        var restored=true
+                        for(command in original.restoreCommands()) {
+                            val response=runCatching {
+                                sendAtCommandInternal(command,1500L,expectedEpoch=epoch)
+                            }.getOrNull()
+                            if(response==null || !CanConsoleAdapterRestorationPolicy.accepted(response)) restored=false
+                        }
+                        if(!restored) {
+                            disconnectIfCurrent(epoch)
+                            throw CanAdapterRestorationException(activeTransport)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun runElmLegacyMutation(target: LegacyMutationTarget, expectedVin: String,
+        approval: EcuWriteConsentFlow.Approval, isCurrent: () -> Boolean,
+        saveBaseline: suspend (LegacyMutationResult) -> Unit): LegacyMutationResult {
+        require(target.valid && approval.warningAcknowledged && approval.confirmedYes)
+        require(expectedVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")))
+        val epoch = transportSessionEpoch.capture()
+        val original = standardElmProfile
+        fun guard() {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            EcuWriteConsentFlow.requireCurrentForTransmit(approval,isCurrent)
+        }
+        return commandSessionMutex.withLock {
+            guard()
+            check(legacyMutationProtocol == target.protocol && standardElmProfile == original)
+            try {
+                val header = when (target.protocol) {
+                    1 -> "616AF1"
+                    4,5 -> "C033F1"
+                    else -> "686AF1"
+                }
+                for (command in listOf("ATSP${target.protocol}", "ATE0", "ATL0", "ATH1", "ATS1", "ATSH $header")) {
+                    guard()
+                    val response = sendAtCommandInternal(command,1500L,expectedEpoch=epoch,
+                        preserveLines=true,beforeTransmit=::guard)
+                    check(CanConsoleAdapterRestorationPolicy.accepted(response)) {
+                        "ELM rejected legacy header configuration."
+                    }
+                }
+                suspend fun exchange(command: String): String {
+                    guard()
+                    return sendAtCommandInternal(command,4000L,expectedEpoch=epoch,
+                        preserveLines=true,beforeTransmit=::guard)
+                }
+                var attempted = false
+                ElmJ1979LegacyMutation.run(target,expectedVin,::guard,
+                    read = { command ->
+                        check(command in setOf("0100","0901","0902","03","07","0A","0101",
+                            "010D","010C","08000000000000"))
+                        exchange(command)
+                    },
+                    observedProtocol = { ElmLegacyResponseFrames.fixedProtocol(exchange("ATDPN")) },
+                    transmit = {
+                        check(!attempted)
+                        attempted = true
+                        exchange(if (target.clear) "04" else "08010000000000")
+                    },
+                    saveBaseline = saveBaseline)
+            } finally {
+                withContext(NonCancellable) {
+                    if (transportSessionEpoch.isCurrent(epoch)) {
+                        var restored = true
+                        for (command in original.restoreCommands()) {
+                            val response = runCatching {
+                                sendAtCommandInternal(command,1500L,expectedEpoch=epoch)
+                            }.getOrNull()
+                            if (response == null || !CanConsoleAdapterRestorationPolicy.accepted(response))
+                                restored = false
+                        }
+                        if (!restored) {
+                            disconnectIfCurrent(epoch)
+                            throw CanAdapterRestorationException(activeTransport)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    val j1979LiveProtocol: Int? get() = legacyMutationProtocol ?: standardElmProfile.protocol.takeIf { isElmEvapCandidate }
+
+    suspend fun runJ1979Network(plan:J1979NetworkPlan,isCurrent:()->Boolean,
+        retain:(J1979NetworkReport)->Unit):J1979NetworkReport {
+        require(plan.valid)
+        val epoch=transportSessionEpoch.capture()
+        val original=standardElmProfile
+        fun guard(){
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isCurrent()){"Network campaign context changed."}
+        }
+        return commandSessionMutex.withLock {
+            guard()
+            check(isElmEvapCandidate&&j1979LiveProtocol==plan.protocol&&standardElmProfile==original)
+            suspend fun command(value:String,timeout:Long)=sendAtCommandInternal(value,timeout,
+                expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+            suspend fun configure(values:List<String>,budget:Long){
+                val start=System.nanoTime()/1000000
+                for(value in values){
+                    guard()
+                    val remaining=budget-(System.nanoTime()/1000000-start)
+                    check(remaining>0){"Network setup budget exhausted."}
+                    check(CanConsoleAdapterRestorationPolicy.accepted(command(value,minOf(1500,remaining))))
+                }
+            }
+            try {
+                J1979NetworkCampaign.run(plan,discover={timeout->
+                    val start=System.nanoTime()/1000000
+                    val header=if(plan.extended)"18DB33F1"else "7DF"
+                    // Disable automatic flow control for the single functional
+                    // support bitmap. Only physical sessions below enable FC.
+                    configure(listOf("ATSP${plan.protocol}","ATE0","ATL0","ATH1","ATS1","ATD0",
+                        "ATCAF0","ATFCSM0","ATCFC0","ATCRA","ATSH $header"),timeout)
+                    fun remaining()=timeout-(System.nanoTime()/1000000-start)
+                    check(remaining()>0)
+                    val raw=command("020100CCCCCCCC",remaining())
+                    check(remaining()>0)
+                    val protocol=command("ATDPN",minOf(1500,remaining()))
+                    J1979NetworkCampaign.DiscoveryReply(raw,protocol)
+                },open={target,budget->
+                    val tx=target.idHex(requireNotNull(target.requestId))
+                    val rx=target.idHex(target.responseId)
+                    configure(listOf("ATSH $tx","ATCRA $rx","ATFCSH $tx","ATFCSD 30 00 00",
+                        "ATFCSM1","ATCFC1"),budget)
+                },exchange={target,payload,timeout->
+                    check(J1979NetworkCampaign.allowed(payload))
+                    val raw=command(ElmJ1979EvapTest.hex(byteArrayOf(payload.size.toByte())+payload),timeout)
+                    val lines=raw.replace('>','\n').lineSequence().map { it.trim().uppercase(java.util.Locale.ROOT) }
+                        .filter { it.isNotEmpty() }.toList()
+                    val data=if(lines==listOf("NO DATA"))null else
+                        ElmUdsPayloadTransport.decode(raw,target.responseId,target.extended)
+                    J1979LiveRecorder.Reply(data,raw)
+                },requireCurrent=::guard).also(retain)
+            }finally {
+                withContext(NonCancellable){
+                    if(transportSessionEpoch.isCurrent(epoch)){
+                        var restored=true
+                        for(value in ElmUdsPayloadTransport.restoreCommandsFor(original.protocol)){
+                            val response=runCatching { sendAtCommandInternal(value,1500L,expectedEpoch=epoch) }.getOrNull()
+                            if(response==null||!CanConsoleAdapterRestorationPolicy.accepted(response))restored=false
+                        }
+                        if(!restored){
+                            disconnectIfCurrent(epoch)
+                            throw CanAdapterRestorationException(activeTransport)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Hold the same exclusive lock as the console and other ELM sessions.
+     * Only the recorder's exact Mode 01/09 allowlist may cross this boundary. */
+    suspend fun runJ1979Live(plan: J1979LivePlan,isCurrent: ()->Boolean,
+        onSample: (J1979LiveObservation)->Unit,retain: (J1979LiveReport)->Unit): J1979LiveReport {
+        require(plan.valid)
+        val epoch=transportSessionEpoch.capture()
+        val original=standardElmProfile
+        val target=plan.target
+        val tx=target.requestId?.let(target::idHex)
+        val rx=target.idHex(target.responseId)
+        fun guard(){
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isCurrent()) { "Live recording context changed." }
+        }
+        return commandSessionMutex.withLock {
+            guard()
+            check(j1979LiveProtocol==target.protocol&&standardElmProfile==original)
+            try {
+                val config=if(target.legacy){
+                    val header=when(target.protocol){1->"616AF1";4,5->"C033F1";else->"686AF1"}
+                    listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATSH $header")
+                }else listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATD0",
+                    "ATCAF0","ATSH $tx","ATCRA $rx","ATFCSH $tx","ATFCSD 30 00 00","ATFCSM1","ATCFC1")
+                for(command in config){
+                    guard()
+                    check(CanConsoleAdapterRestorationPolicy.accepted(sendAtCommandInternal(command,1500L,
+                        expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)))
+                }
+                if(target.legacy){
+                    val link=ElmLegacyLiveLink(target,exchange={command,timeout ->
+                        check(ElmJ1979LegacyRead.allowsRead(command))
+                        sendAtCommandInternal(command,timeout,expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                    },probe={timeout ->
+                        sendAtCommandInternal("ATDPN",timeout,expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                    },requireCurrent=::guard)
+                    J1979LiveRecorder.run(plan,link::query,link::protocolResponse,::guard,onSample,
+                        requestTimeout={if(it[0]==9.toByte())20000 else 4000})
+                        .copy(legacyExchanges=link.traces).also(retain)
+                }else J1979LiveRecorder.run(plan,exchange={ payload,timeout ->
+                    check(J1979LiveRecorder.allowed(payload))
+                    val frame=byteArrayOf(payload.size.toByte())+payload
+                    val raw=sendAtCommandInternal(ElmJ1979EvapTest.hex(frame),timeout,
+                        expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                    val lines=raw.replace('>','\n').lineSequence().map { it.trim().uppercase(java.util.Locale.ROOT) }
+                        .filter { it.isNotEmpty() }.toList()
+                    val data=if(lines==listOf("NO DATA"))null else
+                        ElmUdsPayloadTransport.decode(raw,target.responseId,target.extended)
+                    J1979LiveRecorder.Reply(data,raw)
+                },verifyProtocol={ timeout ->
+                    sendAtCommandInternal("ATDPN",timeout,expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                },requireCurrent=::guard,onSample=onSample).also(retain)
+            }finally {
+                withContext(NonCancellable){
+                    if(transportSessionEpoch.isCurrent(epoch)){
+                        var restored=true
+                        val restore=if(target.legacy)original.restoreCommands() else
+                            ElmUdsPayloadTransport.restoreCommandsFor(original.protocol)
+                        for(command in restore){
+                            val response=runCatching {
+                                sendAtCommandInternal(command,1500L,expectedEpoch=epoch)
+                            }.getOrNull()
+                            if(response==null||!CanConsoleAdapterRestorationPolicy.accepted(response))restored=false
+                        }
+                        if(!restored){
+                            disconnectIfCurrent(epoch)
+                            throw CanAdapterRestorationException(activeTransport)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Physical Mode 02 read campaign; do not widen the ordinary live or
+     * network request allowlist. Retain the selected adapter's protocol
+     * response and restore its original profile before leaving the lock. */
+    suspend fun runJ1979Freeze(requested: J1979FreezePlan,isCurrent: () -> Boolean,
+        retain: (J1979FreezeReport) -> Unit): J1979FreezeReport {
+        val plan = requested.pinned()
+        val epoch = transportSessionEpoch.capture()
+        val original = standardElmProfile
+        val target = plan.target
+        val tx = target.requestId?.let(target::idHex)
+        val rx = target.idHex(target.responseId)
+        fun guard() {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isCurrent()) { "Freeze frame context changed." }
+        }
+        return commandSessionMutex.withLock {
+            guard()
+            check(j1979LiveProtocol == target.protocol && standardElmProfile == original)
+            val started = System.currentTimeMillis()
+            var rawProtocol: String? = null
+            var observedProtocol: Int? = null
+            var result: J1979FreezeResult? = null
+            var failure: String? = null
+            var legacyExchanges=emptyList<LegacyLiveExchange>()
+            try {
+                val config=if(target.legacy){
+                    val header=when(target.protocol){1->"616AF1";4,5->"C033F1";else->"686AF1"}
+                    listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATSH $header")
+                } else listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATD0",
+                    "ATCAF0","ATSH $tx","ATCRA $rx","ATFCSH $tx","ATFCSD 30 00 00","ATFCSM1","ATCFC1")
+                for (command in config) {
+                    guard()
+                    check(CanConsoleAdapterRestorationPolicy.accepted(sendAtCommandInternal(command,1500L,
+                        expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)))
+                }
+                if(target.legacy) {
+                    val link=ElmLegacyLiveLink(target,exchange={command,timeout ->
+                        val allowed=command in setOf("0100","0900","0901","0902") ||
+                            command.matches(Regex("02[0-9A-F]{4}")) &&
+                            command.takeLast(2).toInt(16) in plan.frames &&
+                            command.substring(2,4).toInt(16).let { pid ->
+                                pid%32==0||pid==2||plan.selectedPids.isEmpty()||pid in plan.selectedPids
+                            }
+                        check(allowed)
+                        guard()
+                        sendAtCommandInternal(command,timeout,expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                    },probe={ timeout ->
+                        sendAtCommandInternal("ATDPN",timeout,expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                    },requireCurrent=::guard,freeze=plan)
+                    try {
+                        result=J1979FreezeCampaign.run(plan,link::query,::guard,
+                            requestTimeout={if(it[0]==9.toByte())20000L else 4000L})
+                    } finally {
+                        legacyExchanges=link.traces
+                        rawProtocol=legacyExchanges.lastOrNull { it.requestHex=="ATDPN" }?.rawResponse
+                        observedProtocol=rawProtocol?.let(ElmLegacyResponseFrames::fixedProtocol)
+                    }
+                } else {
+                val protocolReply = sendAtCommandInternal("ATDPN",1500L,expectedEpoch=epoch,
+                    preserveLines=true,beforeTransmit=::guard)
+                check(protocolReply.length <= J1979FreezeCampaign.MAX_RAW)
+                rawProtocol = protocolReply
+                observedProtocol = J1979FreezeCampaign.fixedProtocol(protocolReply)
+                check(observedProtocol == target.protocol) { "ELM fixed CAN protocol unverified." }
+                var rawBudget = 16L * 1024 * 1024
+                result = J1979FreezeCampaign.run(plan,exchange={ payload,timeout ->
+                    check(J1979FreezeCampaign.allowed(payload,plan.frames))
+                    guard()
+                    val raw = sendAtCommandInternal(ElmJ1979EvapTest.hex(byteArrayOf(payload.size.toByte())+payload),
+                        timeout,expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                    rawBudget -= raw.length
+                    check(rawBudget >= 0 && raw.length <= J1979FreezeCampaign.MAX_RAW)
+                    val lines = raw.replace('>','\n').lineSequence()
+                        .map { it.trim().uppercase(java.util.Locale.ROOT) }.filter { it.isNotEmpty() }.toList()
+                    val response = if (lines == listOf("NO DATA")) null else try {
+                        ElmUdsPayloadTransport.decode(raw,target.responseId,target.extended)
+                    } catch (error: Exception) {
+                        throw J1979FreezeCampaign.AdapterReplyError(raw,error)
+                    }
+                    J1979LiveRecorder.Reply(response,raw)
+                },guard=::guard)
+                }
+            } catch (_: CancellationException) {
+                failure = "CANCELLED"
+            } catch (_: Exception) {
+                failure = "TRANSPORT_ERROR"
+            } finally {
+                withContext(NonCancellable) {
+                    if (transportSessionEpoch.isCurrent(epoch)) {
+                        var restored = true
+                        val restore=if(target.legacy)original.restoreCommands() else
+                            ElmUdsPayloadTransport.restoreCommandsFor(original.protocol)
+                        for (command in restore) {
+                            val response = runCatching { sendAtCommandInternal(command,1500L,expectedEpoch=epoch) }.getOrNull()
+                            if (response == null || !CanConsoleAdapterRestorationPolicy.accepted(response)) restored = false
+                        }
+                        if (!restored) {
+                            failure = "TRANSPORT_ERROR"
+                            disconnectIfCurrent(epoch)
+                        }
+                    }
+                }
+            }
+            val retained = result ?: J1979FreezeCampaign.execute(plan,observe={
+                J1979FreezeCampaign.Read(if (failure == "CANCELLED") "CANCELLED" else "CONTEXT_CHANGED",
+                    null,0,false)
+            })
+            J1979FreezeReport(retained,started,System.currentTimeMillis(),rawProtocol,observedProtocol,failure,legacyExchanges).also(retain)
+        }
+    }
+
+    private suspend fun <T> withPrimaryObdMutationSession(expectedVin: String,
+        approval: EcuWriteConsentFlow.Approval, isCurrent: () -> Boolean, mutation: String,
+        recipe: suspend (Int, () -> Unit, suspend (ByteArray) -> ByteArray) -> T): T {
+        require(mutation == "04" || mutation == "0801")
+        require(approval.warningAcknowledged && approval.confirmedYes)
+        require(expectedVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")))
+        val epoch = transportSessionEpoch.capture()
+        val original = standardElmProfile
+        val protocol = original.protocol
+        val (tx, rx) = ElmJ1979EvapTest.addresses(protocol)
+        val extended = protocol in setOf(7, 9)
+        val width = if (extended) 8 else 3
+        val txHex = ElmJ1979EvapTest.hex(tx, width)
+        val rxHex = ElmJ1979EvapTest.hex(rx, width)
+        fun requireCurrent() {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            EcuWriteConsentFlow.requireCurrentForTransmit(approval, isCurrent)
+        }
+        return commandSessionMutex.withLock {
+            requireCurrent()
+            check(!isDemoMode && !isSimulationActive && isElmUdsReadCandidate &&
+                !isJ2534BridgeConnected() && protocol in availableRawCanProfiles() &&
+                standardElmProfile == original)
+            try {
+                for (command in listOf("ATSP$protocol", "ATH1", "ATS1", "ATD0",
+                    "ATCAF0", "ATSH $txHex", "ATCRA $rxHex",
+                    "ATFCSH $txHex", "ATFCSD 30 00 00", "ATFCSM1", "ATCFC1")) {
+                    requireCurrent()
+                    val response = sendAtCommandInternal(command, 1500L, expectedEpoch = epoch,
+                        preserveLines = true)
+                    check(CanConsoleAdapterRestorationPolicy.accepted(response)) {
+                        "ELM rejected physical diagnostic configuration."
+                    }
+                }
+                var mutationAttempted = false
+                recipe(protocol, ::requireCurrent) { payload ->
+                    val request = ElmJ1979EvapTest.hex(payload)
+                    if (request == mutation) {
+                        check(!mutationAttempted) { "A mutating command cannot be retried." }
+                        mutationAttempted = true
+                    } else {
+                        check(request in setOf("0902", "0800", "010D", "010C", "0101", "03", "07", "0A")) {
+                            "Unsupported request in dedicated mutation recipe."
+                        }
+                    }
+                    val frame = byteArrayOf(payload.size.toByte()) + payload
+                    val response = sendAtCommandInternal(ElmJ1979EvapTest.hex(frame), 2500L,
+                        expectedEpoch = epoch, preserveLines = true,
+                        beforeTransmit = { requireCurrent() })
+                    ElmUdsPayloadTransport.decode(response, rx, extended)
+                }
+            } finally {
+                withContext(NonCancellable) {
+                    if (transportSessionEpoch.isCurrent(epoch)) {
+                        var restored = true
+                        for (command in ElmUdsPayloadTransport.restoreCommandsFor(original.protocol)) {
+                            val reply = runCatching {
+                                sendAtCommandInternal(command, 1500L, expectedEpoch = epoch)
+                            }.getOrNull()
+                            if (reply == null || !CanConsoleAdapterRestorationPolicy.accepted(reply))
+                                restored = false
+                        }
+                        if (!restored) {
+                            disconnectIfCurrent(epoch)
+                            throw CanAdapterRestorationException(activeTransport)
+                        }
+                    }
+                }
+            }
         }
     }
 
     /** Invalidates ECU-specific support data after a vehicle identity/profile change. */
     fun invalidateObdPidSupportCache() {
-        cachedSupportedMode01Pids = null
-        cachedSupportedMode01PidsAtMillis = 0L
+        mode01SupportCache.invalidate()
     }
 
     /**
@@ -693,6 +1460,7 @@ class BluetoothObdManager(context: Context) {
     suspend fun captureCanMonitor(
         durationMs: Long = Long.MAX_VALUE,
         can29Bit: Boolean = false,
+        bitrate: Int = 500_000,
         onChunk: (String) -> Unit
     ): String = withContext(Dispatchers.IO) {
         val requestedEpoch = transportSessionEpoch.capture()
@@ -704,32 +1472,45 @@ class BluetoothObdManager(context: Context) {
         check(capabilities.supportsCanHeaders) {
             "The connected adapter does not report CAN header support."
         }
+        require(DiagnosticRouteSelector.rawCanProfile(can29Bit, bitrate) in availableRawCanProfiles()) {
+            "Selected CAN capture profile was not accepted by the connected adapter."
+        }
         require(durationMs >= 1_000L) {
             "CAN monitor duration must be at least one second."
         }
 
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
-            check(isObdCommandChannelAvailable) { "CAN monitor connection changed while waiting." }
-            suspend fun boundCommand(command: String, timeoutMs: Long, onChunk: ((String) -> Unit)? = null): String =
-                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, onChunk = onChunk)
+            check(DiagnosticRouteSelector.rawCanProfile(can29Bit, bitrate) in availableRawCanProfiles()) {
+                "CAN monitor profile changed while waiting."
+            }
+            suspend fun boundCommand(command: String, timeoutMs: Long,
+                beforeTransmit: () -> Unit = {}, onPrompt: () -> Unit = {},
+                onChunk: ((String) -> Unit)? = null): String =
+                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, onChunk = onChunk,
+                    beforeTransmit = beforeTransmit, onPrompt = onPrompt)
             val isStnAdapter = capabilities.tier == AdapterTier.PRO_STN
+            val originalProfile = standardElmProfile
             // STMA emits ISO-15765 OBD messages on STN devices; STM is required for raw CAN frames.
             // STM uses the current filter table, so clear it for this session and restore
             // automatic OBD filtering after the capture.
             val monitorCommand = if (isStnAdapter) "STM" else "ATMA"
             val captured = CanCaptureTextBuffer()
             val monitorErrors = CanMonitorErrorTracker()
+            var monitorMayBeStreaming = false
             try {
                 // Configure one physical CAN format and clear STN receive filters.
                 // All steps require explicit adapter acknowledgement before streaming.
-                for (command in CanMonitorProtocolPolicy.setupCommands(can29Bit, isStnAdapter)) {
+                for (command in CanMonitorProtocolPolicy.setupCommands(can29Bit, isStnAdapter, bitrate)) {
                     val timeout = if (command.startsWith("ATSP")) 1_500L else 1_000L
                     val answer = boundCommand(command, timeout)
-                    if (!CanConsoleAdapterRestorationPolicy.accepted(answer))
-                        throw CanAdapterRestorationException()
+                    check(CanConsoleAdapterRestorationPolicy.accepted(answer)) {
+                        "The connected adapter rejected CAN monitor setup: $command"
+                    }
                 }
-                val monitorResponse = boundCommand(monitorCommand, durationMs) { chunk ->
+                val monitorResponse = boundCommand(monitorCommand, durationMs,
+                    beforeTransmit = { monitorMayBeStreaming = true },
+                    onPrompt = { monitorMayBeStreaming = false }) { chunk ->
                     captured.append(chunk)
                     monitorErrors.append(chunk)
                     onChunk(chunk)
@@ -742,10 +1523,12 @@ class BluetoothObdManager(context: Context) {
                 // ELM/STN monitor mode has no normal prompt; ESC returns the adapter
                 // to command mode even when the caller cancels the capture.
                 withContext(NonCancellable) {
-                    // ESC may return only a prompt. A failed ESC still requires a
-                    // fail-closed session even if later configuration commands respond.
-                    var restored = runCatching { boundCommand("\u001B", 1_000L) }.isSuccess
-                    val commands = CanMonitorProtocolPolicy.restoreCommands(isStnAdapter)
+                    // Interrupt only a monitor that may still be streaming. A rejected
+                    // setup or a monitor that already returned its prompt needs no ESC.
+                    // A failed necessary interrupt still requires fail-closed restoration.
+                    var restored = !monitorMayBeStreaming ||
+                        runCatching { boundCommand("\u001B", 1_000L) }.isSuccess
+                    val commands = CanMonitorProtocolPolicy.restoreCommands(isStnAdapter, originalProfile.protocol)
                     // Restore the command-channel formatting established at probe time.
                     for (command in commands) {
                         val answer = runCatching { boundCommand(command, 1_000L) }.getOrNull()
@@ -778,6 +1561,7 @@ class BluetoothObdManager(context: Context) {
         // The console stores all physical RX chunks before the matcher drops
         // older events from its deliberately bounded recent-record window.
         onPhysicalResponseChunk: (String, Long) -> Unit = { _, _ -> },
+        bitrate: Int = 500_000,
         isOperatorContextCurrent: () -> Boolean
     ): CanConsoleRawTransmissionResult =
         withContext(Dispatchers.IO) {
@@ -799,6 +1583,7 @@ class BluetoothObdManager(context: Context) {
         check(activeTransport in setOf("BLUETOOTH", "BLE", "USB", "WIFI")) {
             "Raw CAN transmission is not available on this transport."
         }
+        require(bitrate in setOf(250_000, 500_000)) { "SW-CAN raw console is receive-only until its TX path is qualified." }
         require(frame.data.size in 1..8) { "Classical CAN payloads must contain 1 to 8 bytes." }
         require(if (frame.isExtended) frame.canId in 0..0x1FFFFFFFL else frame.canId in 0..0x7FFL) {
             "CAN identifier is outside the selected 11-bit/29-bit range."
@@ -809,7 +1594,9 @@ class BluetoothObdManager(context: Context) {
 
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
-            check(isObdCommandChannelAvailable) { "CAN transmission connection changed while waiting." }
+            check(DiagnosticRouteSelector.elmCanProtocol(frame.isExtended, bitrate) in availableRawCanProfiles()) {
+                "CAN transmission profile is unavailable on the current adapter."
+            }
             suspend fun boundCommand(
                 command: String,
                 timeoutMs: Long,
@@ -819,12 +1606,13 @@ class BluetoothObdManager(context: Context) {
                 command, timeoutMs, expectedEpoch = requestedEpoch,
                 onChunk = onChunk, beforeTransmit = beforeTransmit
             )
-            val protocol = if (frame.isExtended) "7" else "6"
+            val protocol = DiagnosticRouteSelector.elmCanProtocol(frame.isExtended, bitrate).toString()
             val header = if (frame.isExtended) {
                 frame.canId.toString(16).uppercase().padStart(8, '0')
             } else {
                 frame.canId.toString(16).uppercase().padStart(3, '0')
             }
+            val originalProfile = standardElmProfile
             val timedCorrelation = CanConsoleLiveDiagnosticCorrelation(
                 frame, requireExplicitStart = true
             )
@@ -918,21 +1706,17 @@ class BluetoothObdManager(context: Context) {
                     timedCorrelation.recentReceivedRecords(), error
                 )
             } finally {
-                // Return to the app's configured 11-bit HS-CAN / automatic-format state.
+                // Restore the original negotiated functional OBD profile.
                 withContext(NonCancellable) {
                     // A successful TX is not permission to keep using an adapter whose
                     // CAN protocol/header could not be restored. Try every cleanup step,
                     // then close the physical session if *any* step was unconfirmed.
                     var restored = true
-                    for ((command, timeout) in listOf(
-                        "ATSP6" to 1_500L,
-                        "ATSH 7DF" to 1_500L,
-                        "ATCAF1" to 1_500L,
-                        CanConsoleIsotpFlowControlPolicy.RESTORE_AUTOMATIC_MODE to 1_500L,
-                        CanConsoleIsotpFlowControlPolicy.ENABLE_AUTOMATIC to 1_500L,
-                        "ATH1" to 1_000L,
-                        "ATS0" to 1_000L
-                    )) {
+                    for (command in listOf(
+                        CanConsoleIsotpFlowControlPolicy.RESTORE_AUTOMATIC_MODE,
+                        CanConsoleIsotpFlowControlPolicy.ENABLE_AUTOMATIC
+                    ) + originalProfile.restoreCommands()) {
+                        val timeout = 1_500L
                         val answer = runCatching { boundCommand(command, timeout) }.getOrNull()
                         if (answer == null || !CanConsoleAdapterRestorationPolicy.accepted(answer))
                             restored = false
@@ -978,7 +1762,9 @@ class BluetoothObdManager(context: Context) {
         timeoutMs: Long,
         expectedEpoch: Long? = null,
         onChunk: ((String) -> Unit)? = null,
-        beforeTransmit: () -> Unit = {}
+        beforeTransmit: () -> Unit = {},
+        preserveLines: Boolean = false,
+        onPrompt: () -> Unit = {}
     ): String = withContext(Dispatchers.IO) {
         commandMutex.withLock {
             // The operation may have waited on the command mutex across a reconnect.
@@ -993,7 +1779,8 @@ class BluetoothObdManager(context: Context) {
                     throw ObdTransportDisconnectedException("OBD connection changed during command")
                 }
             }
-            val payload = (command.trim() + "\r").toByteArray(Charsets.US_ASCII)
+            val payload = ElmResponseCompletion.wireBytes(command)
+            val interruptingMonitor = ElmResponseCompletion.isMonitorInterrupt(command)
             ensureSameSession()
             // Check the operator's account, vehicle and connection consent
             // at the physical command boundary, not only at queue admission.
@@ -1003,23 +1790,23 @@ class BluetoothObdManager(context: Context) {
             try {
             if (sessionTransport == "USB") {
                 usbTransport.write(payload)
-                val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
+                val buffer = StringBuilder(); val bytes = ByteArray(256); val budget = ElmCommandReadBudget(timeoutMs)
                 var promptReceived = false
-                while (System.currentTimeMillis() - start < timeoutMs) {
+                while (budget.remainingMs() > 0) {
                     ensureSameSession()
-                    val n = usbTransport.read(bytes, 100)
+                    val n = usbTransport.read(bytes, budget.pollTimeoutMs(100) ?: break)
                     ensureSameSession()
                     if (n > 0) {
                         val chunk = String(bytes, 0, n, Charsets.US_ASCII)
                         val payloadChunk = chunk.substringBefore('>')
-                        if (buffer.length < 1024 || onChunk == null) {
+                        if (!interruptingMonitor && (buffer.length < 1024 || onChunk == null)) {
                             buffer.append(if (onChunk == null) payloadChunk else payloadChunk.take(1024 - buffer.length))
                         }
                         if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
-                        if (chunk.contains('>')) { promptReceived = true; break }
+                        if (chunk.contains('>')) { promptReceived = true; onPrompt(); break }
                     } else if (n < 0) {
                         throw java.io.EOFException("USB OBD adapter disconnected while reading")
-                    } else delay(10)
+                    } else delay(minOf(10L, budget.remainingMs()))
                 }
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(
@@ -1028,24 +1815,24 @@ class BluetoothObdManager(context: Context) {
                     promptReceived = promptReceived
                 )
                 ensureSameSession()
-                normalizeElmReply(buffer.toString(), command)
+                normalizeElmReply(buffer.toString(), command, preserveLines)
             } else if (sessionTransport == "BLE") {
                 bleTransport.write(payload)
-                val buffer = StringBuilder(); val bytes = ByteArray(512); val start = System.currentTimeMillis()
+                val buffer = StringBuilder(); val bytes = ByteArray(512); val budget = ElmCommandReadBudget(timeoutMs)
                 var promptReceived = false
-                while (System.currentTimeMillis() - start < timeoutMs) {
+                while (budget.remainingMs() > 0) {
                     ensureSameSession()
-                    val n = bleTransport.read(bytes, 100)
+                    val n = bleTransport.read(bytes, budget.pollTimeoutMs(100) ?: break)
                     ensureSameSession()
                     if (n > 0) {
                         val chunk = String(bytes, 0, n, Charsets.US_ASCII)
                         val payloadChunk = chunk.substringBefore('>')
-                        if (buffer.length < 1024 || onChunk == null) {
+                        if (!interruptingMonitor && (buffer.length < 1024 || onChunk == null)) {
                             buffer.append(if (onChunk == null) payloadChunk else payloadChunk.take(1024 - buffer.length))
                         }
                         if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
-                        if (chunk.contains('>')) { promptReceived = true; break }
-                    } else delay(10)
+                        if (chunk.contains('>')) { promptReceived = true; onPrompt(); break }
+                    } else delay(minOf(10L, budget.remainingMs()))
                 }
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(
@@ -1054,29 +1841,29 @@ class BluetoothObdManager(context: Context) {
                     promptReceived = promptReceived
                 )
                 ensureSameSession()
-                normalizeElmReply(buffer.toString(), command)
+                normalizeElmReply(buffer.toString(), command, preserveLines)
             } else if (sessionTransport == "WIFI") {
                 wifiTransport.write(payload)
-                val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
+                val buffer = StringBuilder(); val bytes = ByteArray(256); val budget = ElmCommandReadBudget(timeoutMs)
                 var promptReceived = false
-                while (System.currentTimeMillis() - start < timeoutMs) {
+                while (budget.remainingMs() > 0) {
                     ensureSameSession()
                     try {
-                        val n = wifiTransport.read(bytes)
+                        val n = wifiTransport.read(bytes, budget.pollTimeoutMs(100) ?: break)
                         ensureSameSession()
                         if (n > 0) {
                             val chunk = String(bytes, 0, n, Charsets.US_ASCII)
                             val payloadChunk = chunk.substringBefore('>')
-                            if (buffer.length < 1024 || onChunk == null) {
+                            if (!interruptingMonitor && (buffer.length < 1024 || onChunk == null)) {
                             buffer.append(if (onChunk == null) payloadChunk else payloadChunk.take(1024 - buffer.length))
                         }
                             if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
-                            if (chunk.contains('>')) { promptReceived = true; break }
+                            if (chunk.contains('>')) { promptReceived = true; onPrompt(); break }
                         } else if (n < 0) {
                             throw java.io.EOFException("Wi-Fi OBD adapter closed the connection")
                         }
                     } catch (_: java.net.SocketTimeoutException) { }
-                    delay(10)
+                    delay(minOf(10L, budget.remainingMs()))
                 }
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(
@@ -1085,26 +1872,43 @@ class BluetoothObdManager(context: Context) {
                     promptReceived = promptReceived
                 )
                 ensureSameSession()
-                normalizeElmReply(buffer.toString(), command)
+                normalizeElmReply(buffer.toString(), command, preserveLines)
             } else {
                 check(sessionTransport == "BLUETOOTH") {
                     "An ELM command cannot be sent through the selected transport."
                 }
-                val out = outputStream; val inp = inputStream
-                if (out == null || inp == null || socket?.isConnected != true) {
+                val out = outputStream; val inp = inputStream; val ownedSocket = socket
+                if (out == null || inp == null || ownedSocket?.isConnected != true) {
                     throw ObdTransportDisconnectedException("Bluetooth OBD adapter is not connected")
                 }
-                while (inp.available() > 0) {
+                // Bound the drain if the adapter was left streaming CAN.
+                val drainStart = android.os.SystemClock.elapsedRealtime()
+                var drained = 0
+                while (!interruptingMonitor && inp.available() > 0) {
                     ensureSameSession()
+                    if (drained >= 8192 || android.os.SystemClock.elapsedRealtime() - drainStart >= 500L) {
+                        throw java.net.SocketTimeoutException("Bluetooth adapter continuously streaming; reconnect after stopping monitor")
+                    }
                     if (inp.read() < 0) throw java.io.EOFException("Bluetooth OBD adapter disconnected")
+                    drained++
                 }
                 ensureSameSession()
-                out.write(payload); out.flush()
+                BoundedBluetoothConnect.write(timeoutMs.coerceIn(1L, 4000L), write = {
+                    ensureSameSession()
+                    if (socket !== ownedSocket || !ownedSocket.isConnected)
+                        throw ObdTransportDisconnectedException("Bluetooth command socket was replaced")
+                    // Recheck approval after drain and worker dispatch, just
+                    // before sending bytes on this exact socket.
+                    beforeTransmit()
+                    ensureSameSession()
+                    out.write(payload)
+                    out.flush()
+                }, close = { ownedSocket.close() })
                 val buffer = StringBuilder()
                 val callbackBuffer = StringBuilder()
-                val start = System.currentTimeMillis()
+                val budget = ElmCommandReadBudget(timeoutMs)
                 var promptReceived = false
-                while (System.currentTimeMillis() - start < timeoutMs) {
+                while (budget.remainingMs() > 0) {
                     ensureSameSession()
                     if (inp.available() > 0) {
                         val received = inp.read()
@@ -1112,17 +1916,17 @@ class BluetoothObdManager(context: Context) {
                         if (received < 0) throw java.io.EOFException("Bluetooth OBD adapter disconnected")
                         val char = received.toChar()
                         if (char == '>') {
-                            promptReceived = true
+                            promptReceived = true; onPrompt()
                             if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
                             break
                         }
-                        if (buffer.length < 1024 || onChunk == null) buffer.append(char)
+                        if (!interruptingMonitor && (buffer.length < 1024 || onChunk == null)) buffer.append(char)
                         callbackBuffer.append(char)
                         if (char == '\r' || char == '\n' || callbackBuffer.length >= 128) {
                             onChunk?.invoke(callbackBuffer.toString())
                             callbackBuffer.clear()
                         }
-                    } else delay(15)
+                    } else delay(minOf(15L, budget.remainingMs()))
                 }
                 if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
                 ensureSameSession()
@@ -1132,7 +1936,7 @@ class BluetoothObdManager(context: Context) {
                     promptReceived = promptReceived
                 )
                 ensureSameSession()
-                normalizeElmReply(buffer.toString(), command)
+                normalizeElmReply(buffer.toString(), command, preserveLines)
             }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
@@ -1223,7 +2027,7 @@ class BluetoothObdManager(context: Context) {
      * Both the queued session and the completed result are tied to the current
      * connection epoch, so reconnects cannot reuse an obsolete bridge.
      */
-    suspend fun <T> withJ2534BridgeUdsSession(
+    suspend fun <T> withSelectedUdsReadSession(
         requestCanId: Int,
         responseCanId: Int,
         protocolNumber: Int,
@@ -1231,7 +2035,88 @@ class BluetoothObdManager(context: Context) {
         readDids: Set<Int> = emptySet(),
         block: suspend (UdsClient) -> T
     ): T {
+        // Route once per operation, never retry on a different ECU or adapter.
         val epoch = transportSessionEpoch.capture()
+        val extended = protocolNumber in setOf(34, 36, 64)
+        require(protocolNumber in setOf(33, 34, 35, 36, 63, 64))
+        val maxId = if (extended) 0x1FFFFFFF else 0x7FF
+        require(requestCanId in 0..maxId && responseCanId in 0..maxId &&
+            requestCanId != responseCanId)
+        transportSessionEpoch.requireCurrent(epoch)
+        require(protocolNumber in availableUdsReadProfiles(requestCanId, responseCanId)) {
+            "The selected connector and ECU address pair do not admit this UDS profile."
+        }
+        val result = when {
+            isJ2534BridgeConnected() -> withJ2534BridgeUdsSessionAtEpoch(epoch,
+                requestCanId, responseCanId, protocolNumber, timeoutMs, readDids, block)
+            StnUdsSessionAdmission.allowsReadCandidate(activeAdapterCapabilities,
+                isObdCommandChannelAvailable, protocolNumber) ->
+                withStnUdsSessionAtEpoch(epoch, requestCanId, responseCanId, protocolNumber,
+                    timeoutMs, readDids, null, block, readCandidate = true)
+            isElmUdsReadCandidate && protocolNumber in setOf(33, 34, 35, 36) ->
+                withElmUdsReadSession(epoch, requestCanId, responseCanId, protocolNumber,
+                    timeoutMs, readDids, block)
+            else -> error("No compatible implemented UDS transport on the current adapter.")
+        }
+        transportSessionEpoch.requireCurrent(epoch)
+        return result
+    }
+
+    private suspend fun <T> withElmUdsReadSession(
+        epoch: Long,
+        requestCanId: Int,
+        responseCanId: Int,
+        protocolNumber: Int,
+        timeoutMs: Long,
+        readDids: Set<Int>,
+        block: suspend (UdsClient) -> T
+    ): T = commandSessionMutex.withLock {
+        transportSessionEpoch.requireQueuedCurrent(epoch)
+        check(isElmUdsReadCandidate && protocolNumber in
+            availableUdsReadProfiles(requestCanId, responseCanId))
+        val originalProfile = standardElmProfile
+        val transport = ElmUdsPayloadTransport(requestCanId, responseCanId, protocolNumber) { command, timeout ->
+            sendAtCommandInternal(command, timeout, expectedEpoch = epoch, preserveLines = true)
+        }
+        val result = try {
+            block(UdsClient(transport, UdsAccessPolicy.readOnly(readDids), timeoutMs))
+        } finally {
+            withContext(NonCancellable) {
+                if (transportSessionEpoch.isCurrent(epoch)) {
+                    var restored = true
+                    for (command in ElmUdsPayloadTransport.restoreCommandsFor(originalProfile.protocol)) {
+                        val response = runCatching {
+                            sendAtCommandInternal(command, 1_500L, expectedEpoch = epoch)
+                        }.getOrNull()
+                        if (response == null || !CanConsoleAdapterRestorationPolicy.accepted(response))
+                            restored = false
+                    }
+                    if (!restored) {
+                        disconnectIfCurrent(epoch)
+                        error("ELM diagnostic session cleanup failed; reconnect the adapter.")
+                    }
+                }
+            }
+        }
+        transportSessionEpoch.requireCurrent(epoch)
+        result
+    }
+
+    suspend fun <T> withJ2534BridgeUdsSession(
+        requestCanId: Int,
+        responseCanId: Int,
+        protocolNumber: Int,
+        timeoutMs: Long = 5000L,
+        readDids: Set<Int> = emptySet(),
+        block: suspend (UdsClient) -> T
+    ): T = withJ2534BridgeUdsSessionAtEpoch(transportSessionEpoch.capture(),
+        requestCanId, responseCanId, protocolNumber, timeoutMs, readDids, block)
+
+    private suspend fun <T> withJ2534BridgeUdsSessionAtEpoch(
+        epoch: Long, requestCanId: Int, responseCanId: Int, protocolNumber: Int,
+        timeoutMs: Long, readDids: Set<Int>, block: suspend (UdsClient) -> T
+    ): T {
+        transportSessionEpoch.requireCurrent(epoch)
         check(isJ2534BridgeConnected()) { "A real connected J2534 bridge is required." }
         return commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
@@ -1430,22 +2315,31 @@ class BluetoothObdManager(context: Context) {
         readDids: Set<Int> = emptySet(),
         policy: UdsAccessPolicy? = null,
         block: suspend (UdsClient) -> T
+    ): T = withStnUdsSessionAtEpoch(transportSessionEpoch.capture(),
+        requestCanId, responseCanId, protocolNumber, timeoutMs, readDids, policy, block)
+
+    private suspend fun <T> withStnUdsSessionAtEpoch(
+        requestedEpoch: Long, requestCanId: Int, responseCanId: Int,
+        protocolNumber: Int, timeoutMs: Long, readDids: Set<Int>,
+        policy: UdsAccessPolicy?, block: suspend (UdsClient) -> T,
+        readCandidate: Boolean = false
     ): T {
-        val requestedEpoch = transportSessionEpoch.capture()
-        check(StnUdsSessionAdmission.allowsRead(
-            activeAdapterCapabilities, isObdCommandChannelAvailable
-        )) { "A connected physical OBDLink STN adapter with verified CAN transmit is required." }
+        transportSessionEpoch.requireCurrent(requestedEpoch)
+        require(!readCandidate || policy == null)
+        fun admitted() = if (readCandidate) StnUdsSessionAdmission.allowsReadCandidate(
+            activeAdapterCapabilities, isObdCommandChannelAvailable, protocolNumber
+        ) else StnUdsSessionAdmission.allowsRead(activeAdapterCapabilities, isObdCommandChannelAvailable)
+        check(admitted()) { "A connected physical OBDLink STN adapter with verified CAN transmit is required." }
         return commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
-            check(StnUdsSessionAdmission.allowsRead(
-                activeAdapterCapabilities, isObdCommandChannelAvailable
-            )) { "The physical STN adapter disconnected while waiting for the UDS session." }
+            check(admitted()) { "The physical STN adapter disconnected while waiting for the UDS session." }
+            val originalProfile = standardElmProfile
             val transport = StnUdsPayloadTransport(
                 requestCanId = requestCanId,
                 responseCanId = responseCanId,
                 protocolNumber = protocolNumber
             ) { command, commandTimeout ->
-                sendAtCommandInternal(command, commandTimeout, expectedEpoch = requestedEpoch)
+                sendAtCommandInternal(command, commandTimeout, expectedEpoch = requestedEpoch, preserveLines = true)
             }
             val result = try {
                 block(UdsClient(transport, policy ?: UdsAccessPolicy.readOnly(readDids), timeoutMs))
@@ -1456,14 +2350,14 @@ class BluetoothObdManager(context: Context) {
                 // A replaced connection must NEVER be touched by old cleanup.
                 withContext(NonCancellable) {
                     if (transportSessionEpoch.isCurrent(requestedEpoch)) {
-                        val restore = StnUdsAdapterRestoration.restore { command ->
+                        val restore = StnUdsAdapterRestoration.restore(originalProfile.protocol) { command ->
                             sendAtCommandInternal(command, 1_500L, expectedEpoch = requestedEpoch)
                         }
                         if (!restore.succeeded && transportSessionEpoch.isCurrent(requestedEpoch)) {
                             // A partially restored adapter cannot safely serve
                             // normal PID reads. Never disconnect a newer session
                             // that replaced this adapter while cleanup ran.
-                            disconnect()
+                            disconnectIfCurrent(requestedEpoch)
                             error("STN diagnostic session cleanup failed; reconnect the OBD adapter.")
                         }
                     }
@@ -1527,30 +2421,31 @@ class BluetoothObdManager(context: Context) {
             j2534BridgeRequestCanId = null
             j2534BridgeResponseCanId = null
             j2534BridgeProtocolNumber = null
+            // Closing RFCOMM first interrupts pending native reads/writes.
+            runCatching { socket?.close() }
             runCatching { inputStream?.close() }
             runCatching { outputStream?.close() }
-            runCatching { socket?.close() }
 
             inputStream = null
             outputStream = null
             socket = null
             activeTransport = "BLUETOOTH"
-            cachedSupportedMode01Pids = null
-            cachedSupportedMode01PidsAtMillis = 0L
+            mode01SupportCache.invalidate()
             isDemoMode = true
             isSimulationActive = false
             activeAdapterCapabilities = null
+            standardElmProfile = ElmObdSessionProfile.AUTO
         }
     }
 }
 
 /** Strip the adapter's echo only when it occupies the first nonempty line. */
-internal fun normalizeElmReply(raw: String, command: String): String {
+internal fun normalizeElmReply(raw: String, command: String, preserveLines: Boolean = false): String {
     val lines = raw.trim().lineSequence().iterator()
     if (!lines.hasNext()) return ""
     val first = lines.next().trim()
     return buildList {
         if (!first.equals(command.trim(), ignoreCase = true)) add(first)
         for (line in lines) if (line.isNotBlank()) add(line.trim())
-    }.joinToString(" ")
+    }.joinToString(if (preserveLines) "\n" else " ")
 }

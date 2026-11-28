@@ -64,7 +64,8 @@ internal static class DoIpDiagnosticSessionSelfTests
     private static async Task RunCaseAsync(Func<Stream, Task> gateway,
         Func<DoIpDiagnosticTransport, Task> client, bool pendingRoute = false,
         byte activationType = 0x00, byte[]? activationOemData = null,
-        byte protocolVersion = DoIpCodec.Version)
+        byte protocolVersion = DoIpCodec.Version,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -83,7 +84,7 @@ internal static class DoIpDiagnosticSessionSelfTests
                 CancellationToken.None, portOverride: port,
                 protocolVersion: protocolVersion,
                 activationType: activationType,
-                activationOemData: activationOemData);
+                activationOemData: activationOemData, trace: trace);
             await client(transport);
             await server.WaitAsync(TimeSpan.FromSeconds(3));
         }
@@ -230,6 +231,1001 @@ internal static class DoIpDiagnosticSessionSelfTests
             await Expect<ArgumentException>(() => Task.Run(() =>
                 DoIpVinReader.ParseLogicalAddress(badAddress)), "Reject invalid logical address.");
 
+        // Exercise the application DTC reader through real loopback TCP.
+        byte[] dtcRequest = [0x19, 0x02, 0x05];
+        byte[] dtcReply = [0x59, 0x02, 0x0F, 0x12, 0x34, 0x56, 0x01];
+        await RunCaseAsync(async stream =>
+        {
+            var message = await ReadAsync(stream);
+            Check(message.Type == DoIpCodec.DiagnosticMessage &&
+                message.Payload.SequenceEqual((byte[])[0x0E, 0x80, 0x12, 0x34, .. dtcRequest]),
+                "DTC request reaches the selected logical ECU.");
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(dtcReply));
+        }, async client =>
+        {
+            byte[]? tx = null;
+            byte[]? rx = null;
+            var report = await DoIpVinReader.ReadDtcsAsync(client, 0x05,
+                TimeSpan.FromSeconds(2), CancellationToken.None,
+                requested: bytes => { tx = bytes.ToArray(); bytes[0] = 0; },
+                received: bytes => { rx = bytes.ToArray(); bytes[0] = 0; });
+            Check(report.AvailabilityMask == 0x0F && report.Codes.Count == 1 &&
+                report.Codes[0].Code == 0x123456 && report.Codes[0].Status == 1,
+                "DTC read returns correlated fault and availability.");
+            Check(tx is not null && tx.SequenceEqual(dtcRequest), "DTC TX journal copy.");
+            Check(rx is not null && rx.SequenceEqual(dtcReply), "DTC RX journal copy.");
+        });
+
+        foreach (var invalidDtcReply in new byte[][]
+        {
+            [0x59, 0x02, 0x0F, 0x12, 0x34, 0x56, 0x02],
+            [0x59, 0x02, 0x0F, 0x12, 0x34, 0x56],
+            [0x59, 0x02, 0x01, 0x12, 0x34, 0x56, 0x01, 0x12, 0x34, 0x56, 0x01]
+        })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await ReadAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(invalidDtcReply));
+            }, async client =>
+            {
+                await Expect<InvalidDataException>(async () =>
+                {
+                    _ = await DoIpVinReader.ReadDtcsAsync(client, 0x05,
+                        TimeSpan.FromSeconds(2), CancellationToken.None);
+                }, "Malformed or uncorrelated DTC report rejected.");
+            });
+        }
+
+        using (var canceledDtc = new CancellationTokenSource())
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await ReadAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(dtcReply));
+            }, async client =>
+            {
+                await Expect<OperationCanceledException>(async () =>
+                {
+                    _ = await DoIpVinReader.ReadDtcsAsync(client, 0x05,
+                        TimeSpan.FromSeconds(2), canceledDtc.Token,
+                        received: _ => canceledDtc.Cancel());
+                }, "Cancellation during DTC RX prevents publication.");
+            });
+        }
+
+        // A VIN-specific gateway discovery is only an announcement. Before
+        // reading a target's DID/DTC, verify its real F190 on the active route.
+        const string selectedVehicleVin = "1G1FA1RXXR0123456";
+        const string otherVehicleVin = "1G1FA1RXXR0123457";
+        var observedForVin = new DoIpVehicleDiscovery.Identity(selectedVehicleVin,
+            Ecu, new byte[6], new byte[6], 0, null, IPAddress.Loopback, DoIpCodec.Version);
+        foreach (var ecuVin in new[] { selectedVehicleVin, otherVehicleVin })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(ecuVin)]));
+            }, async client =>
+            {
+                var tx = new List<byte[]>();
+                var rx = new List<byte[]>();
+                if (ecuVin == selectedVehicleVin)
+                {
+                    var actual = await DoIpVinReader.VerifyObservedVinAsync(client, observedForVin,
+                        TimeSpan.FromSeconds(2), CancellationToken.None, tx.Add, rx.Add);
+                    Check(actual == selectedVehicleVin, "ECU VIN matches observed gateway.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () =>
+                    {
+                        _ = await DoIpVinReader.VerifyObservedVinAsync(client, observedForVin,
+                            TimeSpan.FromSeconds(2), CancellationToken.None, tx.Add, rx.Add);
+                    }, "ECU VIN mismatch is rejected before DID/DTC traffic.");
+                }
+                Check(tx.Count == 1 && rx.Count == 1 && tx[0].SequenceEqual(Request),
+                    "VIN verification is recorded as one real F190 TX/RX.");
+            });
+        }
+
+        // Typed DTC reads are not published until the final F190 matches.
+        foreach (var finalMatches in new[] { true, false })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x19,0x02,0x05}),
+                    "Verified DTC query follows initial VIN.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(dtcReply));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                if (finalMatches)
+                {
+                    var report = await DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin,
+                        timeout, token, () => DoIpVinReader.ReadDtcsAsync(client, 0x05, timeout, token));
+                    Check(report.Codes.Count == 1, "Verified DTC result published after final VIN.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () =>
+                    {
+                        _ = await DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin,
+                            timeout, token, () => DoIpVinReader.ReadDtcsAsync(client, 0x05, timeout, token));
+                    }, "Changed final VIN prevents DTC publication.");
+                }
+            });
+        }
+
+        // Permanent DTCs use 19/15, even if the current status is zero.
+        foreach (var finalMatches in new[] { true, false })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, 0x15 }),
+                    "Permanent DTC query uses its dedicated subfunction without a mask.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x59, 0x15, 8, 1, 2, 3, 0]));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                Task<ObdOnUdsServices.DtcStatusReport> Read() =>
+                    DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                    {
+                        var response = await client.ExchangeUdsAsync(
+                            ObdOnUdsServices.ReadPermanentDtcs(), timeout, token);
+                        return ObdOnUdsServices.DecodePermanentDtcs(response);
+                    });
+                if (finalMatches)
+                {
+                    var report = await Read();
+                    Check(report.Codes.Count == 1 && report.Codes[0].Status == 0,
+                        "Permanent code is retained independently of current status.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed final VIN prevents permanent DTC publication.");
+                }
+            });
+        }
+
+        // Legacy scopes use the selected subfunction on the same verified session.
+        foreach (var sub in new byte[] { 0x0F, 0x10, 0x11, 0x12, 0x13 })
+        foreach (var finalMatches in new[] { true, false })
+        {
+            var request = ObdOnUdsServices.ReadLegacyDtc(sub, 8, 0x010203, 1);
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                byte[] expected = sub == 0x10 ? [0x0E, 0x80, 0x12, 0x34, 0x19, sub, 1, 2, 3, 1] :
+                    [0x0E, 0x80, 0x12, 0x34, 0x19, sub, 8];
+                Check(query.Payload.SequenceEqual(expected), "Legacy DTC request is not replaced by a primary/OBDonUDS request.");
+                byte[] reply = sub switch
+                {
+                    0x10 => [0x59, sub, 1, 2, 3, 8, 1, 0xAA],
+                    0x11 or 0x12 => [0x59, sub, 8, 1, 0, 1],
+                    _ => [0x59, sub, 8, 1, 2, 3, 8]
+                };
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(reply));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                Task<ObdOnUdsServices.LegacyDtcReport> Read() =>
+                    DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                    {
+                        var response = await client.ExchangeUdsAsync(request, timeout, token);
+                        return ObdOnUdsServices.DecodeLegacyDtc(request, response);
+                    });
+                if (finalMatches)
+                {
+                    var report = await Read();
+                    Check(report.Subfunction == sub && (sub switch
+                    {
+                        0x10 => report.Detail?.Dtc == 0x010203,
+                        0x11 or 0x12 => report.Count?.Count == 1,
+                        _ => report.List?.Codes.Single().Code == 0x010203
+                    }), "Legacy scope and result preserved.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed VIN prevents publication of a legacy DTC result.");
+                }
+            });
+        }
+
+        // Extended records: typed data is only published after the second VIN check.
+        foreach (var sub in new byte[] { 0x16, 0x1A })
+        foreach (var finalMatches in new[] { true, false })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, sub, 1 }),
+                    "Extended record query preserves the selected record.");
+                byte[] reply = sub == 0x16 ? [0x59, sub, 1, 1, 2, 3, 8, 0xAA, 0xBB] :
+                    [0x59, sub, 8, 1, 1, 2, 3, 0];
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(reply));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                int? size = sub == 0x16 ? 2 : null;
+                var request = ObdOnUdsServices.ReadExtendedRecord(1, size);
+                Task<ObdOnUdsServices.ExtendedRecordReport> Read() =>
+                    DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                    {
+                        var response = await client.ExchangeUdsAsync(request, timeout, token);
+                        return ObdOnUdsServices.DecodeExtendedRecord(1, size, response);
+                    });
+                if (finalMatches)
+                {
+                    var result = await Read();
+                    Check(result.Record == 1 && result.Entries.Single().Dtc == 0x010203 &&
+                        (sub != 0x16 || result.Entries.Single().Data.SequenceEqual(new byte[] { 0xAA, 0xBB })),
+                        "Verified extended record is published.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed final VIN prevents extended record publication.");
+                }
+            });
+        }
+
+        // User-defined memory: retain the explicit memory and reject an identity change.
+        foreach (var finalMatches in new[] { true, false })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, 0x17, 8, 2 }),
+                    "User-memory DTC query preserves status and memory.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x59, 0x17, 2, 8, 1, 2, 3, 8]));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                var request = ObdOnUdsServices.ReadUserMemory(0x17, 2, 8);
+                Task<ObdOnUdsServices.UserMemoryReport> Read() =>
+                    DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                    {
+                        var response = await client.ExchangeUdsAsync(request, timeout, token);
+                        return ObdOnUdsServices.DecodeUserMemory(request, response);
+                    });
+                if (finalMatches)
+                {
+                    var report = await Read();
+                    Check(report.Memory == 2 && report.List!.Codes.Single().Code == 0x010203,
+                        "User-memory report published after identity revalidation.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed VIN prevents user-memory report publication.");
+                }
+            });
+        }
+
+        // Stored data by record number is published only after the final ECU identity check.
+        foreach (var finalMatches in new[] { true, false })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, 5, 1 }),
+                    "Stored data uses exact record selector.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x59, 5, 1, 1, 2, 3, 8, 1, 0xF1, 0x90, 0xAA]));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                var request = ObdOnUdsServices.ReadStoredRecord(1);
+                Task<ObdOnUdsServices.StoredRecordReport> Read() =>
+                    DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                    {
+                        var response = await client.ExchangeUdsAsync(request, timeout, token);
+                        return ObdOnUdsServices.DecodeStoredRecord(1, response);
+                    });
+                if (finalMatches)
+                {
+                    var report = await Read();
+                    Check(report.Dtc == 0x010203 && report.RawData.Length == 4, "Stored record retained.");
+                }
+                else
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); }, "Changed VIN prevents stored data publication.");
+            });
+        }
+
+        // A wildcard stored-data response is not an individual-record echo.
+        foreach (var finalMatches in new[] { true, false })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, 5, 255 }),
+                    "All stored records use exact wildcard selector.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu(Convert.FromHexString("5905010102030802F40C1234F40D56020405060001F40D78")));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                var request = ObdOnUdsServices.ReadAllStoredRecords();
+                var catalog = ObdOnUdsServices.ParseStoredDidLengths("F40C:2,F40D:1");
+                Task<ObdOnUdsServices.AllStoredRecords> Read() =>
+                    DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                    {
+                        var response = await client.ExchangeUdsAsync(request, timeout, token);
+                        return ObdOnUdsServices.DecodeAllStoredRecords(response, catalog);
+                    });
+                if (finalMatches)
+                {
+                    var report = await Read();
+                    Check(report.Records.Count == 2 && report.Records[1].Record == 2 &&
+                        report.Records[0].Dids[0].Data.SequenceEqual(new byte[] { 0x12, 0x34 }),
+                        "Both stored records retained after final VIN verification.");
+                }
+                else
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed VIN prevents wildcard stored data publication.");
+            });
+        }
+
+        // Typed snapshot and extended-data records are historical values, not live samples.
+        foreach (var sub in new byte[] { 4, 6 })
+        foreach (var finalMatches in new[] { true, false })
+        {
+            var payload = Convert.FromHexString(sub == 4
+                ? "5904010203080102F40C1234F40D560201F40D78"
+                : "59060102030801123490AA91BBCC");
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, sub, 1, 2, 3, 255 }),
+                    "Decoded DTC records use exact DTC and wildcard selector.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(payload));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                var didLengths = ObdOnUdsServices.ParseStoredDidLengths("F40C:2,F40D:1");
+                var recordLengths = ObdOnUdsServices.ParseExtendedRecordLengths("01:2,90:1,91:2");
+                var request = sub == 4 ? ObdOnUdsServices.ReadDecodedSnapshot(0x010203, 255) :
+                    ObdOnUdsServices.ReadDecodedExtended(0x010203, 255, recordLengths);
+                Task<int> Read() => DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                {
+                    var reply = await client.ExchangeUdsAsync(request, timeout, token);
+                    if (sub == 4)
+                    {
+                        var snapshots = ObdOnUdsServices.DecodeSnapshotRecords(0x010203, 255, reply, didLengths);
+                        Check(snapshots.Records[1].Dids[0].Data.SequenceEqual(new byte[] { 0x78 }),
+                            "Historical snapshot bytes retained.");
+                        return snapshots.Records.Count;
+                    }
+                    var extended = ObdOnUdsServices.DecodeExtendedRecords(0x010203, 255, reply, recordLengths);
+                    Check(extended.Records[2].Data.SequenceEqual(new byte[] { 0xBB, 0xCC }),
+                        "Extended record bytes retained.");
+                    return extended.Records.Count;
+                });
+                if (finalMatches)
+                    Check(await Read() == (sub == 4 ? 2 : 3), "Decoded records published after final VIN.");
+                else
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed VIN prevents decoded DTC record publication.");
+            });
+        }
+
+        // Decoded user memory records must remain scoped to the requested memory and VIN.
+        foreach (var sub in new byte[] { 0x18, 0x19 })
+        foreach (var finalMatches in new[] { true, false })
+        {
+            var payload = Convert.FromHexString(sub == 0x18
+                ? "591802010203080101F40D78" : "5919020102030801123490AA");
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, sub, 1, 2, 3, 255, 2 }),
+                    "Decoded memory read preserves exact memory selection.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(payload));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                var request = ObdOnUdsServices.ReadUserMemory(sub, 2, 0, 0x010203, 255);
+                Task<int> Read() => DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                {
+                    var reply = await client.ExchangeUdsAsync(request, timeout, token);
+                    if (sub == 0x18)
+                    {
+                        var report = ObdOnUdsServices.DecodeUserMemorySnapshot(2, 0x010203, 255, reply,
+                            ObdOnUdsServices.ParseStoredDidLengths("F40D:1"));
+                        Check(report.RawResponse.SequenceEqual(payload), "Memory snapshot raw bytes retained.");
+                        return report.Records.Count;
+                    }
+                    var extended = ObdOnUdsServices.DecodeUserMemoryExtended(2, 0x010203, 255, reply,
+                        ObdOnUdsServices.ParseExtendedRecordLengths("01:2,90:1"));
+                    Check(extended.RawResponse.SequenceEqual(payload), "Memory extended raw bytes retained.");
+                    return extended.Records.Count;
+                });
+                if (finalMatches)
+                    Check(await Read() == (sub == 0x18 ? 1 : 2), "Memory records published after VIN revalidation.");
+                else
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed VIN prevents user memory result publication.");
+            });
+        }
+
+        // Multi-DID polling: each sample must be verified before publication.
+        foreach (var finalIdentityMatches in new[] { true, false })
+        {
+            var samples = new List<int>();
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                for (var i = 0; i < 2; i++)
+                {
+                    var query = await ReadAsync(stream);
+                    Check(query.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x22,0xF4,0x0C,0xF4,0x0D}),
+                        "Multi-DID monitoring transmits one request per sample.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu([0x62, 0xF4, 0x0C, 0x12, (byte)i, 0xF4, 0x0D, 0x56]));
+                    _ = await RequireRequestAsync(stream);
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                            i == 0 || finalIdentityMatches ? selectedVehicleVin : otherVehicleVin)]));
+                }
+            }, async client =>
+            {
+                Task Monitor() => DoIpVinReader.MonitorVerifiedMultiDidAsync(client, observedForVin, selectedVehicleVin,
+                    UdsMultiDidCli.Parse("0xF40C:2,0xF40D:1"), false, 2, TimeSpan.FromMilliseconds(250),
+                    TimeSpan.FromSeconds(2), CancellationToken.None, (index, values) =>
+                    {
+                        Check(values.Count == 2 && values[0].Data[1] == index - 1 &&
+                            values[1].Data.SequenceEqual(new byte[] { 0x56 }), "Multi-DID sample decoded in order.");
+                        samples.Add(index);
+                    });
+                if (finalIdentityMatches) await Monitor();
+                else await Expect<InvalidDataException>(Monitor, "Changed final VIN invalidates multi-DID monitor.");
+            });
+            Check(samples.SequenceEqual(finalIdentityMatches ? new[] {1, 2} : new[] {1}),
+                "Only identity-verified samples are published.");
+        }
+
+        // Explicit console request follows the same-session VIN read, not
+        // a stale discovery. A mismatch never reaches the requested service.
+        foreach (var vinMatches in new[] { true, false })
+        {
+            byte[] command = [0x22, 0x12, 0x34];
+            var commandReceived = false;
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                var reportedVin = vinMatches ? selectedVehicleVin : otherVehicleVin;
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(reportedVin)]));
+                if (vinMatches)
+                {
+                    var request = await ReadAsync(stream);
+                    commandReceived = request.Type == DoIpCodec.DiagnosticMessage &&
+                        request.Payload.SequenceEqual(new byte[] {0x0E, 0x80, 0x12, 0x34, 0x22, 0x12, 0x34});
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62, 0x12, 0x34, 0xAB]));
+                }
+            }, async client =>
+            {
+                if (vinMatches)
+                {
+                    var result = await DoIpVinReader.ExchangeVerifiedAsync(client, observedForVin,
+                        command, TimeSpan.FromSeconds(2), CancellationToken.None);
+                    Check(result.SequenceEqual(new byte[] {0x62, 0x12, 0x34, 0xAB}),
+                        "Confirmed request returns actual correlated response.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () =>
+                    {
+                        _ = await DoIpVinReader.ExchangeVerifiedAsync(client, observedForVin,
+                            command, TimeSpan.FromSeconds(2), CancellationToken.None);
+                    }, "Explicit command refused on mismatching ECU VIN.");
+                }
+            });
+            Check(commandReceived == vinMatches, "Explicit command follows only matching F190.");
+        }
+
+        // An explicit confirmed sequence uses one routing activation and stops
+        // immediately on the first negative or malformed response.
+        foreach (var failFirst in new[] { false, true })
+        {
+            var replies = new List<int>();
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var first = await ReadAsync(stream);
+                Check(first.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x22,0x12,0x34}),
+                    "Sequence command one sent in order.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu(failFirst ? new byte[] {0x7F,0x22,0x31} : new byte[] {0x62,0x12,0x34,0x01}));
+                if (!failFirst)
+                {
+                    var second = await ReadAsync(stream);
+                    Check(second.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x19,0x01,0xFF}),
+                        "Sequence command two sent on the same session.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x59,1,0xFF,0,0,1]));
+                }
+            }, async client =>
+            {
+                var completed = false;
+                Task<byte[]>? competing = null;
+                try
+                {
+                    var done = await DoIpVinReader.ExchangeSequenceVerifiedAsync(client, observedForVin,
+                        new byte[][] { [0x22,0x12,0x34], [0x19,1,0xFF] }, TimeSpan.FromSeconds(2),
+                        CancellationToken.None, (index, _) =>
+                        {
+                            replies.Add(index);
+                            if (index == 1)
+                                competing = client.ExchangeUdsAsync([0x22,0x12,0x34],
+                                    TimeSpan.FromSeconds(2), CancellationToken.None);
+                        });
+                    completed = done == 2;
+                }
+                catch (Exception) when (failFirst)
+                {
+                    // A negative reply closes the transport; no subsequent command.
+                }
+                Check(completed != failFirst, "Sequence completes only on both correlated replies.");
+                if (!failFirst)
+                {
+                    Check(competing is not null, "Sequence callback attempted a concurrent request.");
+                    await Expect<InvalidOperationException>(async () =>
+                    {
+                        _ = await competing!;
+                    }, "A concurrent callback cannot inject a diagnostic request.");
+                }
+            });
+            Check(replies.Count == (failFirst ? 0 : 2), "Sequence stopped or completed as expected.");
+        }
+
+        // A callback failure after a valid reply is not permission to reuse
+        // the same socket for another operation; the session is retired.
+        await RunCaseAsync(async stream =>
+        {
+            _ = await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+            // This is the first *custom* UDS command, not the F190 identity
+            // request expected by RequireRequestAsync.
+            var first = await ReadAsync(stream);
+            Check(first.Type == DoIpCodec.DiagnosticMessage &&
+                first.Payload.SequenceEqual(new byte[] { 0x0E,0x80,0x12,0x34,0x22,0x12,0x34 }),
+                "Callback failure fixture received the first command.");
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0x12,0x34,0x01]));
+        }, async client =>
+        {
+            await Expect<IOException>(async () =>
+            {
+                _ = await DoIpVinReader.ExchangeSequenceVerifiedAsync(client, observedForVin,
+                    new byte[][] { [0x22,0x12,0x34], [0x19,1,0xFF] },
+                    TimeSpan.FromSeconds(2), CancellationToken.None,
+                    (_, _) => throw new IOException("Cannot publish confirmed reply."));
+            }, "Sequence callback failure is reported.");
+            await Expect<InvalidOperationException>(async () =>
+            {
+                _ = await client.ExchangeUdsAsync([0x22,0x12,0x34],
+                    TimeSpan.FromSeconds(2), CancellationToken.None);
+            }, "Callback failure retires the entire DoIP socket.");
+        });
+
+        // A legislated OBD route uses F802 and F810, not generic F190.
+        // Check both an unknown initial protocol and a changed final protocol.
+        foreach (var (protocolValue, finalProtocol) in new (byte, byte)[] { (1, 1), (2, 2), (1, 2) })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                var vinRequest = await ReadAsync(stream);
+                Check(vinRequest.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x22,0xF8,0x02}),
+                    "OBDonUDS reads legislated VIN.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62,0xF8,0x02, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var protocol = await ReadAsync(stream);
+                Check(protocol.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x22,0xF8,0x10}),
+                    "OBDonUDS route asks the ECU for its protocol.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0xF8,0x10,protocolValue]));
+                if (protocolValue == 1)
+                {
+                    var data = await ReadAsync(stream);
+                    Check(data.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x22,0xF4,0x0C}),
+                        "Legislated DID sent after identification.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0xF4,0x0C,0xAB]));
+                    var finalVin = await ReadAsync(stream);
+                    Check(finalVin.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF8,0x02]),
+                        "OBD single DID rechecks legislated VIN on the same connection.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu([0x62,0xF8,0x02, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                    var finalIdentification = await ReadAsync(stream);
+                    Check(finalIdentification.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF8,0x10]),
+                        "OBD single DID rechecks protocol before returning the data.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0xF8,0x10,finalProtocol]));
+                }
+            }, async client =>
+            {
+                if (protocolValue == 1 && finalProtocol == 1)
+                {
+                    var obd = await DoIpVinReader.ReadVerifiedObdAsync(client, selectedVehicleVin,
+                        0xF40C, TimeSpan.FromSeconds(2), CancellationToken.None);
+                    Check(obd.ProtocolValue == 1 && obd.Data is { Length: 1 } && obd.Data[0] == 0xAB,
+                        "OBDonUDS DID data is preserved.");
+                }
+                else await Expect<InvalidDataException>(async () =>
+                {
+                    _ = await DoIpVinReader.ReadVerifiedObdAsync(client, selectedVehicleVin,
+                        0xF40C, TimeSpan.FromSeconds(2), CancellationToken.None);
+                }, "Unknown or changed protocol value cannot authorize the legislated DID result.");
+            });
+        }
+
+        // Identification can report unknown protocol values, but only stable ones.
+        foreach (var (firstProtocol, secondProtocol) in new (byte, byte)[] { (1, 1), (2, 2), (1, 2) })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                foreach (var protocolValue in new[] { firstProtocol, secondProtocol })
+                {
+                    var vinRequest = await ReadAsync(stream);
+                    Check(vinRequest.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF8,0x02]),
+                        "Discovery uses the legislated VIN.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu([0x62,0xF8,0x02, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                    var protocolRequest = await ReadAsync(stream);
+                    Check(protocolRequest.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF8,0x10]),
+                        "Discovery reads the protocol identity, not application data.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu([0x62,0xF8,0x10,protocolValue]));
+                }
+            }, async client =>
+            {
+                if (firstProtocol == secondProtocol)
+                {
+                    var result = await DoIpVinReader.ReadStableObdIdentityAsync(client, selectedVehicleVin,
+                        TimeSpan.FromSeconds(2), CancellationToken.None);
+                    Check(result.ProtocolValue == firstProtocol && result.Data is null,
+                        "Stable unknown protocol is retained without a data-route claim.");
+                }
+                else await Expect<InvalidDataException>(async () =>
+                {
+                    _ = await DoIpVinReader.ReadStableObdIdentityAsync(client, selectedVehicleVin,
+                        TimeSpan.FromSeconds(2), CancellationToken.None);
+                }, "Unstable protocol discovery is rejected.");
+            });
+        }
+
+        // Monitoring OBDonUDS verifies the legislated identity before publication of each sample.
+        foreach (var finalProtocol in new byte[] { 1, 2 })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                async Task Identify(byte protocolValue)
+                {
+                    var vinRequest = await ReadAsync(stream);
+                    Check(vinRequest.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF8,0x02]),
+                        "OBD monitoring uses F802, not F190.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu([0x62,0xF8,0x02, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                    var protocol = await ReadAsync(stream);
+                    Check(protocol.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF8,0x10]),
+                        "OBD monitoring verifies F810.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0xF8,0x10,protocolValue]));
+                }
+                await Identify(1);
+                for (byte index = 1; index <= 2; index++)
+                {
+                    var request = await ReadAsync(stream);
+                    Check(request.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF4,0x0C]),
+                        "Same ECU and legislated DID on every sample.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0xF4,0x0C,index]));
+                    await Identify(index == 1 ? (byte)1 : finalProtocol);
+                }
+            }, async client =>
+            {
+                var samples = new List<byte>();
+                async Task Monitor() => await DoIpVinReader.MonitorVerifiedObdAsync(client,
+                    selectedVehicleVin, 0xF40C, 2, TimeSpan.FromMilliseconds(250),
+                    TimeSpan.FromSeconds(2), CancellationToken.None, (_, data) => samples.Add(data[0]));
+                if (finalProtocol == 1) await Monitor();
+                else await Expect<InvalidDataException>(Monitor, "A changed protocol invalidates monitoring completion.");
+                Check(samples.SequenceEqual(finalProtocol == 1 ? new byte[] {1,2} : new byte[] {1}),
+                    "The sample with unverified protocol identity is not published.");
+            });
+        }
+
+        // A contradictory identity in a single sample must never be published.
+        await RunCaseAsync(async stream =>
+        {
+            var query = await ReadAsync(stream);
+            Check(query.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF1,0x90]),
+                "Single monitoring VIN request uses F190.");
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                FromEcu([0x62,0xF1,0x90, .. System.Text.Encoding.ASCII.GetBytes(otherVehicleVin)]));
+        }, async client =>
+        {
+            var published = 0;
+            await Expect<InvalidDataException>(() => DoIpVinReader.MonitorDidAsync(client, 0xF190, 1,
+                TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(2), CancellationToken.None,
+                (_, _) => published++, expectedVin: selectedVehicleVin), "Contradictory sampled VIN rejected.");
+            Check(published == 0, "No contradictory sample was published.");
+        });
+
+        // Regression: an immediately consumed final response must not
+        // be mistaken for a response crossing the exchange boundary.
+        await RunCaseAsync(async stream =>
+        {
+            for (var index = 0; index < 128; index++)
+            {
+                var request = await ReadAsync(stream);
+                Check(request.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0x12,0x34]),
+                    "Sequential diagnostic requests stay correlated.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62,0x12,0x34,(byte)index]));
+            }
+        }, async client =>
+        {
+            for (var index = 0; index < 128; index++)
+            {
+                var reply = await client.ExchangeUdsAsync([0x22,0x12,0x34],
+                    TimeSpan.FromSeconds(2), CancellationToken.None);
+                Check(reply.SequenceEqual((byte[])[0x62,0x12,0x34,(byte)index]),
+                    "A valid final reply leaves the session available for the next request.");
+            }
+        });
+
+        // One routed session serves sequential monitored DID requests.
+        await RunCaseAsync(async stream =>
+        {
+            for (byte sample = 1; sample <= 3; sample++)
+            {
+                var request = await ReadAsync(stream);
+                Check(request.Type == DoIpCodec.DiagnosticMessage &&
+                    request.Payload.SequenceEqual((byte[])[0x0E, 0x80, 0x12, 0x34, 0x22, 0x12, 0x34]),
+                    "Monitoring addresses the same ECU and DID on each sample.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0x12, 0x34, sample]));
+            }
+        }, async client =>
+        {
+            var values = new List<byte>();
+            var txCount = 0;
+            var rxCount = 0;
+            await DoIpVinReader.MonitorDidAsync(client, 0x1234, 3,
+                TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(2),
+                CancellationToken.None, (index, data) =>
+                {
+                    Check(index == values.Count + 1 && data.Length == 1,
+                        "Monitor sample preserves sequence and strips DID header.");
+                    values.Add(data[0]);
+                }, _ => txCount++, _ => rxCount++);
+            Check(values.SequenceEqual((byte[])[1, 2, 3]) && txCount == 3 && rxCount == 3,
+                "Monitor emits three correlated results and TX/RX events.");
+        });
+        foreach (var invalidDidReply in new byte[][] { [0x62, 0x12, 0x35, 1], [0x62, 0x12, 0x34] })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await ReadAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(invalidDidReply));
+            }, async client =>
+            {
+                await Expect<InvalidDataException>(async () =>
+                {
+                    _ = await DoIpVinReader.ReadDidAsync(client, 0x1234,
+                        TimeSpan.FromSeconds(2), CancellationToken.None);
+                }, "Wrong or empty DID response rejected.");
+            });
+        }
+
+        // Scope-qualified memory capture on a simulated gateway. No physical ECU.
+        var backupScope = new DoIpBackupScope(simulatedVin, Ecu, Tester, Ecu, 0x1234,
+            "A1B2", 0x100, 4, 2, "CALIBRATION");
+        DoIpScopedBackup.ValidateCaptureBudget(backupScope with { Length = 8192, BlockSize = 1 });
+        await Expect<InvalidDataException>(() => Task.Run(() =>
+            DoIpScopedBackup.ValidateCaptureBudget(backupScope with { Length = 8193, BlockSize = 1 })),
+            "DoIP capture must reject excessive block count before network access.");
+        async Task BackupRequest(Stream stream, byte[] request, byte[] response)
+        {
+            var message = await ReadAsync(stream);
+            Check(message.Type == DoIpCodec.DiagnosticMessage &&
+                message.Payload.SequenceEqual((byte[])[0x0E, 0x80, 0x12, 0x34, .. request]),
+                "Backup sends only the expected scoped read to the same ECU.");
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(response));
+        }
+        async Task BackupIdentity(Stream stream)
+        {
+            await BackupRequest(stream, Request,
+                [0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(simulatedVin)]);
+            await BackupRequest(stream, [0x22, 0x12, 0x34], [0x62, 0x12, 0x34, 0xA1, 0xB2]);
+        }
+        await RunCaseAsync(async stream =>
+        {
+            for (var pass = 0; pass < 2; pass++)
+            {
+                await BackupIdentity(stream);
+                await BackupRequest(stream, [0x23, 0x14, 0, 0, 1, 0, 2], [0x63, 1, 2]);
+                await BackupRequest(stream, [0x23, 0x14, 0, 0, 1, 2, 2], [0x63, 3, 4]);
+                await BackupIdentity(stream);
+            }
+            await BackupIdentity(stream);
+        }, async client =>
+        {
+            var capture = await DoIpScopedBackup.ReadAsync(client, backupScope,
+                TimeSpan.FromSeconds(2), CancellationToken.None);
+            Check(capture.First.SequenceEqual((byte[])[1, 2, 3, 4]) &&
+                capture.Second.SequenceEqual(capture.First) &&
+                !ReferenceEquals(capture.First, capture.Second), "DoIP backup performs independent reads.");
+            var folder = Path.Combine(Path.GetTempPath(), "CamaroDiagDoIp-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            try
+            {
+                var path = Path.Combine(folder, "backup.zip");
+                DoIpScopedBackup.SaveNew(path, capture, CancellationToken.None);
+                var verified = DoIpScopedBackup.VerifyZip(path, backupScope, CancellationToken.None);
+                Check(verified.Sha256 == capture.Sha256, "DoIP backup verifies against original profile.");
+                var validZip = File.ReadAllBytes(path);
+                var central = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(
+                    validZip.AsSpan(validZip.Length - 6, 4));
+                Check(central > 0 && central < validZip.Length - 22, "DoIP test ZIP directory offset.");
+                var brokenPath = Path.Combine(folder, "broken.zip");
+                foreach (var broken in new byte[][] { validZip[..central], validZip[..^1], [..validZip, 0x41] })
+                {
+                    File.WriteAllBytes(brokenPath, broken);
+                    await Expect<InvalidDataException>(() => Task.Run(() =>
+                        DoIpScopedBackup.VerifyZip(brokenPath, backupScope, CancellationToken.None)),
+                        "Incomplete DoIP directory or trailing bytes rejected.");
+                }
+                foreach (var offset in new[] { 16, 34 })
+                {
+                    var broken = validZip.ToArray();
+                    broken[central + offset] ^= 1;
+                    File.WriteAllBytes(brokenPath, broken);
+                    await Expect<InvalidDataException>(() => Task.Run(() =>
+                        DoIpScopedBackup.VerifyZip(brokenPath, backupScope, CancellationToken.None)),
+                        "DoIP directory checksum or disk metadata rejected.");
+                }
+                var escapedPath = Path.Combine(folder, "escaped.zip");
+                File.Copy(path, escapedPath);
+                using (var zip = System.IO.Compression.ZipFile.Open(escapedPath, System.IO.Compression.ZipArchiveMode.Update))
+                {
+                    string manifestText;
+                    using (var reader = new StreamReader(zip.GetEntry("manifest.json")!.Open()))
+                        manifestText = reader.ReadToEnd();
+                    zip.GetEntry("manifest.json")!.Delete();
+                    using var writer = new StreamWriter(zip.CreateEntry("manifest.json").Open());
+                    writer.Write(manifestText.Replace("CALIBRATION", @"\u0043ALIBRATION"));
+                }
+                Check(DoIpScopedBackup.VerifyZip(escapedPath, backupScope, CancellationToken.None).Sha256 == capture.Sha256,
+                    "Equivalent JSON string escapes do not change the selected DoIP scope.");
+                await Expect<InvalidDataException>(() => Task.Run(() =>
+                    DoIpScopedBackup.VerifyZip(path, backupScope with { Start = 0x200 }, CancellationToken.None)),
+                    "DoIP archive rejected for different memory region.");
+                await Expect<IOException>(() => Task.Run(() =>
+                    DoIpScopedBackup.SaveNew(path, capture, CancellationToken.None)),
+                    "Original DoIP backup cannot be overwritten.");
+                using (var zip = System.IO.Compression.ZipFile.Open(path, System.IO.Compression.ZipArchiveMode.Update))
+                {
+                    zip.GetEntry("verification.bin")!.Delete();
+                    using var entry = zip.CreateEntry("verification.bin").Open();
+                    entry.Write(new byte[] { 1, 2, 3, 9 });
+                }
+                await Expect<InvalidDataException>(() => Task.Run(() =>
+                    DoIpScopedBackup.VerifyZip(path, backupScope, CancellationToken.None)),
+                    "Tampered DoIP backup rejected.");
+            }
+            finally { Directory.Delete(folder, recursive: true); }
+        });
+        await RunCaseAsync(async stream =>
+        {
+            await BackupRequest(stream, Request,
+                [0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(simulatedVin)]);
+            await BackupRequest(stream, [0x22, 0x12, 0x34], [0x62, 0x12, 0x34, 0xA1, 0xB3]);
+        }, async client =>
+        {
+            await Expect<UnauthorizedAccessException>(async () =>
+            {
+                _ = await DoIpScopedBackup.ReadAsync(client, backupScope, TimeSpan.FromSeconds(2),
+                    CancellationToken.None);
+            }, "Different firmware identity prevents memory acquisition.");
+        });
+
+        await RunCaseAsync(async stream =>
+        {
+            await BackupIdentity(stream);
+            await BackupRequest(stream, [0x23, 0x14, 0, 0, 1, 0, 2], [0x63, 1, 2]);
+            await BackupRequest(stream, [0x23, 0x14, 0, 0, 1, 2, 2], [0x63, 3, 4]);
+            await BackupRequest(stream, Request,
+                [0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(simulatedVin)]);
+            await BackupRequest(stream, [0x22, 0x12, 0x34], [0x62, 0x12, 0x34, 0xA1, 0xB3]);
+        }, async client =>
+        {
+            var progressCount = 0;
+            await Expect<UnauthorizedAccessException>(async () =>
+            {
+                _ = await DoIpScopedBackup.ReadAsync(client, backupScope, TimeSpan.FromSeconds(2),
+                    CancellationToken.None, (_, _) => progressCount++);
+            }, "Identity changed before publishing memory acquisition progress.");
+            Check(progressCount == 0, "No unverified memory progress may be published.");
+        });
+
         // UDP and TCP identity correlation: no diagnostic PDU may be sent
         // if routing activation reports a different logical gateway.
         var mismatchListener = new TcpListener(IPAddress.Loopback, 0);
@@ -263,6 +1259,7 @@ internal static class DoIpDiagnosticSessionSelfTests
 
         // Full happy path: routing 0x11 pending then 0x10, gateway ACK,
         // AliveCheck and UDS NRC 0x78 followed by final correlated response.
+        var pduTrace = new System.Collections.Concurrent.ConcurrentQueue<(string Direction, byte[] Frame)>();
         await RunCaseAsync(async stream =>
         {
             await RequireRequestAsync(stream);
@@ -291,7 +1288,31 @@ internal static class DoIpDiagnosticSessionSelfTests
                 TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             Check(response.SequenceEqual(Positive),
                 "DoIP routing/ACK/AliveCheck/NRC/positive PDU.");
-        }, pendingRoute: true);
+        }, pendingRoute: true, trace: entry =>
+        {
+            pduTrace.Enqueue((entry.Direction, entry.Bytes.ToArray()));
+            // A trace subscriber cannot modify the live protocol message.
+            Array.Fill(entry.Bytes, (byte)0);
+        });
+        var traceMessages = pduTrace.Select(x => (x.Direction, Message: DoIpCodec.Decode(x.Frame))).ToArray();
+        Check(traceMessages.Length == 9, "DoIP trace retains every complete routing/control/diagnostic PDU.");
+        foreach (var pair in new[]
+        {
+            ("TX", DoIpCodec.RoutingActivationRequest),
+            ("RX", DoIpCodec.RoutingActivationResponse),
+            ("TX", DoIpCodec.DiagnosticMessage),
+            ("RX", DoIpCodec.DiagnosticPositiveAck),
+            ("RX", DoIpCodec.AliveCheckRequest),
+            ("TX", DoIpCodec.AliveCheckResponse),
+            ("RX", DoIpCodec.DiagnosticMessage)
+        })
+            Check(traceMessages.Any(x => x.Direction == pair.Item1 && x.Message.Type == pair.Item2),
+                "DoIP transport trace includes " + pair.Item1 + " 0x" + pair.Item2.ToString("X4"));
+        Check(traceMessages.Count(x => x.Direction == "RX" &&
+            x.Message.Type == DoIpCodec.RoutingActivationResponse) == 2 &&
+            traceMessages.Count(x => x.Direction == "RX" &&
+            x.Message.Type == DoIpCodec.DiagnosticMessage) == 2,
+            "Pending and final routing/UDS messages are kept separately.");
 
         // An OEM-specific activation must be an operator-provided field,
         // not an invented token or a modified ISO-reserved area.
@@ -677,6 +1698,52 @@ internal static class DoIpDiagnosticSessionSelfTests
                 "Cancelled DoIP UDS exchange retires the shared socket.");
         });
 
+        // A cancellation triggered by the last received diagnostic PDU
+        // prevents even a positive raw exchange from being published.
+        using (var finalRxCancellation = new CancellationTokenSource())
+        {
+            await RunCaseAsync(async stream =>
+            {
+                await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Positive));
+            }, async client =>
+            {
+                await Expect<OperationCanceledException>(() =>
+                    client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(2),
+                        finalRxCancellation.Token),
+                    "Cancellation at final diagnostic RX rejects a positive result.");
+                await Expect<InvalidOperationException>(() =>
+                    client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                        CancellationToken.None),
+                    "Cancelled final response cannot be reused for another request.");
+            }, trace: observed =>
+            {
+                if (observed.Direction == "RX" &&
+                    DoIpCodec.Decode(observed.Bytes).Type == DoIpCodec.DiagnosticMessage)
+                    finalRxCancellation.Cancel();
+            });
+        }
+
+        // A broken journal is fatal, not an unavailable ECU or a successful reply.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Positive));
+        }, async client =>
+        {
+            await Expect<DoIpDiagnosticTransport.TraceObserverException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(2), CancellationToken.None),
+                "A trace sink IOException must remain distinguishable from a transport IOException.");
+            await Expect<InvalidOperationException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1), CancellationToken.None),
+                "Trace observer failure retires the route.");
+        }, trace: observed =>
+        {
+            if (observed.Direction == "RX" &&
+                DoIpCodec.Decode(observed.Bytes).Type == DoIpCodec.DiagnosticMessage)
+                throw new IOException("Simulated evidence sink failure.");
+        });
+
         // Invalid P2 or P2* must fail before an on-wire diagnostic request.
         await RunCaseAsync(async stream =>
         {
@@ -823,6 +1890,34 @@ internal static class DoIpDiagnosticSessionSelfTests
                 client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
                     CancellationToken.None),
                 "Truncated TCP diagnostic response retires DoIP connection.");
+        });
+
+        // Closing in the middle of the next header must never allow
+        // another diagnostic operation on the same socket.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            var complete = DoIpCodec.Encode(DoIpCodec.DiagnosticMessage, FromEcu(Positive));
+            var burst = complete.Concat(new byte[] { 0x02, 0xFD, 0x80 }).ToArray();
+            await stream.WriteAsync(burst);
+            await stream.FlushAsync();
+        }, async client =>
+        {
+            try
+            {
+                var reply = await client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None);
+                Check(reply.SequenceEqual(Positive), "Only the complete first PDU may be returned.");
+            }
+            catch (EndOfStreamException)
+            {
+                // The pump observed the truncated next PDU before returning.
+                Check(true, "Known truncated next PDU rejects the exchange.");
+            }
+            await Task.Delay(60);
+            await Expect<InvalidOperationException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1), CancellationToken.None),
+                "Truncated next PDU retires the connection.");
         });
 
         // Multiple consecutive NRC 0x78 packets renew P2* only; they are

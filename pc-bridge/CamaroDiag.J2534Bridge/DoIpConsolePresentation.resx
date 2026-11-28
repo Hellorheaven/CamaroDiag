@@ -35,4 +35,187 @@
   <data name="VinNotice" xml:space="preserve"><value>VIN correlation is not ECU authentication or authorization for writing.</value></data>
   <data name="InvalidLogical" xml:space="preserve"><value>Enter distinct, explicit four-digit hexadecimal tester and ECU addresses.</value></data>
   <data name="InvalidCertificate" xml:space="preserve"><value>Client certificate requires TLS and a valid 40-digit hexadecimal thumbprint.</value></data>
+  <data name="ReadDtcs" xml:space="preserve"><value>Read ECU DTCs (UDS)</value></data>
+  <data name="DtcMask" xml:space="preserve"><value>DTC status mask (hex)</value></data>
+  <data name="InvalidDtcMask" xml:space="preserve"><value>Enter exactly two hexadecimal digits for the DTC status mask.</value></data>
+  <data name="DtcStarted" xml:space="preserve"><value>DoIP / {0} / UDS: DTC read at gateway {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="DtcResult" xml:space="preserve"><value>DTC count={0}; requested mask=0x{1:X2}; available mask=0x{2:X2}; effective mask=0x{3:X2}</value></data>
+  <data name="DtcBitFailed" xml:space="preserve"><value>Test failed</value></data>
+  <data name="DtcBitFailedCycle" xml:space="preserve"><value>Failed this operation cycle</value></data>
+  <data name="DtcBitPending" xml:space="preserve"><value>Pending</value></data>
+  <data name="DtcBitConfirmed" xml:space="preserve"><value>Confirmed</value></data>
+  <data name="DtcBitIncompleteSinceClear" xml:space="preserve"><value>Test not completed since last clear</value></data>
+  <data name="DtcBitFailedSinceClear" xml:space="preserve"><value>Failed since last clear</value></data>
+  <data name="DtcBitIncompleteCycle" xml:space="preserve"><value>Test not completed this operation cycle</value></data>
+  <data name="DtcBitWarningRequested" xml:space="preserve"><value>Warning indicator requested</value></data>
+  <data name="DtcStatusUnavailable" xml:space="preserve"><value>Status unavailable</value></data>
+  <data name="DtcNoAssertedAvailableBits" xml:space="preserve"><value>No available status bit asserted</value></data>
+  <data name="DtcNoAvailableFilter" xml:space="preserve"><value>No requested status bit is available; this result cannot establish absence of faults.</value></data>
+  <data name="DtcEntry" xml:space="preserve"><value>DTC 0x{0:X6}, status 0x{1:X2}</value></data>
+  <data name="DtcNotice" xml:space="preserve"><value>Read-only status report; no faults were cleared. An empty result only applies to the requested available status bits.</value></data>
+  <data name="ReadDid" xml:space="preserve"><value>Read ECU data</value></data>
+  <data name="DidLabel" xml:space="preserve"><value>Data identifier DID (hex)</value></data>
+  <data name="DidResult" xml:space="preserve"><value>DID 0x{0:X4}: {1}</value></data>
+  <data name="DidStarted" xml:space="preserve"><value>DoIP / {0} / UDS: DID read at {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="InvalidDid" xml:space="preserve"><value>Enter four hexadecimal digits for the DID.</value></data>
+  <data name="MonitorDid" xml:space="preserve"><value>Monitor DID</value></data>
+  <data name="MonitorInterval" xml:space="preserve"><value>Interval (ms)</value></data>
+  <data name="MonitorCount" xml:space="preserve"><value>Samples</value></data>
+  <data name="MonitorSample" xml:space="preserve"><value>#{0} DID 0x{1:X4}: {2}</value></data>
+  <data name="MonitorComplete" xml:space="preserve"><value>Monitoring finished: {0} samples.</value></data>
+  <data name="Backup" xml:space="preserve"><value>Back up ECU region</value></data>
+  <data name="BackupProfile" xml:space="preserve"><value>Select DoIP memory profile</value></data>
+  <data name="BackupMismatch" xml:space="preserve"><value>The memory profile does not match the selected DoIP target.</value></data>
+  <data name="BackupExists" xml:space="preserve"><value>Choose a new file; backups are never overwritten.</value></data>
+  <data name="BackupConfirm" xml:space="preserve"><value>Read ECU region twice? VIN {0}, ECU 0x{1:X4}, start 0x{2:X8}, {3} bytes.</value></data>
+  <data name="BackupStarted" xml:space="preserve"><value>DoIP / {0}: backup at {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="BackupProgress" xml:space="preserve"><value>Pass {0}/2: {1}/{2} bytes</value></data>
+  <data name="BackupSaved" xml:space="preserve"><value>Verified region backup: {0} bytes, SHA-256 {1}, {2}</value></data>
+  <data name="BackupVerify" xml:space="preserve"><value>Verify DoIP backup</value></data>
+  <data name="BackupVerified" xml:space="preserve"><value>Archive integrity verified: {0} bytes, SHA-256 {1}. This check does not establish hardware provenance.</value></data>
+  <data name="ExpectedVin" xml:space="preserve"><value>Expected VIN (leave IP blank to discover)</value></data>
+  <data name="InvalidExpectedVin" xml:space="preserve"><value>Enter a valid 17-character VIN.</value></data>
+  <data name="VinDiscoveryStarted" xml:space="preserve"><value>Discovering DoIP gateway for VIN {0}</value></data>
+  <data name="TraceIncomplete" xml:space="preserve"><value>DoIP history incomplete: receive buffer limit exceeded.</value></data>
+  <data name="Exchange" xml:space="preserve"><value>Send UDS command(s)</value></data>
+  <data name="Payload" xml:space="preserve"><value>UDS command(s) (hex; separated by ;)</value></data>
+  <data name="InvalidPayload" xml:space="preserve"><value>Enter 1–16 hexadecimal commands separated by semicolons.</value></data>
+  <data name="ExpectedVinRequired" xml:space="preserve"><value>Enter the expected VIN and discover the matching gateway before sending.</value></data>
+  <data name="ExchangeTarget" xml:space="preserve"><value>VIN {0}, gateway {1}, ECU 0x{2:X4}, tester 0x{3:X4}, {4}, command {5}</value></data>
+  <data name="ExchangeWarning" xml:space="preserve"><value>This command may change or erase ECU data and render the ECU unusable. Select OK to continue to the separate confirmation.</value></data>
+  <data name="ExchangeWarningTitle" xml:space="preserve"><value>ECU command warning</value></data>
+  <data name="ExchangeConfirm" xml:space="preserve"><value>Send this exact sequence to the selected ECU? Stops on the first error. No cancels without sending.</value></data>
+  <data name="ExchangeStarted" xml:space="preserve"><value>DoIP / {0} / UDS: command at {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="ExchangeResult" xml:space="preserve"><value>ECU response: {0}</value></data>
+  <data name="CountDtcs" xml:space="preserve"><value>Count DTCs</value></data>
+  <data name="DtcCountResult" xml:space="preserve"><value>DTC count={0}; requested mask=0x{1:X2}; available mask=0x{2:X2}; format=0x{3:X2}; effective mask=0x{4:X2}</value></data>
+  <data name="Snapshot" xml:space="preserve"><value>Read snapshot</value></data>
+  <data name="Extended" xml:space="preserve"><value>Read extended data</value></data>
+  <data name="DetailDtc" xml:space="preserve"><value>DTC (6 hex digits)</value></data>
+  <data name="DetailRecord" xml:space="preserve"><value>Record (hex)</value></data>
+  <data name="InvalidDetail" xml:space="preserve"><value>Enter a six-digit hexadecimal DTC and nonzero two-digit record.</value></data>
+  <data name="DetailResult" xml:space="preserve"><value>DTC 0x{0:X6}; status 0x{1:X2}; raw records: {2}</value></data>
+  <data name="SequenceReply" xml:space="preserve"><value>Command #{0}: ECU response {1}</value></data>
+  <data name="SequenceComplete" xml:space="preserve"><value>Sequence complete: {0} responses.</value></data>
+  <data name="ObdIdentify" xml:space="preserve"><value>Identify OBDonUDS</value></data>
+  <data name="ObdRead" xml:space="preserve"><value>Read OBDonUDS DID</value></data>
+  <data name="ObdInvalidDid" xml:space="preserve"><value>Select a legislated DID from F400 to F8FF.</value></data>
+  <data name="ObdVerified" xml:space="preserve"><value>OBDonUDS confirmed (F810={0:X2}); VIN {1}.</value></data>
+  <data name="ObdUnknown" xml:space="preserve"><value>OBDonUDS not confirmed (F810={0:X2}); VIN {1}.</value></data>
+  <data name="ObdMonitor" xml:space="preserve"><value>Monitor OBDonUDS DID</value></data>
+  <data name="ObdMonitorSample" xml:space="preserve"><value>OBDonUDS sample {0}: DID {1:X4} = {2}</value></data>
+  <data name="ObdMonitorComplete" xml:space="preserve"><value>OBDonUDS monitoring complete: {0} samples, ECU identity rechecked.</value></data>
+  <data name="SessionP2" xml:space="preserve"><value>P2 (ms, blank = total)</value></data>
+  <data name="SessionP2Star" xml:space="preserve"><value>P2* (ms, blank = total)</value></data>
+  <data name="RoutingType" xml:space="preserve"><value>Routing type (hex)</value></data>
+  <data name="RoutingOem" xml:space="preserve"><value>OEM routing data (8 hex, optional)</value></data>
+  <data name="InvalidSessionOptions" xml:space="preserve"><value>Invalid session options. Check timing and routing fields.</value></data>
+  <data name="SessionSummary" xml:space="preserve"><value>Timeout {0} ms; P2 {1} ms; P2* {2} ms; routing {3:X2}; OEM {4}</value></data>
+  <data name="WwhMask" xml:space="preserve"><value>Read WWH DTCs</value></data>
+  <data name="WwhPermanent" xml:space="preserve"><value>Read permanent WWH DTCs</value></data>
+  <data name="WwhReadiness" xml:space="preserve"><value>Read WWH readiness DTCs</value></data>
+  <data name="WwhSeverity" xml:space="preserve"><value>WWH severity mask (hex)</value></data>
+  <data name="WwhGroup" xml:space="preserve"><value>WWH readiness group (hex)</value></data>
+  <data name="WwhResult" xml:space="preserve"><value>WWH 0x{0:X2}: {1} DTCs; status mask 0x{2:X2}; format 0x{3:X2}</value></data>
+  <data name="WwhMetadata" xml:space="preserve"><value>Severity availability: {0}; readiness group: {1}</value></data>
+  <data name="WwhFilters" xml:space="preserve"><value>Requested/effective status: 0x{0:X2} / 0x{1:X2} · requested/effective severity: 0x{2:X2} / 0x{3:X2}</value></data>
+  <data name="WwhFilterUnavailable" xml:space="preserve"><value>At least one WWH filter is unavailable; the result cannot establish absence of emissions faults.</value></data>
+  <data name="WwhRecord" xml:space="preserve"><value>DTC {0:X6}; status {1:X2}; severity {2}</value></data>
+  <data name="MultiLayout" xml:space="preserve"><value>DID lengths (0xHHHH:bytes, ...)</value></data>
+  <data name="MultiRead" xml:space="preserve"><value>Read multiple UDS DIDs</value></data>
+  <data name="ObdMultiRead" xml:space="preserve"><value>Read multiple OBD DIDs</value></data>
+  <data name="InvalidMultiLayout" xml:space="preserve"><value>Invalid DID layout or non-legislated OBD DID.</value></data>
+  <data name="MultiResult" xml:space="preserve"><value>DID {0:X4} ({1} bytes): {2}</value></data>
+  <data name="ScalingDid" xml:space="preserve"><value>Read UDS scaling data</value></data>
+  <data name="ScalingResult" xml:space="preserve"><value>DID {0:X4} scaling data (raw): {1}</value></data>
+  <data name="ObdDtcs" xml:space="preserve"><value>Read OBDonUDS DTCs</value></data>
+  <data name="ObdCount" xml:space="preserve"><value>Count OBDonUDS DTCs</value></data>
+  <data name="ObdSnapshot" xml:space="preserve"><value>OBDonUDS snapshot</value></data>
+  <data name="ObdExtended" xml:space="preserve"><value>OBDonUDS extended data</value></data>
+  <data name="SupportedDtcs" xml:space="preserve"><value>Supported DTCs</value></data>
+  <data name="LegacyMirrorDtcs" xml:space="preserve"><value>Legacy mirror DTCs</value></data>
+  <data name="LegacyMirrorCount" xml:space="preserve"><value>Legacy mirror DTC count</value></data>
+  <data name="LegacyMirrorExtended" xml:space="preserve"><value>Legacy mirror extended data</value></data>
+  <data name="LegacyEmissionsDtcs" xml:space="preserve"><value>Legacy emissions DTCs</value></data>
+  <data name="LegacyEmissionsCount" xml:space="preserve"><value>Legacy emissions DTC count</value></data>
+  <data name="LegacyMirrorResult" xml:space="preserve"><value>Legacy UDS mirror memory</value></data>
+  <data name="LegacyEmissionsResult" xml:space="preserve"><value>Legacy UDS emissions</value></data>
+  <data name="StoredRecord" xml:space="preserve"><value>Read stored DTC data by record</value></data>
+  <data name="InvalidStoredRecord" xml:space="preserve"><value>Select one stored record 00..FE.</value></data>
+  <data name="StoredRecordResult" xml:space="preserve"><value>Stored record 0x{0:X2}</value></data>
+  <data name="StoredRecordCount" xml:space="preserve"><value>Declared DID count: {0}</value></data>
+  <data name="AllStoredRecords" xml:space="preserve"><value>Read all stored records</value></data>
+  <data name="StoredCatalog" xml:space="preserve"><value>Documented DID lengths (F40C:2,F40D:1)</value></data>
+  <data name="InvalidStoredCatalog" xml:space="preserve"><value>Enter documented DID lengths.</value></data>
+  <data name="AllStoredResult" xml:space="preserve"><value>Stored records: {0}</value></data>
+  <data name="DecodedExtended" xml:space="preserve"><value>Decoded UDS extended data</value></data>
+  <data name="ObdDecodedExtended" xml:space="preserve"><value>Decoded OBDonUDS extended data</value></data>
+  <data name="ExtendedCatalog" xml:space="preserve"><value>Documented record lengths (01:2,90:1)</value></data>
+  <data name="InvalidExtendedCatalog" xml:space="preserve"><value>Enter documented lengths and a valid record number.</value></data>
+  <data name="DecodedExtendedResult" xml:space="preserve"><value>DTC {0:X6} — status {1:X2} — records: {2}</value></data>
+  <data name="DecodedExtendedEntry" xml:space="preserve"><value>Record 0x{0:X2}: {1}</value></data>
+  <data name="MemoryDecodedSnapshot" xml:space="preserve"><value>Decoded memory snapshots</value></data>
+  <data name="MemoryDecodedExtended" xml:space="preserve"><value>Decoded memory extended data</value></data>
+  <data name="DecodedSnapshot" xml:space="preserve"><value>Decoded UDS snapshots</value></data>
+  <data name="ObdDecodedSnapshot" xml:space="preserve"><value>Decoded OBDonUDS snapshots</value></data>
+  <data name="DecodedSnapshotResult" xml:space="preserve"><value>DTC {0:X6} — status {1:X2} — snapshots: {2}</value></data>
+  <data name="SnapshotRecordResult" xml:space="preserve"><value>Snapshot 0x{0:X2}</value></data>
+  <data name="DecodedStoredRecord" xml:space="preserve"><value>Decoded stored record</value></data>
+  <data name="StoredRecordEmpty" xml:space="preserve"><value>No stored data for this record</value></data>
+  <data name="ExtendedRecordSupport" xml:space="preserve"><value>DTCs supporting extended record</value></data>
+  <data name="ExtendedRecordSize" xml:space="preserve"><value>Uniform documented record length (bytes)</value></data>
+  <data name="ExtendedRecordData" xml:space="preserve"><value>Read extended record data</value></data>
+  <data name="InvalidExtendedRecord" xml:space="preserve"><value>Select record 01..EF and valid documented length.</value></data>
+  <data name="ExtendedRecordResult" xml:space="preserve"><value>Record 0x{0:X2}: {1} DTCs</value></data>
+  <data name="ExtendedRecordMask" xml:space="preserve"><value>Available status mask 0x{0:X2}</value></data>
+  <data name="MemorySelection" xml:space="preserve"><value>DTC memory (hex)</value></data>
+  <data name="MemoryDtcs" xml:space="preserve"><value>Read memory DTCs</value></data>
+  <data name="MemorySnapshot" xml:space="preserve"><value>Memory snapshot</value></data>
+  <data name="MemoryExtended" xml:space="preserve"><value>Memory extended data</value></data>
+  <data name="InvalidMemorySelection" xml:space="preserve"><value>Invalid DTC memory selector.</value></data>
+  <data name="MemoryResult" xml:space="preserve"><value>DTC memory 0x{0:X2}</value></data>
+  <data name="MemoryDetailResult" xml:space="preserve"><value>DTC 0x{0:X6}, status 0x{1:X2}, raw records {2}</value></data>
+  <data name="PermanentDtcs" xml:space="preserve"><value>Permanent UDS DTCs</value></data>
+  <data name="PermanentResult" xml:space="preserve"><value>Permanent DTCs: {0}; available status mask 0x{1:X2}</value></data>
+  <data name="SnapshotIndex" xml:space="preserve"><value>Snapshot index</value></data>
+  <data name="SupportedResult" xml:space="preserve"><value>Supported DTCs: {0}; available status mask 0x{1:X2}</value></data>
+  <data name="SnapshotIndexResult" xml:space="preserve"><value>Available snapshot records: {0}</value></data>
+  <data name="SnapshotIndexEntry" xml:space="preserve"><value>DTC 0x{0:X6}, record 0x{1:X2}</value></data>
+  <data name="MultiMonitor" xml:space="preserve"><value>Monitor multiple UDS DIDs</value></data>
+  <data name="ObdMultiMonitor" xml:space="preserve"><value>Monitor multiple OBDonUDS DIDs</value></data>
+  <data name="MultiMonitorSample" xml:space="preserve"><value>Provisional sample {0}: {1}</value></data>
+  <data name="MultiMonitorComplete" xml:space="preserve"><value>Verified multi-DID samples: {0}</value></data>
+  <data name="FirstFailed" xml:space="preserve"><value>First failed DTC</value></data>
+  <data name="FirstConfirmed" xml:space="preserve"><value>First confirmed DTC</value></data>
+  <data name="RecentFailed" xml:space="preserve"><value>Most recent failed DTC</value></data>
+  <data name="RecentConfirmed" xml:space="preserve"><value>Most recent confirmed DTC</value></data>
+  <data name="NoHistoricalDtc" xml:space="preserve"><value>No matching historical DTC</value></data>
+  <data name="FaultCounters" xml:space="preserve"><value>Fault detection counters</value></data>
+  <data name="FaultCountersResult" xml:space="preserve"><value>Fault detection counters: {0} records</value></data>
+  <data name="FaultCounterEntry" xml:space="preserve"><value>DTC 0x{0:X6}, counter {1}</value></data>
+  <data name="SeverityMask" xml:space="preserve"><value>UDS severity mask (hex)</value></data>
+  <data name="SeverityCount" xml:space="preserve"><value>Count by severity</value></data>
+  <data name="SeverityList" xml:space="preserve"><value>DTCs by severity</value></data>
+  <data name="SeverityInfo" xml:space="preserve"><value>DTC severity information</value></data>
+  <data name="SeverityCountResult" xml:space="preserve"><value>Matching DTCs: {0}; availability 0x{1:X2}; format 0x{2:X2}</value></data>
+  <data name="SeverityListResult" xml:space="preserve"><value>Severity records: {0}; availability 0x{1:X2}</value></data>
+  <data name="SeverityRecord" xml:space="preserve"><value>DTC 0x{0:X6} — severity 0x{1:X2}, unit 0x{2:X2}, status 0x{3:X2}</value></data>
+  <data name="Inventory" xml:space="preserve"><value>ECU inventory</value></data>
+  <data name="InventoryAddresses" xml:space="preserve"><value>ECU addresses (hex, comma-separated)</value></data>
+  <data name="InventoryStarted" xml:space="preserve"><value>Checking explicit ECU addresses: {0}</value></data>
+  <data name="InventoryVerified" xml:space="preserve"><value>ECU 0x{0:X4}: VIN verified ({1})</value></data>
+  <data name="InventoryUnverified" xml:space="preserve"><value>ECU 0x{0:X4}: not verified (not proof of absence)</value></data>
+  <data name="InventoryComplete" xml:space="preserve"><value>Inventory complete: {0}/{1} VINs verified</value></data>
+  <data name="ObdInventory" xml:space="preserve"><value>OBDonUDS ECU inventory</value></data>
+  <data name="InventoryObdSupported" xml:space="preserve"><value>ECU 0x{0:X4}: OBDonUDS identified (0x{1:X2})</value></data>
+  <data name="InventoryObdUnrecognized" xml:space="preserve"><value>ECU 0x{0:X4}: OBDonUDS not identified (F810 = 0x{1:X2})</value></data>
+  <data name="MonitorPartial" xml:space="preserve"><value>Incomplete capture: {0}/{1} verified samples.</value></data>
+  <data name="InventoryProgress" xml:space="preserve"><value>Inventory: {0}/{1} targets examined (partial)</value></data>
+  <data name="InventoryReasonTimeout" xml:space="preserve"><value>Response timed out.</value></data>
+  <data name="InventoryReasonIdentity" xml:space="preserve"><value>ECU identity or diagnostic response is invalid.</value></data>
+  <data name="InventoryReasonCommunication" xml:space="preserve"><value>Communication or identity verification failed.</value></data>
+  <data name="InventoryReasonNrc" xml:space="preserve"><value>ECU returned a negative UDS response.</value></data>
+  <data name="InventoryReasonHeader" xml:space="preserve"><value>DoIP header rejected.</value></data>
+  <data name="InventoryReasonRouting" xml:space="preserve"><value>DoIP routing activation denied.</value></data>
+  <data name="InventoryReasonAck" xml:space="preserve"><value>DoIP diagnostic acknowledgement rejected.</value></data>
 </root>

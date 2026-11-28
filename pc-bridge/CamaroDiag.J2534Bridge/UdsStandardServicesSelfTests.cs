@@ -20,6 +20,11 @@ internal static class UdsStandardServicesSelfTests
 
         void Equal(byte[] bytes, string expected, string name) =>
             Check(Convert.ToHexString(bytes) == expected, name);
+        UdsServiceRefusal? serviceRefusal = null;
+        try { UdsStandardServices.RequireResponse([0x22, 0xF1, 0x90], [0x7F, 0x22, 0x31]); }
+        catch (UdsServiceRefusal error) { serviceRefusal = error; }
+        Check(serviceRefusal is not null && serviceRefusal.Service == 0x22 && serviceRefusal.Code == 0x31,
+            "A correlated UDS rejection preserves its service and NRC.");
         Equal(UdsStandardServices.Session(0x02), "1002", "Programming session");
         Equal(UdsStandardServices.Reset(0x01), "1101", "ECU reset");
         Equal(UdsStandardServices.TesterPresent(true), "3E80",

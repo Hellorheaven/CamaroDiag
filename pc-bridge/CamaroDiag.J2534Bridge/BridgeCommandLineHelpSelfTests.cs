@@ -39,10 +39,21 @@ internal static class BridgeCommandLineHelpSelfTests
             Require(french.Contains(option, StringComparison.Ordinal), "French " + option);
         }
         foreach (var option in new[] {
-            "--doip-discover", "--doip-status", "--doip-exchange",
+            "--doip-discover", "--doip-status", "--doip-exchange", "--doip-backup", "--doip-verify-backup", "--confirm-read true",
             "--listen-ipv6-ifindex", "--multicast-ipv6-ifindex",
-            "--doip-version", "--uds-p2-ms", "--uds-p2-star-ms",
+            "--doip-version", "--uds-p2-ms", "--uds-p2-star-ms", "--sequence", "--expected-vin",
             "--power-mode true", "--broadcast-ip", "--vin", "--eid",
+            "--trace-file", "--routing-activation-type", "--routing-oem-data",
+            "--monitor-did", "--obd-monitor-did", "--monitor-dids", "--obd-monitor-dids",
+            "--samples", "--interval-ms", "--ecu-inventory",
+            "--uds-did", "--uds-scaling-did", "--uds-dtc-mask", "--uds-dtc-count-mask",
+            "--uds-snapshot", "--uds-snapshot-record", "--uds-extended-dtc", "--uds-extended-record",
+            "--uds-supported-dtcs", "--uds-permanent-dtcs", "--uds-snapshot-index", "--uds-historical-dtc", "--uds-fault-counters", "--obd-identify",
+            "--uds-severity-count", "--uds-severity-list", "--uds-severity-status", "--uds-severity-info",
+            "--uds-memory", "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended", "--uds-memory-record",
+            "--uds-stored-record", "--uds-extended-record-support", "--uds-extended-record-data", "--uds-extended-record-size",
+            "--uds-mirror-mask", "--uds-mirror-count", "--uds-mirror-extended", "--uds-mirror-record",
+            "--uds-legacy-emissions-mask", "--uds-legacy-emissions-count",
             "--tls true", "--tester", "--ecu", "--payload"
         })
         {

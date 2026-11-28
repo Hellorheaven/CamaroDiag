@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 
 namespace CamaroDiag.J2534Bridge;
 
@@ -10,6 +11,27 @@ namespace CamaroDiag.J2534Bridge;
 /// </summary>
 internal static class NativeE39BenchWorkflow
 {
+    // An E39 programming session changes diagnostic/security state long
+    // before the first flash erase. Reserve the actual transport from
+    // identity preflight through RAM loading, full-image verification and
+    // final durable journal completion, not just the inner flash link.
+    private static readonly ConditionalWeakTable<ITransport, SemaphoreSlim> TransportGates = new();
+
+    private sealed class TransportLease(SemaphoreSlim gate) : IDisposable
+    {
+        private SemaphoreSlim? owner = gate;
+        public void Dispose() => Interlocked.Exchange(ref owner, null)?.Release();
+    }
+
+    private static IDisposable ReserveTransport(ITransport transport)
+    {
+        var gate = TransportGates.GetValue(transport, static _ => new SemaphoreSlim(1, 1));
+        if (!gate.Wait(0))
+            throw new InvalidOperationException(
+                "Another E39 programming workflow already owns this physical transport.");
+        return new TransportLease(gate);
+    }
+
     internal interface ITransport : NativeE39ProgrammingSession.ITransport, NativeE39RamLoader.ILink
     {
         Task<NativeGmlanIdentification.Identity> ReadIdentityAsync(CancellationToken cancellationToken);
@@ -80,19 +102,29 @@ internal static class NativeE39BenchWorkflow
     {
         ArgumentNullException.ThrowIfNull(transport);
         ArgumentNullException.ThrowIfNull(journal);
+        // Do not send session/seed-key/kernel commands before reserving this
+        // adapter transport. Other distinct transports are unaffected.
+        using var exclusiveTransport = ReserveTransport(transport);
         var prepared = Prepare(policy, backup, original, target, kernel);
         var q = policy.Session;
         var session = (NativeE39ProgrammingSession.ITransport)transport;
         token.ThrowIfCancellationRequested();
         var first = await transport.ReadIdentityAsync(token);
+        // A vendor driver may return an identity even after the caller
+        // cancelled. Do not issue the second probe or enter programming mode.
+        token.ThrowIfCancellationRequested();
         var second = await transport.ReadIdentityAsync(token);
+        token.ThrowIfCancellationRequested();
         var identity = NativeGmlanBenchProbe.RequireStableIdentity(first, second);
         await NativeE39ProgrammingSession.PrepareAsync(session, identity, q, token);
+        token.ThrowIfCancellationRequested();
         await NativeE39RamLoader.StageAsync(transport, prepared.Kernel,
             q.MinimumSupplyMillivolts, q.MaximumSupplyMillivolts, token);
+        token.ThrowIfCancellationRequested();
         var link = new NativeE39KernelLink(session.ExchangeAsync, session.ReadSupplyMillivoltsAsync,
             policy.MaximumReadBytes);
         await link.ProbeAsync(token);
+        token.ThrowIfCancellationRequested();
 
         // Full fresh read of the physical main flash, including unchanged
         // regions, before ANY erase is admitted.
@@ -117,11 +149,15 @@ internal static class NativeE39BenchWorkflow
         {
             token.ThrowIfCancellationRequested();
             uint? supply = await link.ReadSupplyMillivoltsAsync(token);
+            // Some adapter drivers can return a value after cancellation.
+            // Never treat that late result as a valid preflight or completion.
+            token.ThrowIfCancellationRequested();
             if (!supply.HasValue || supply.Value < options.MinimumSupplyMillivolts ||
                 supply.Value > options.MaximumSupplyMillivolts)
                 throw new IOException("Unsafe supply during complete image verification.");
             int length = Math.Min(chunkSize, expected.Length - offset);
             byte[] actual = await link.ReadFlashBytesAsync((uint)offset, length, token);
+            token.ThrowIfCancellationRequested();
             if (actual.Length != length ||
                 !CryptographicOperations.FixedTimeEquals(actual, expected.AsSpan(offset, length)))
                 throw new InvalidDataException($"Complete native image differs at chunk 0x{offset:X6}.");
@@ -136,11 +172,16 @@ internal static class NativeE39BenchWorkflow
             uint address, byte[] liveBytes, string sha256, CancellationToken token) =>
             journal.PreserveOriginalBlockAsync(address, liveBytes, sha256, token);
 
+        public Task RequireOriginalBlocksIntactAsync(CancellationToken token) =>
+            journal.RequireOriginalBlocksIntactAsync(token);
+
         public async Task AppendAsync(NativeE39WriteSequence.Event evidence, CancellationToken token)
         {
             if (evidence.Phase == NativeE39WriteSequence.Phase.Completed)
             {
                 await RequireImageAsync(link, expected, options, token);
+                await journal.RequireOriginalBlocksIntactAsync(token);
+                token.ThrowIfCancellationRequested();
                 evidence = evidence with { Detail = evidence.Detail + ";FullImageSHA256=" + Hash(expected) };
             }
             await journal.AppendAsync(evidence, token);

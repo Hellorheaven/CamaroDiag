@@ -46,13 +46,13 @@ internal sealed partial class BridgeDesktopForm
     {
         var tab = new TabPage("Téléchargements Debug");
         var panel = Grid();
-        WideRow(panel, new Label
-        {
-            AutoSize = true, Dock = DockStyle.Fill, ForeColor = Color.DarkSlateGray,
-            Text = "Versions Debug de la PR active. Chaque ZIP provient d'un véritable " +
-                   "artefact GitHub Actions non expiré. Le téléchargement s'ouvre " +
-                   "dans votre navigateur : GitHub exige sa propre connexion."
-        }, 65);
+        // WideRow(panel, new Label
+        // {
+            // AutoSize = true, Dock = DockStyle.Fill, ForeColor = Color.DarkSlateGray,
+            // Text = "Versions Debug de la PR active. Chaque ZIP provient d'un véritable " +
+                   // "artefact GitHub Actions non expiré. Le téléchargement s'ouvre " +
+                   // "dans votre navigateur : GitHub exige sa propre connexion."
+        // }, 65);
         Row(panel, "Compte privé", debugBuildAuthStatus, debugBuildGoogleSignIn, 56);
         WideRow(panel, debugBuildRefresh, 43);
         WideRow(panel, debugBuildAndroidOpen, 47);

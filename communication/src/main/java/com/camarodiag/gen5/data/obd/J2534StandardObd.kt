@@ -8,7 +8,14 @@ import java.util.Locale
  * The caller supplies a physical channel and must correlate its CAN ID.
  */
 internal object J2534StandardObd {
-    fun supportsChannel(request: Int, response: Int, protocol: Int): Boolean =
+    fun supportsChannel(request: Int, response: Int, protocol: Int): Boolean {
+        if (protocol in setOf(33, 35)) return request in 0x7E0..0x7E7 && response == request + 8
+        if (protocol !in setOf(34, 36) || (request and 0xFF00.inv()) != 0x18DA00F1) return false
+        val address = (request shr 8) and 0xFF
+        return address !in setOf(0xF1, 0xFE, 0xFF) && response == (0x18DAF100 or address)
+    }
+
+    fun supportsPrimaryChannel(request: Int, response: Int, protocol: Int): Boolean =
         (protocol in setOf(33, 35) && request == 0x7E0 && response == 0x7E8) ||
             (protocol in setOf(34, 36) && request == 0x18DA10F1 && response == 0x18DAF110)
 
@@ -43,20 +50,40 @@ internal object J2534StandardObd {
 
     private fun ByteArray.u(index: Int): Int = this[index].toInt() and 0xFF
 
+    /** Mode 09 PID 02 on a physical ISO-TP channel has a single VIN record. */
+    fun vinData(reply: ByteArray): String? {
+        if (isExplicitlyUnsupported(9, reply)) return null
+        if (reply.size != 20 || reply.u(0) != 0x49 || reply.u(1) != 2 || reply.u(2) != 1)
+            return null
+        return reply.copyOfRange(3, 20).toString(Charsets.US_ASCII)
+            .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+    }
+
+    fun stableOdometerVin(before: String?, after: String?): String? {
+        check(before == null || after == null || before == after) {
+            "Vehicle VIN changed during odometer read."
+        }
+        return before?.takeIf { it == after }
+    }
+
     fun pidData(pid: Int, reply: ByteArray): ByteArray {
         require(pid in 0..255)
         require(reply.size >= 3 && reply.u(0) == 0x41 && reply.u(1) == pid) {
             "Invalid or negative Mode 01 response."
         }
-        // Enforce exact data length for the standard signals used by the
-        // fuel/ethanol monitor. ISO-TP padding is not part of a J2534 payload.
+        // Enforce exact data length for known Mode 01 signals, including
+        // raw/encoded signals. ISO-TP padding is not part of a J2534 payload.
         val expected = when (pid) {
-            0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0, 0x01,
-            0x24, 0x25, 0x34, 0x35, 0xA6 -> 4
-            0x0C, 0x10, 0x14, 0x15, 0x16, 0x17, 0x1F, 0x42, 0x43, 0x44 -> 2
+            0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0, 0xE0, 0x01,
+            0x24, 0x25, 0x28, 0x29, 0x34, 0x35, 0x38, 0x39, 0xA6 -> 4
+            0x0C, 0x10, 0x14, 0x15, 0x16, 0x17, 0x1F,
+            0x21, 0x22, 0x23, 0x31, 0x32, 0x3C, 0x3D, 0x3E, 0x3F,
+            0x42, 0x43, 0x44, 0x4D, 0x4E, 0x53, 0x54, 0x59,
+            0x5D, 0x5E, 0x63 -> 2
             0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
-            0x0D, 0x0E, 0x0F, 0x11, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A,
-            0x4B, 0x4C, 0x52 -> 1
+            0x0D, 0x0E, 0x0F, 0x11, 0x13, 0x1D, 0x2C, 0x2D, 0x2E,
+            0x2F, 0x30, 0x33, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A,
+            0x4B, 0x4C, 0x52, 0x5A, 0x5B, 0x5C, 0x61, 0x62 -> 1
             else -> null // unknown/nonstandard PIDs require their own decoder
         }
         require(expected == null || reply.size == expected + 2) {
@@ -73,7 +100,9 @@ internal object J2534StandardObd {
         val pids = (0 until 31).filter { index ->
             bitmap.u(index / 8) and (1 shl (7 - index % 8)) != 0
         }.map { base + it + 1 }.toSet()
-        return pids to (base < 0xE0 && bitmap.u(3) and 1 != 0)
+        val continuation = bitmap.u(3) and 1 != 0
+        require(base < 0xE0 || !continuation) { "PID support continuation exceeds the one-byte PID space." }
+        return pids to continuation
     }
 
     fun dtcs(mode: Int, reply: ByteArray): List<ObdDtc> {
@@ -102,6 +131,13 @@ internal object J2534StandardObd {
     fun optionalDtcs(mode: Int, reply: ByteArray): List<ObdDtc>? =
         if (mode in setOf(7,10) && isExplicitlyUnsupported(mode,reply)) null
         else dtcs(mode,reply)
+
+    /** Inventory all three modes independently. Explicit refusal is unavailable,
+     * while malformed replies and other NRCs remain errors. */
+    fun evidenceDtcs(mode: Int, reply: ByteArray): List<ObdDtc>? {
+        require(mode in setOf(3, 7, 10))
+        return if (isExplicitlyUnsupported(mode, reply)) null else dtcs(mode, reply)
+    }
 
     fun isExplicitlyUnsupported(mode: Int, reply: ByteArray): Boolean =
         reply.size == 3 && reply.u(0) == 0x7F && reply.u(1) == mode &&

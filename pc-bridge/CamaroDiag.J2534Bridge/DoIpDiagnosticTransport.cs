@@ -19,15 +19,65 @@ namespace CamaroDiag.J2534Bridge;
 /// </summary>
 internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
 {
+    internal sealed record SessionOptions(int P2Ms, int P2StarMs, byte RoutingType, string OemHex)
+    {
+        internal static SessionOptions Parse(int totalMs, string p2, string p2Star, string routing, string oem)
+        {
+            if (routing.Length != 2 || !byte.TryParse(routing,
+                System.Globalization.NumberStyles.AllowHexSpecifier,
+                System.Globalization.CultureInfo.InvariantCulture, out var routingType))
+                throw new ArgumentException("Routing type must contain two hexadecimal digits.");
+            static int Stage(string value, int fallback) => string.IsNullOrWhiteSpace(value) ? fallback :
+                int.TryParse(value, System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed :
+                    throw new ArgumentException("Invalid UDS response timing.");
+            var options = new SessionOptions(Stage(p2, totalMs), Stage(p2Star, totalMs),
+                routingType, oem.ToUpperInvariant());
+            options.Validate(TimeSpan.FromMilliseconds(totalMs));
+            return options;
+        }
+
+        internal void Validate(TimeSpan total)
+        {
+            if (P2Ms < 1 || P2StarMs < P2Ms || P2StarMs > total.TotalMilliseconds ||
+                OemHex is null || (OemHex.Length != 0 && (OemHex.Length != 8 || !OemHex.All(Uri.IsHexDigit))))
+                throw new ArgumentException("Invalid bounded UDS timing or four-byte OEM routing data.");
+        }
+
+        internal byte[]? OemBytes => OemHex.Length == 0 ? null : Convert.FromHexString(OemHex);
+    }
+
+    private readonly SessionOptions? sessionOptions;
     private readonly TcpClient socket;
     private readonly Stream stream;
     private readonly ushort testerAddress;
     private readonly ushort ecuAddress;
+    private ushort? routedGatewayAddress;
+    internal bool MatchesLogicalTarget(ushort gateway, ushort tester, ushort ecu) =>
+        routedGatewayAddress == gateway && testerAddress == tester && ecuAddress == ecu;
     private readonly byte protocolVersion;
+    internal sealed record PduTrace(string Direction, DateTimeOffset ObservedAtUtc, byte[] Bytes);
+    internal sealed class TraceObserverException(Exception inner)
+        : InvalidOperationException("DoIP trace observer failed: " + inner.Message, inner) { }
+    private readonly Action<PduTrace>? trace;
+    private void Trace(string direction, byte[] frame)
+    {
+        // Give the observer a private copy; it cannot alter a transmitted
+        // request or received response. Includes diagnostic and control PDUs.
+        if (trace is null) return;
+        try { trace(new PduTrace(direction, DateTimeOffset.UtcNow, frame.ToArray())); }
+        catch (Exception error)
+        {
+            // Evidence sink errors must never be mistaken for ECU timeouts
+            // or communication failures eligible for inventory continuation.
+            throw new TraceObserverException(error);
+        }
+    }
     // 0 = ready, 1 = one UDS exchange in progress, 2 = closed/uncertain.
     // DoIP carries no per-request transaction ID. A late reply after a
     // failed exchange could otherwise be mistaken for a fresh request.
     private int exchangeState;
+    private readonly object exchangeBoundary = new();
     private int disposed;
     // One owner reads from the TCP stream for the entire activated session.
     // Gateway AliveChecks must be answered even while no UDS exchange runs.
@@ -41,18 +91,28 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             FullMode = BoundedChannelFullMode.Wait
         });
     private readonly SemaphoreSlim writeGate = new(1, 1);
+    // The route belongs to one complete application operation, not merely
+    // each request/reply inside a confirmed multi-command sequence.
+    private readonly SemaphoreSlim operationGate = new(1, 1);
     private readonly CancellationTokenSource lifetime = new();
     private Task? receiveTask;
     private Exception? receiveFailure;
+    // A clean EOF between PDUs is not equivalent to a truncated PDU.
+    private sealed class PeerClosedAtBoundaryException : EndOfStreamException
+    {
+        internal PeerClosedAtBoundaryException() : base("DoIP peer closed at a PDU boundary.") { }
+    }
 
     private DoIpDiagnosticTransport(TcpClient socket, Stream dataStream,
-        ushort tester, ushort ecu, byte version)
+        ushort tester, ushort ecu, byte version, Action<PduTrace>? trace, SessionOptions? sessionOptions)
     {
         this.socket = socket;
         stream = dataStream;
         testerAddress = tester;
         ecuAddress = ecu;
         protocolVersion = version;
+        this.trace = trace;
+        this.sessionOptions = sessionOptions;
     }
 
     internal static async Task<DoIpDiagnosticTransport> ConnectAsync(
@@ -61,8 +121,17 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         byte protocolVersion = DoIpCodec.Version,
         string? clientCertificateThumbprint = null,
         int? portOverride = null, byte activationType = 0x00,
-        byte[]? activationOemData = null, ushort? expectedGatewayAddress = null)
+        byte[]? activationOemData = null, ushort? expectedGatewayAddress = null,
+        Action<PduTrace>? trace = null, SessionOptions? sessionOptions = null)
     {
+        if (sessionOptions is not null)
+        {
+            sessionOptions.Validate(timeout);
+            if (activationType != 0 || activationOemData is not null)
+                throw new ArgumentException("Use one source of routing activation parameters.");
+            activationType = sessionOptions.RoutingType;
+            activationOemData = sessionOptions.OemBytes;
+        }
         if (string.IsNullOrWhiteSpace(host) || host.Length > 253 ||
             tester == ecu || timeout <= TimeSpan.Zero ||
             timeout > TimeSpan.FromSeconds(30) ||
@@ -71,6 +140,9 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             (activationOemData is not null && activationOemData.Length != 4) ||
             (clientCertificateThumbprint is not null && !useTls))
             throw new ArgumentException("Explicit gateway, distinct logical addresses and timeout required.");
+        if (System.Net.IPAddress.TryParse(host, out var numericAddress) &&
+            !DoIpVehicleDiscovery.IsExplicitUnicast(numericAddress))
+            throw new ArgumentException("Explicit unicast address and IPv6 scope required.");
         cancellationToken.ThrowIfCancellationRequested();
         // Freeze the caller-owned OEM routing bytes before any asynchronous I/O.
         var fixedActivationOemData = activationOemData?.ToArray();
@@ -91,7 +163,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                     FindClientCertificate(clientCertificateThumbprint);
                 var authentication = new SslClientAuthenticationOptions
                 {
-                    TargetHost = host,
+                    TargetHost = DoIpVehicleDiscovery.TlsServerName(host),
                     EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
                     CertificateRevocationCheckMode = X509RevocationMode.Online
                 };
@@ -99,10 +171,16 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                     authentication.ClientCertificates =
                         new X509CertificateCollection { clientCert };
                 await tls.AuthenticateAsClientAsync(authentication, deadline.Token);
+                if (clientCert is not null &&
+                    (!tls.IsMutuallyAuthenticated || tls.LocalCertificate is null ||
+                     !string.Equals(tls.LocalCertificate.GetCertHashString(), clientCert.Thumbprint,
+                         StringComparison.OrdinalIgnoreCase)))
+                    throw new AuthenticationException(
+                        "The selected TLS client certificate was not used for mutual authentication.");
                 dataStream = tls;
             }
             var session = new DoIpDiagnosticTransport(socket, dataStream,
-                tester, ecu, protocolVersion);
+                tester, ecu, protocolVersion, trace, sessionOptions);
             await session.SendAsync(DoIpCodec.RoutingActivation(
                 tester, activationType: activationType,
                 version: protocolVersion,
@@ -118,10 +196,10 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 // Receiving a routing message concurrently with a timer's
                 // expiry cannot retroactively activate an expired session.
                 deadline.Token.ThrowIfCancellationRequested();
-                DoIpCodec.RequireNoGenericNack(routing);
                 if (routing.Version != protocolVersion)
                     throw new InvalidDataException(
                         "DoIP gateway routing response changed protocol version.");
+                DoIpCodec.RequireNoGenericNack(routing);
                 if (routing.Type == DoIpCodec.AliveCheckRequest)
                 {
                     await session.SendAsync(DoIpCodec.ReplyToAliveCheck(
@@ -153,6 +231,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 break;
             }
             deadline.Token.ThrowIfCancellationRequested();
+            session.routedGatewayAddress = routingEntityAddress;
             session.StartReceivePump();
             return session;
         }
@@ -202,12 +281,89 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         TimeSpan timeout, CancellationToken cancellationToken,
         TimeSpan? p2Timeout = null, TimeSpan? p2StarTimeout = null)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!await operationGate.WaitAsync(0, cancellationToken))
+            throw new InvalidOperationException("A DoIP diagnostic operation already owns this session.");
+        try
+        {
+            return await ExchangeUdsCoreAsync(request, timeout, cancellationToken, p2Timeout, p2StarTimeout);
+        }
+        finally { operationGate.Release(); }
+    }
+
+    /// <summary>
+    /// Keep the same logical ECU, socket and receive owner for the complete
+    /// approved command sequence. No competing diagnostic operation may
+    /// consume a response or inject a command between its steps.
+    /// </summary>
+    internal async Task<int> ExchangeSequenceAsync(IReadOnlyList<byte[]> commands,
+        string expectedVin, TimeSpan timeout, CancellationToken cancellationToken,
+        Action<int, byte[]> onReply,
+        TimeSpan? p2Timeout = null, TimeSpan? p2StarTimeout = null)
+    {
+        ArgumentNullException.ThrowIfNull(commands);
+        ArgumentNullException.ThrowIfNull(onReply);
+        if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) ||
+            commands.Count is < 1 or > 16 ||
+            commands.Any(c => c is null || c.Length is < 1 or > 4091) ||
+            commands.Sum(c => (long)c.Length) > 4091)
+            throw new ArgumentException("Expected 1..16 valid UDS commands and an observed VIN.");
+        // Freeze every approved command before the first await/TX.
+        var frozen = commands.Select(c => c.ToArray()).ToArray();
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!await operationGate.WaitAsync(0, cancellationToken))
+            throw new InvalidOperationException("A DoIP diagnostic operation already owns this session.");
+        try
+        {
+            // The VIN check and all subsequent commands are part of the same
+            // exclusive session operation. A concurrent request cannot
+            // intervene after identity verification but before first TX.
+            var vinReply = await ExchangeUdsCoreAsync(
+                UdsStandardServices.ReadDid(0xF190), timeout, cancellationToken,
+                p2Timeout, p2StarTimeout);
+            if (!string.Equals(DoIpVinReader.ParseVin(vinReply), expectedVin,
+                    StringComparison.Ordinal))
+                throw new InvalidDataException("DoIP ECU VIN changed before the sequence.");
+            for (var index = 0; index < frozen.Length; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var response = await ExchangeUdsCoreAsync(frozen[index], timeout,
+                    cancellationToken, p2Timeout, p2StarTimeout);
+                cancellationToken.ThrowIfCancellationRequested();
+                onReply(index + 1, response.ToArray());
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            return frozen.Length;
+        }
+        catch
+        {
+            // Callback failures are uncertain too: retire the exact socket
+            // and never permit a following command or automatic retry.
+            lock (exchangeBoundary) exchangeState = 2;
+            try { lifetime.Cancel(); }
+            catch (ObjectDisposedException) { /* Already retired elsewhere. */ }
+            stream.Dispose();
+            socket.Dispose();
+            throw;
+        }
+        finally { operationGate.Release(); }
+    }
+
+    private async Task<byte[]> ExchangeUdsCoreAsync(byte[] request,
+        TimeSpan timeout, CancellationToken cancellationToken,
+        TimeSpan? p2Timeout, TimeSpan? p2StarTimeout)
+    {
         if (request is null || request.Length == 0 ||
             request.Length > DoIpCodec.MaxPayload - 4)
             throw new ArgumentException(
                 "UDS request must fit the DoIP diagnostic PDU.", nameof(request));
         if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
             throw new ArgumentOutOfRangeException(nameof(timeout));
+        if (sessionOptions is not null)
+        {
+            p2Timeout ??= TimeSpan.FromMilliseconds(sessionOptions.P2Ms);
+            p2StarTimeout ??= TimeSpan.FromMilliseconds(sessionOptions.P2StarMs);
+        }
         // Reject malformed stage settings *before* sending any potentially
         // modifying UDS request to the ECU, even through non-CLI callers.
         if ((p2Timeout.HasValue &&
@@ -223,7 +379,12 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         // A caller must not be able to mutate a pending diagnostic request
         // or its ACK/UDS correlation on a shared array.
         var fixedRequest = request.ToArray();
-        var previous = Interlocked.CompareExchange(ref exchangeState, 1, 0);
+        int previous;
+        lock (exchangeBoundary)
+        {
+            previous = exchangeState;
+            if (previous == 0) exchangeState = 1;
+        }
         if (previous != 0)
             throw new InvalidOperationException(previous == 1 ?
                 "DoIP socket already has an active UDS exchange." :
@@ -262,10 +423,10 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                     {
                         throw new TimeoutException("DoIP diagnostic UDS stage deadline exceeded.");
                     }
-                    DoIpCodec.RequireNoGenericNack(message);
                     if (message.Version != protocolVersion)
                         throw new InvalidDataException(
                             "DoIP response changed the negotiated protocol version.");
+                    DoIpCodec.RequireNoGenericNack(message);
                     if (message.Type == DoIpCodec.AliveCheckRequest)
                     {
                         await SendAsync(DoIpCodec.ReplyToAliveCheck(
@@ -280,18 +441,33 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 }
             },
             remaining, deadline.Token, p2Timeout, p2StarTimeout);
-        if (Interlocked.CompareExchange(ref exchangeState, 0, 1) != 1)
-            throw new ObjectDisposedException(nameof(DoIpDiagnosticTransport));
-        // A duplicate positive UDS PDU may have arrived before this
-        // exchange ended. It has no transaction token and MUST NOT become
-        // the response to a later command with the same SID. Fail closed.
-        if (inbound.Reader.TryPeek(out _))
-            throw new InvalidDataException(
-                "DoIP stale queued diagnostic response after final UDS reply; reconnect.");
-        // An EOF received just after a valid final reply retires the
-        // connection, but does not retroactively invalidate that reply.
-        if (Volatile.Read(ref receiveFailure) is not null)
-            Interlocked.Exchange(ref exchangeState, 2);
+        lock (exchangeBoundary)
+        {
+            // Cancellation or expiry during final decoding/queue validation
+            // must not turn an uncertain transaction into a reusable socket.
+            cancellationToken.ThrowIfCancellationRequested();
+            if (overall.Elapsed >= timeout)
+                throw new TimeoutException("DoIP exchange expired before final publication.");
+            deadline.Token.ThrowIfCancellationRequested();
+            if (exchangeState != 1)
+                throw new ObjectDisposedException(nameof(DoIpDiagnosticTransport));
+            // Check for queued duplicates and transition to idle atomically
+            // with the pump's publish. Consuming a legitimate final reply
+            // may resume this continuation before TryWrite itself returns.
+            if (inbound.Reader.TryPeek(out _))
+                throw new InvalidDataException(
+                    "DoIP stale queued diagnostic response after final UDS reply; reconnect.");
+            // Only a clean EOF between frames may follow a valid final
+            // reply. A malformed, truncated or overflowing receive stream
+            // already detected by the pump cannot establish success.
+            if (receiveFailure is not null && receiveFailure is not PeerClosedAtBoundaryException)
+                ExceptionDispatchInfo.Capture(receiveFailure).Throw();
+            cancellationToken.ThrowIfCancellationRequested();
+            if (overall.Elapsed >= timeout)
+                throw new TimeoutException("DoIP exchange expired before final publication.");
+            deadline.Token.ThrowIfCancellationRequested();
+            exchangeState = receiveFailure is null ? 0 : 2;
+        }
         return response;
         }
         catch
@@ -299,7 +475,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             // Even a cancelled/timed-out write may already be on the TCP
             // wire. Never silently retry it or allow a late reply to be
             // interpreted as belonging to another operation.
-            Interlocked.Exchange(ref exchangeState, 2);
+            lock (exchangeBoundary) exchangeState = 2;
             try { lifetime.Cancel(); }
             catch (ObjectDisposedException) { /* Concurrent DisposeAsync retired session. */ }
             stream.Dispose();
@@ -315,8 +491,10 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         await writeGate.WaitAsync(token);
         try
         {
+            token.ThrowIfCancellationRequested();
             await stream.WriteAsync(frame, token);
             await stream.FlushAsync(token);
+            Trace("TX", frame);
         }
         finally { writeGate.Release(); }
     }
@@ -346,18 +524,20 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 // There is no universal UDS transaction identifier. A
                 // duplicate or unsolicited response between exchanges
                 // cannot be safely assigned to the NEXT request.
-                if (Volatile.Read(ref exchangeState) != 1)
-                    throw new InvalidDataException(
-                        "Unsolicited DoIP diagnostic data outside an exchange; reconnect.");
-                if (!inbound.Writer.TryWrite(message))
-                    throw new InvalidDataException(
-                        "DoIP diagnostic receive buffer overflow; reconnect.");
-                // The exchange may have finished just while TryWrite
-                // published the frame; a late write after transition to
-                // idle must retire the socket, never feed a next exchange.
-                if (Volatile.Read(ref exchangeState) != 1)
-                    throw new InvalidDataException(
-                        "DoIP response crossed diagnostic exchange boundary; reconnect.");
+                lock (exchangeBoundary)
+                {
+                    if (exchangeState != 1)
+                    {
+                        // Retire before releasing the boundary lock so a new
+                        // request cannot start after this unsolicited frame.
+                        exchangeState = 2;
+                        throw new InvalidDataException(
+                            "Unsolicited DoIP diagnostic data outside an exchange; reconnect.");
+                    }
+                    if (!inbound.Writer.TryWrite(message))
+                        throw new InvalidDataException(
+                            "DoIP diagnostic receive buffer overflow; reconnect.");
+                }
             }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
@@ -366,11 +546,19 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         }
         catch (Exception error)
         {
-            Volatile.Write(ref receiveFailure, error);
-            inbound.Writer.TryComplete(error);
-            // If a valid final response was already queued for an active
-            // exchange, allow it to finish before retiring the session.
-            if (Interlocked.CompareExchange(ref exchangeState, 2, 0) == 0)
+            bool close;
+            lock (exchangeBoundary)
+            {
+                receiveFailure = error;
+                inbound.Writer.TryComplete(error);
+                // If an exchange is active, the waiter owns final failure
+                // handling. Only an orderly close may preserve a queued
+                // valid final reply; all other failures are checked before
+                // the exchange can return success.
+                close = exchangeState != 1;
+                if (close) exchangeState = 2;
+            }
+            if (close)
             {
                 stream.Dispose();
                 socket.Dispose();
@@ -391,11 +579,17 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     private async Task<DoIpCodec.Message> ReceiveAsync(CancellationToken token)
     {
         var header = new byte[8];
-        await stream.ReadExactlyAsync(header, token);
+        // Distinguish no next PDU from a peer closing in the middle of
+        // its header or payload. ReadExactly on the whole header cannot
+        // distinguish these conditions.
+        if (await stream.ReadAsync(header.AsMemory(0, 1), token) == 0)
+            throw new PeerClosedAtBoundaryException();
+        await stream.ReadExactlyAsync(header.AsMemory(1), token);
         var length = DoIpCodec.ReadPayloadLength(header);
         var message = new byte[8 + length];
         header.CopyTo(message, 0);
         if (length > 0) await stream.ReadExactlyAsync(message.AsMemory(8), token);
+        Trace("RX", message);
         return DoIpCodec.Decode(message);
     }
 
@@ -405,7 +599,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         // transport; closing a TCP session must be idempotent.
         if (Interlocked.Exchange(ref disposed, 1) != 0)
             return;
-        Interlocked.Exchange(ref exchangeState, 2);
+        lock (exchangeBoundary) exchangeState = 2;
         lifetime.Cancel();
         stream.Dispose();
         socket.Dispose();

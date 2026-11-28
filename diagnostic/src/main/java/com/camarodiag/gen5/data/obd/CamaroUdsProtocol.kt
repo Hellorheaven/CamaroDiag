@@ -16,17 +16,35 @@ object CamaroUdsProtocol {
         headersResp: String = "OK",
         protocolResp: String = "OK",
         swCanWiringVerified: Boolean = false,
-        transmitProbeResp: String = ""
+        transmitProbeResp: String = "",
+        hardwareResp: String = "",
+        elmProtocolProbe: Map<Int, String> = emptyMap(),
+        stnProtocolProbe: Map<Int, String> = emptyMap(),
+        selectedElmProtocol: Int = 6,
+        reportedElmProtocol: Int? = selectedElmProtocol.takeIf { it in 1..10 },
+        protocolNumberResponse: String = ""
     ): AdapterCapabilities {
+        require(selectedElmProtocol in 0..10)
+        require(reportedElmProtocol == null || reportedElmProtocol in 1..10)
+        val acceptedElm = elmProtocolProbe.filter { (number, answer) ->
+            number in 1..10 && hasStandaloneOk(answer)
+        }.keys.toSet() + (if (selectedElmProtocol != 0 && hasStandaloneOk(protocolResp))
+            setOf(selectedElmProtocol) else emptySet())
+        val verifiedCan = reportedElmProtocol != null && reportedElmProtocol in 6..9 &&
+            hasPositiveMode01Pid00Response(transmitProbeResp)
         val logs = listOf(
             "> ATZ  -> $atzResp",
             "> STI  -> $stiResp",
+            "> STDI -> $hardwareResp",
             "> ATAL -> $atalResp",
             "> STP 61 -> $stp61Resp",
             "> ATH1 -> $headersResp",
-            "> ATSP 6 -> $protocolResp",
-            "> 0100 (physical TX verification) -> $transmitProbeResp"
-        )
+            "> ATSP ${selectedElmProtocol.toString(16).uppercase(Locale.ROOT)} -> $protocolResp",
+            "> 0100 (physical TX verification) -> $transmitProbeResp",
+            "> ATDPN -> $protocolNumberResponse"
+        ) + elmProtocolProbe.toSortedMap().map { (number, answer) ->
+            "> ATTP${number.toString(16).uppercase(Locale.ROOT)} -> $answer"
+        } + stnProtocolProbe.toSortedMap().map { (number, answer) -> "> STP $number -> $answer" }
 
         // Select STN-only monitor commands only when the adapter's firmware response
         // identifies an STN chipset. A Bluetooth name or the OBDLink product banner is
@@ -34,10 +52,10 @@ object CamaroUdsProtocol {
         val isStn = hasStnFirmwareBanner(stiResp) ||
             hasStnFirmwareBanner(atzResp)
 
-        // STP 61 alone is not proof of DLC pin-1 wiring. MX/MX+ are explicitly listed by the adapter maker as SW-CAN capable.
-        val normalizedDeviceName = deviceName.uppercase(Locale.ROOT)
-        val verifiedObdLinkMxHardware = normalizedDeviceName.contains("OBDLINK MX+") ||
-            Regex("\\bOBDLINK MX\\b").containsMatchIn(normalizedDeviceName)
+        // A Bluetooth device name is user-editable. Use the firmware hardware
+        // identification (STDI) or separately verified physical wiring.
+        val mxModel = Regex("^OBDLink\\s+(MX\\+|MX)(?:\\s+.*)?$", RegexOption.IGNORE_CASE)
+        val verifiedObdLinkMxHardware = hardwareResp.lineSequence().any { mxModel.matches(it.trim()) }
         val supportsSwCan = (swCanWiringVerified || verifiedObdLinkMxHardware) && isStn &&
             hasStandaloneOk(stp61Resp)
         val supportsLong = hasStandaloneOk(atalResp)
@@ -56,9 +74,15 @@ object CamaroUdsProtocol {
             supportsLongFrames = supportsLong,
             supportsSwCan = supportsSwCan,
             supportsCanHeaders = hasStandaloneOk(headersResp) &&
-                hasStandaloneOk(protocolResp),
+                (acceptedElm.any { it in 6..9 } || verifiedCan),
             rawProbeLog = logs,
-            supportsCanTransmit = hasPositiveMode01Pid00Response(transmitProbeResp)
+            supportsCanTransmit = verifiedCan,
+            hardwareId = hardwareResp.trim(),
+            reportedElmProtocol = reportedElmProtocol,
+            acceptedElmProtocols = acceptedElm + (if (verifiedCan) setOfNotNull(reportedElmProtocol) else emptySet()),
+            acceptedStnProtocols = if (isStn) stnProtocolProbe.filter { (number, answer) ->
+                number in setOf(61, 62) && supportsSwCan && hasStandaloneOk(answer)
+            }.keys.toSet() + (if (supportsSwCan) setOf(61) else emptySet()) else emptySet()
         )
     }
 
@@ -92,13 +116,7 @@ object CamaroUdsProtocol {
      * must never enable raw CAN transmission.
      */
     private fun hasPositiveMode01Pid00Response(response: String): Boolean {
-        val responseLine = Regex(
-            "^(?:(?:7E[8-F]|18DAF1[0-9A-F]{2}))?(?:06)?4100[0-9A-F]{8}$"
-        )
-        return response.lineSequence().any { line ->
-            val compact = line.uppercase(Locale.ROOT).replace(Regex("[^0-9A-F]"), "")
-            responseLine.matches(compact)
-        }
+        return parsePidBytes(response, "00")?.size == 4
     }
 
     fun buildTopology(vehicle: VehicleProfile, adapter: AdapterCapabilities): List<EcuModule> {
@@ -195,15 +213,73 @@ object CamaroUdsProtocol {
         response: String,
         pid: String,
         primaryPowertrainResponderOnly: Boolean = false
-    ): IntArray? {
+    ): IntArray? = parsePidObservations(response, pid, primaryPowertrainResponderOnly)
+        .firstOrNull()?.bytes?.toIntArray()
+
+    data class PidObservation(val responder: String?, val bytes: List<Int>)
+
+    /** Keep each validated Mode 01 response attached to its actual responder. */
+    fun parsePidObservations(response: String, pid: String,
+        primaryPowertrainResponderOnly: Boolean = false): List<PidObservation> =
+        parseStandardPidRecords(response, pid, 0x41, null, primaryPowertrainResponderOnly)
+
+    /** Mode 02 echoes a frame number after the PID, before the data. */
+    fun parseFreezeFrameObservations(response: String, pid: Int, frame: Int = 0): List<PidObservation> {
+        if (pid !in 0..255 || frame !in 0..255) return emptyList()
+        return parseStandardPidRecords(response, "%02X".format(Locale.ROOT, pid), 0x42, frame, false)
+    }
+
+    private fun parseStandardPidRecords(response: String, pid: String, service: Int,
+        frame: Int?, primaryPowertrainResponderOnly: Boolean): List<PidObservation> {
         val pidHex = pid.trim().uppercase(Locale.ROOT).padStart(2, '0')
-        if (!Regex("[0-9A-F]{2}").matches(pidHex)) return null
+        if (!Regex("[0-9A-F]{2}").matches(pidHex)) return emptyList()
+        val observations = mutableListOf<PidObservation>()
         val expectedPid = pidHex.toInt(16)
-        val hexPairData = Regex("(?:[0-9A-F]{2}){3,10}")
+        val prefix = if (frame == null) 2 else 3
+        val expectedLength = if (frame != null && expectedPid in setOf(0x02, 0x03)) 2
+            else SafeObdRequestPolicy.expectedMode01DataBytes(expectedPid)
+        fun observation(responder: String?, bytes: List<Int>): PidObservation? {
+            if (primaryPowertrainResponderOnly && responder != null &&
+                responder !in setOf("7E8", "18DAF110")) return null
+            if (bytes.size <= prefix || bytes[0] != service || bytes[1] != expectedPid ||
+                (frame != null && bytes[2] != frame)) return null
+            if (frame != null && expectedLength == null) return null
+            if (expectedLength != null && bytes.size != expectedLength + prefix) return null
+            return PidObservation(responder, bytes.drop(prefix))
+        }
+        val request = "%02X%02X".format(Locale.ROOT, service - 0x40, expectedPid) +
+            (frame?.let { "%02X".format(Locale.ROOT, it) } ?: "")
+        val cleaned = response.lineSequence().filter {
+            it.filterNot(Char::isWhitespace).uppercase(Locale.ROOT) != request
+        }.joinToString("\n")
+        if (ObdNumberedIdentityFrames.hasSegmentedPhysical(cleaned)) {
+            return ObdNumberedIdentityFrames.parseAddressedPhysical(cleaned).orEmpty()
+                .mapNotNull { observation(it.responder, it.bytes) }
+        }
+        // Numbered ELM blocks have no reliable source address; never infer one.
+        if (Regex("(?i)(?:^|\\s)[0-9A-F]:").containsMatchIn(cleaned)) {
+            return ObdNumberedIdentityFrames.parseAll(cleaned).orEmpty()
+                .mapNotNull { observation(null, it) }
+        }
+        // Already assembled payloads from physical providers may exceed one CAN frame.
+        val hexPairData = Regex("(?:[0-9A-F]{2}){3,255}")
         // A Mode 01 reply must use a documented OBD responder header, not
         // arbitrary three hex characters that could be adapter chatter.
         val canHeader = Regex("(?:7E[8-F]|18DAF1[0-9A-F]{2})")
-        for (sourceLine in response.lineSequence()) {
+        val lines = response.lineSequence().flatMap { line ->
+            // A compact journal/adapter can flatten several complete records.
+            // Split only explicit header boundaries or compact positive records,
+            // never individual hexadecimal bytes of a spaced payload.
+            val headers = line.split(Regex("(?i)\\s+(?=(?:7E[8-F]|18DAF1[0-9A-F]{2})(?:\\s|[0-9A-F]{6,}))"))
+            headers.asSequence().flatMap { row ->
+                val tokens = row.trim().split(Regex("\\s+"))
+                if (tokens.size > 1 && tokens.all {
+                    it.matches(Regex("(?i)(?:[0-9A-F]{2}){3,10}")) &&
+                        it.startsWith("%02X%02X".format(Locale.ROOT, service, expectedPid), ignoreCase = true)
+                }) tokens.asSequence() else sequenceOf(row)
+            }
+        }
+        for (sourceLine in lines) {
             val line = sourceLine.trim().removeSuffix(">").trimEnd().uppercase(Locale.ROOT)
             if (line.isEmpty()) continue
             val parts = line.split(Regex("\\s+"))
@@ -221,8 +297,12 @@ object CamaroUdsProtocol {
             if (primaryPowertrainResponderOnly && responder != null &&
                 responder !in setOf("7E8", "18DAF110")) continue
             val data = when {
-                parts.size > 1 && canHeader.matches(parts[0]) ->
-                    parts.drop(1).joinToString("")
+                parts.size > 1 && canHeader.matches(parts[0]) -> {
+                    val body = parts.drop(1)
+                    if (body.first().length == 1 && body.first().all { it in '0'..'9' })
+                        "0" + body.joinToString("")
+                    else body.joinToString("")
+                }
                 // 11-bit (3 hex chars) or 29-bit (8 hex chars) CAN
                 // responder header without spacing, never an arbitrary prefix.
                 parts.size == 1 && line.length % 2 == 1 &&
@@ -234,20 +314,27 @@ object CamaroUdsProtocol {
             }
             if (!hexPairData.matches(data)) continue
             var bytes = data.chunked(2).map { it.toInt(16) }
-            if (bytes.first() != 0x41) {
-                val dlc = bytes.first()
-                if (dlc !in 1..8 || dlc != bytes.size - 1) continue
-                bytes = bytes.drop(1)
+            // Explicit DLC before a PCI byte must exactly describe the frame.
+            if (responder != null && bytes.size in 4..9 &&
+                bytes.first() == bytes.size - 1 && bytes[1] in 1..7 &&
+                bytes[2] == service) bytes = bytes.drop(1)
+            if (bytes.first() != service) {
+                val declared = bytes.first()
+                if (declared !in 1..8) continue
+                bytes = when {
+                    declared == bytes.size - 1 -> bytes.drop(1)
+                    // Only an entire physical classic CAN frame can carry
+                    // padding beyond its explicit ISO-TP single-frame length.
+                    responder != null && bytes.size == 8 && declared in 1..7 &&
+                        bytes[1] == service -> bytes.drop(1).take(declared)
+                    else -> continue
+                }
             }
-            if (bytes.size < 3 || bytes[0] != 0x41 || bytes[1] != expectedPid) continue
-            // Apply the same exact SAE lengths as the read-only console and
-            // the physical J2534 bridge. An extra byte must never turn a
-            // malformed live sensor frame into an apparently valid reading.
-            val expectedLength = SafeObdRequestPolicy.expectedMode01DataBytes(expectedPid)
-            if (expectedLength != null && bytes.size != expectedLength + 2) continue
-            return bytes.drop(2).toIntArray()
+            // A physical single-frame response cannot carry an unbounded payload.
+            if (responder != null && bytes.size > 7) continue
+            observation(responder, bytes)?.let(observations::add)
         }
-        return null
+        return observations
     }
 
     /**
@@ -298,7 +385,8 @@ object CamaroUdsProtocol {
     fun parseOdometerPidD3(response: String): Double? = parseOdometerPid(response, "D3")
 
     private fun parseOdometerPid(response: String, pid: String): Double? {
-        val bytes = parsePidBytes(response, pid) ?: return null
+        val observations = parsePidObservations(response, pid)
+        val bytes = observations.map { it.bytes }.distinct().singleOrNull() ?: return null
         // The four-byte definition is required; a truncated or concatenated
         // reply must never become a plausible vehicle mileage reading.
         if (bytes.size != 4) return null

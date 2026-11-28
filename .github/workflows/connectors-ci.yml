@@ -1,6 +1,6 @@
 name: Connectors CI
 # Heavy tests are never triggered by pull_request synchronize.
-# Run manually at ~50-commit checkpoints and before merging; ready_for_review is a final gate.
+# Execute only at completed workstream/protocol acceptance; never at commit-count intervals.
 # One cross-component gate for the common firmware/host contract. A hardware
 # documentation-only change does not trigger compilation; run manually for bench work.
 on:
@@ -22,6 +22,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Build and run native Linux C++20 SAE J1979 bridge tests (final gate only)
+        run: |
+          set -euo pipefail
+          make -C connectors/host/linux-native clean all test
       - name: Build and run native USB parser tests
         run: |
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/discovery_parser_test.cpp -o /tmp/discovery_parser_test
@@ -44,10 +48,116 @@ jobs:
           /tmp/journal_writer_gate_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/interprocessor_link_test.cpp -o /tmp/interprocessor_link_test
           /tmp/interprocessor_link_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_interprocessor_read_test.cpp -o /tmp/j1979_interprocessor_read_test
+          /tmp/j1979_interprocessor_read_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_spi_transport_test.cpp -o /tmp/j1979_spi_transport_test
+          /tmp/j1979_spi_transport_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/stm32g4/native-tests/j1979_read_session_test.cpp -o /tmp/stm_j1979_read_session_test
+          /tmp/stm_j1979_read_session_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/isotp_observer_test.cpp -o /tmp/isotp_observer_test
           /tmp/isotp_observer_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_read_evidence_test.cpp -o /tmp/j1979_read_evidence_test
+          /tmp/j1979_read_evidence_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_can_read_session_test.cpp -o /tmp/j1979_can_read_session_test
+          /tmp/j1979_can_read_session_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_can_read_exchange_test.cpp -o /tmp/j1979_can_read_exchange_test
+          /tmp/j1979_can_read_exchange_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_can_campaign_test.cpp -o /tmp/j1979_can_campaign_test
+          /tmp/j1979_can_campaign_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_freeze_campaign_test.cpp -o /tmp/j1979_freeze_campaign_test
+          /tmp/j1979_freeze_campaign_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_live_campaign_test.cpp -o /tmp/j1979_live_campaign_test
+          /tmp/j1979_live_campaign_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_maintenance_test.cpp -o /tmp/j1979_maintenance_test
+          /tmp/j1979_maintenance_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_maintenance_interprocessor_test.cpp -o /tmp/j1979_maintenance_interprocessor_test
+          /tmp/j1979_maintenance_interprocessor_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_maintenance_storage_test.cpp -o /tmp/j1979_maintenance_storage_test
+          /tmp/j1979_maintenance_storage_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_maintenance_archive_test.cpp -o /tmp/j1979_maintenance_archive_test
+          /tmp/j1979_maintenance_archive_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_campaign_evidence_test.cpp -o /tmp/j1979_campaign_evidence_test
+          /tmp/j1979_campaign_evidence_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/j1979_usb_campaign_test.cpp -o /tmp/j1979_usb_campaign_test
+          /tmp/j1979_usb_campaign_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/j1979_usb_auth_test.cpp -o /tmp/j1979_usb_auth_test
+          /tmp/j1979_usb_auth_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/j1979_local_usb_owner_test.cpp -o /tmp/j1979_local_usb_owner_test
+          /tmp/j1979_local_usb_owner_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/j1979_read_guard_test.cpp -o /tmp/j1979_read_guard_test
+          /tmp/j1979_read_guard_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/kline_observer_test.cpp -o /tmp/kline_observer_test
           /tmp/kline_observer_test
+  linux-native-packages:
+    # Reused only by the explicit protocol/workstream final gate.
+    # ARM is exercised in a matching userspace; not a hardware ECU test.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            architecture: amd64
+            image: debian:13
+          - platform: linux/arm64
+            architecture: arm64
+            image: debian:13
+          - platform: linux/arm/v7
+            architecture: armhf
+            image: debian:13
+          - platform: linux/amd64
+            architecture: amd64
+            image: ubuntu:24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Enable ARM userspace emulation
+        if: matrix.architecture != 'amd64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm,arm64
+      - name: Compile native C++20 CLI and Qt desktop; validate Debian packaging
+        env:
+          TARGET_PLATFORM: ${{ matrix.platform }}
+          TARGET_ARCH: ${{ matrix.architecture }}
+          TARGET_IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          docker run --rm --platform "$TARGET_PLATFORM" \
+            -e TARGET_ARCH -e DEBIAN_FRONTEND=noninteractive \
+            -v "$GITHUB_WORKSPACE:/source:ro" "$TARGET_IMAGE" sh -ec '
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                build-essential pkg-config libssl-dev qt6-base-dev \
+                dpkg-dev binutils ca-certificates
+              test "$(dpkg --print-architecture)" = "$TARGET_ARCH"
+              mkdir -p /tmp/work
+              cp -a /source/connectors /tmp/work/
+              cd /tmp/work/connectors/host/linux-native
+              make -j2 all gui
+              ./camarodiag-native --help
+              QT_QPA_PLATFORM=offscreen ./camarodiag-j1979-desktop --self-test-ui
+              if [ "$TARGET_ARCH" != amd64 ]; then make -j2 test; fi
+              make deb deb-gui
+              for package in out/*.deb; do
+                test "$(dpkg-deb -f "$package" Architecture)" = "$TARGET_ARCH"
+                dpkg-deb -I "$package"
+                dpkg-deb -c "$package"
+                case "$(dpkg-deb -f "$package" Depends)" in
+                  *python*|*pyserial*) echo "Unexpected Python runtime dependency"; exit 1 ;;
+                esac
+              done
+              desktop=$(find out -name "*desktop*.deb")
+              test -n "$desktop"
+              dpkg-deb -x "$desktop" /tmp/installed
+              test -x /tmp/installed/usr/bin/camarodiag-native
+              test -x /tmp/installed/usr/bin/camarodiag-j1979-desktop
+              test -f /tmp/installed/usr/share/applications/camarodiag-j1979.desktop
+              /tmp/installed/usr/bin/camarodiag-native --help
+              QT_QPA_PLATFORM=offscreen /tmp/installed/usr/bin/camarodiag-j1979-desktop --self-test-ui
+            '
   esp32-build:
     runs-on: ubuntu-latest
     steps:
@@ -84,11 +194,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Test portable Java protocol
+      - name: Compile Kotlin CU authentication and test portable protocol
         run: |
           mkdir -p /tmp/android-protocol
-          javac -Xlint:all -Werror -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/BinaryDiscovery.java connectors/host/android/src/test/java/com/camarodiag/connectors/BinaryDiscoveryTest.java
-          java -ea -cp /tmp/android-protocol com.camarodiag.connectors.BinaryDiscoveryTest
+          command -v kotlinc
+          kotlinc -Werror -jvm-target 17 -include-runtime -d /tmp/android-cu-auth.jar $(find connectors/host/android/src/main/java/com/camarodiag/connectors -name '*.kt' ! -name 'UsbJ1979.kt' ! -name 'UsbDiscovery.kt' | sort)
+          kotlinc -Werror -jvm-target 17 -cp /tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/test/java/com/camarodiag/connectors/*.kt
+          java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.BinaryDiscoveryTest
+          java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979UsbTest
+          java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979FreezeUsbTest
+          java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979LiveUsbTest
+          java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979MaintenanceUsbTest
       - name: Use runner Android SDK
         run: |
           test -n "$ANDROID_HOME"
@@ -98,7 +214,7 @@ jobs:
           test -f "$ANDROID_HOME/platforms/android-35/android.jar"
       - name: Compile native USB Host adapter
         run: |
-          javac -Xlint:all -Werror -cp "$ANDROID_HOME/platforms/android-35/android.jar" -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/*.java
+          kotlinc -Werror -jvm-target 17 -cp "$ANDROID_HOME/platforms/android-35/android.jar:/tmp/android-protocol:/tmp/android-cu-auth.jar" -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/UsbJ1979.kt connectors/host/android/src/main/java/com/camarodiag/connectors/UsbDiscovery.kt
   python-host-tests:
     runs-on: ubuntu-latest
     strategy:

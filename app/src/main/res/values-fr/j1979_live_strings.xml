@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_live_title">Enregistrement J1979</string>
+    <string name="j1979_live_source">CAN ID physique de réponse</string>
+    <string name="j1979_live_pids">PID numériques (hex., séparés par virgules)</string>
+    <string name="j1979_live_cycles">Nombre de cycles</string>
+    <string name="j1979_live_interval">Intervalle des cycles (ms)</string>
+    <string name="j1979_live_budget">Budget total (s)</string>
+    <string name="j1979_live_confirm">Confirmer le calculateur physique documenté et le VIN %1$s</string>
+    <string name="j1979_live_run">Démarrer l’enregistrement</string>
+    <string name="j1979_live_unavailable">Un canal CAN classique ELM/STN compatible et négocié est requis.</string>
+    <string name="j1979_live_completed">Enregistrement terminé</string>
+    <string name="j1979_live_incomplete">Enregistrement incomplet</string>
+    <string name="j1979_live_cycle_count">Cycles : %1$d/%2$d</string>
+    <string name="j1979_live_summary">min %1$s · max %2$s · moyenne %3$s %4$s</string>
+    <string name="j1979_live_export_csv">Exporter CSV</string>
+    <string name="j1979_live_scope">Lectures horodatées distinctes, ni mesures simultanées ni mutation.</string>
+    <string name="j1979_live_legacy_confirm">Confirmer la source legacy et le VIN %1$s ; les requêtes sont fonctionnelles.</string>
+    <string name="j1979_live_legacy_scope">Réponses filtrées par en-tête à des requêtes fonctionnelles ; ni adressage physique ni mutation.</string>
+</resources>

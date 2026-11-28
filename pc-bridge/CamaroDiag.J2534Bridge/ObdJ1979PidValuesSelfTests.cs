@@ -168,6 +168,10 @@ internal static class ObdJ1979PidValuesSelfTests
         Check(ObdJ1979PidValues.Decode([0x01, 0x34],
             [0x41, 0x34, 0x00, 0x01, 0x00, 0x02]) is null,
             "Four-byte oxygen sensor ratio remains raw, not guessed.");
+        Check(Read(0xA6,0,0x12,0xD6,0x87).Number==123456.7 &&
+            Read(0xA6,0,0x12,0xD6,0x87).Unit=="km","Unsigned 32-bit odometer in tenths of km.");
+        Check(Read(0xA6,0xFF,0xFF,0xFF,0xFF).Number==429496729.5,"No signed overflow.");
+        Reject<InvalidDataException>(()=>Read(0xA6,0,1,2),"Odometer truncated.");
         return count;
     }
 }

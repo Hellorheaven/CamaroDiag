@@ -8,6 +8,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.nio.file.Files
 
 class PersistentEcuWriteJournalTest {
     @get:Rule val temporaryFolder = TemporaryFolder()
@@ -81,6 +82,60 @@ class PersistentEcuWriteJournalTest {
             journal.append(record.copy(stage = EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE))
         }.isFailure)
         assertTrue(completePrefix.contentEquals(file.readBytes()))
+    }
+
+    @Test fun rollbackAfterEraseReceiptPoisonsActiveBoundaryCheck() = runBlocking {
+        val (file,journal) = newJournal()
+        journal.append(record)
+        val baseline = file.readBytes()
+        journal.append(record.copy(stage = EcuWriteTransaction.Stage.BEFORE_ERASE))
+        val accepted = file.readBytes()
+        journal.requireAcceptedState()
+        file.writeBytes(baseline)
+        assertTrue(runCatching { journal.requireAcceptedState() }.isFailure)
+        file.writeBytes(accepted)
+        assertTrue(runCatching { journal.requireAcceptedState() }.isFailure)
+        assertTrue(runCatching {
+            journal.append(record.copy(stage = EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE))
+        }.isFailure)
+        assertTrue(accepted.contentEquals(file.readBytes()))
+    }
+
+    @Test fun sameBytesReplacementDoesNotQualifyAsActiveJournal() = runBlocking {
+        val (file,journal)=newJournal()
+        journal.append(record)
+        org.junit.Assume.assumeNotNull(Files.readAttributes(file.toPath(),
+            java.nio.file.attribute.BasicFileAttributes::class.java).fileKey())
+        val saved=File(temporaryFolder.root,"original-journal")
+        Files.move(file.toPath(),saved.toPath())
+        file.writeBytes(saved.readBytes())
+        assertTrue(PersistentEcuWriteJournal.inspectExisting(file,target,vin).valid)
+        assertTrue(runCatching { journal.requireAcceptedState() }.isFailure)
+        file.delete()
+        Files.move(saved.toPath(),file.toPath())
+        assertTrue(runCatching { journal.requireAcceptedState() }.isFailure)
+        Unit
+    }
+
+    @Test fun redirectedJournalCannotBeAcceptedOrReopenedForAppend() = runBlocking {
+        val (file,journal)=newJournal()
+        journal.append(record)
+        val original=file.readBytes()
+        val saved=File(temporaryFolder.root,"saved-journal.txt")
+        Files.move(file.toPath(),saved.toPath())
+        try {
+            Files.createSymbolicLink(file.toPath(),saved.toPath())
+        } catch (failure: Exception) {
+            org.junit.Assume.assumeNoException(failure)
+        }
+        assertFalse(PersistentEcuWriteJournal.inspectExisting(file,target,vin).valid)
+        assertTrue(runCatching { journal.append(record.copy(stage=EcuWriteTransaction.Stage.BEFORE_ERASE)) }.isFailure)
+        assertTrue(original.contentEquals(saved.readBytes()))
+        Files.delete(file.toPath())
+        Files.move(saved.toPath(),file.toPath())
+        assertTrue(runCatching { journal.append(record.copy(stage=EcuWriteTransaction.Stage.BEFORE_ERASE)) }.isFailure)
+        assertTrue(original.contentEquals(file.readBytes()))
+        Unit
     }
 
     @Test fun existingTransactionLogCannotBeOverwritten() {

@@ -14,11 +14,17 @@ internal sealed class NativeE39FileWriteJournal :
 {
     private const int MaximumJournalBytes = 8 * 1024 * 1024;
     private readonly FileStream stream;
+    private readonly string journalPath;
+    private long acceptedLength;
+    private byte[] acceptedDigest=SHA256.HashData(Array.Empty<byte>());
     private readonly string backupDirectory;
     private bool backupDirectoryCreated;
     private readonly SemaphoreSlim gate = new(1, 1);
     private bool disposed;
     private bool appendFailed;
+    private bool backupInvalidated;
+    private readonly Dictionary<string, (int Length, byte[] Hash)> savedEnvelopes =
+        new(StringComparer.Ordinal);
 
     internal enum CompletionState
     {
@@ -37,11 +43,12 @@ internal sealed class NativeE39FileWriteJournal :
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var full = Path.GetFullPath(path);
+        journalPath=full;
         backupDirectory = full + ".blocks";
         // An existing path can represent a flash interrupted days ago.
         // Never truncate it, even on an explicit second attempt.
         stream = new FileStream(full, FileMode.CreateNew,
-            FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough);
+            FileAccess.ReadWrite, FileShare.Read, 4096, FileOptions.WriteThrough);
     }
 
     /// <summary>
@@ -53,15 +60,17 @@ internal sealed class NativeE39FileWriteJournal :
         uint address, byte[] liveBytes, string expectedSha256, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(liveBytes);
-        if (liveBytes.Length == 0 ||
-            !string.Equals(Convert.ToHexString(SHA256.HashData(liveBytes)),
+        // Freeze before any await or digest: the caller may reuse its receive buffer.
+        var frozen = liveBytes.ToArray();
+        if (frozen.Length == 0 || frozen.Length > 1024 * 1024 ||
+            !string.Equals(Convert.ToHexString(SHA256.HashData(frozen)),
                 expectedSha256, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Physical sector bytes differ from the verified original.");
         await gate.WaitAsync(token);
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this);
-            if (appendFailed)
+            if (appendFailed || backupInvalidated)
                 throw new IOException("Interrupted journal cannot accept physical backup data.");
             if (!backupDirectoryCreated)
             {
@@ -70,9 +79,9 @@ internal sealed class NativeE39FileWriteJournal :
                 Directory.CreateDirectory(backupDirectory);
                 backupDirectoryCreated = true;
             }
+            RequireBackupDirectory();
             var name = Path.Combine(backupDirectory,
-                address.ToString("X8") + "-" + liveBytes.Length + ".ecu-block");
-            var frozen = liveBytes.ToArray();
+                address.ToString("X8") + "-" + frozen.Length + ".ecu-block");
             var header = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new {
                 Schema = 1, Region = "E39_MAIN_FLASH",
                 Address = address, Length = frozen.Length,
@@ -86,10 +95,13 @@ internal sealed class NativeE39FileWriteJournal :
                 output.Flush(flushToDisk: true);
             }
             // Require a newly read, byte-identical persistent capture.
-            var check = File.ReadAllBytes(name);
+            RequireBackupDirectory();
+            var check = ReadCreatedEnvelope(name,header.Length+frozen.Length);
+            RequireBackupDirectory();
             if (check.Length != header.Length + frozen.Length ||
                 !check.AsSpan(0, header.Length).SequenceEqual(header) ||
-                !check.AsSpan(header.Length).SequenceEqual(frozen))
+                !check.AsSpan(header.Length).SequenceEqual(frozen) ||
+                !savedEnvelopes.TryAdd(name, (check.Length, SHA256.HashData(check))))
                 throw new InvalidDataException("Persisted ECU sector backup is incomplete or altered.");
         }
         catch
@@ -98,6 +110,89 @@ internal sealed class NativeE39FileWriteJournal :
             throw;
         }
         finally { gate.Release(); }
+    }
+
+    private void RequireBackupDirectory()
+    {
+        var attrs=File.GetAttributes(backupDirectory);
+        if((attrs & FileAttributes.Directory)==0 || (attrs & FileAttributes.ReparsePoint)!=0)
+            throw new InvalidDataException("Original ECU backup directory is missing or redirected.");
+    }
+
+    internal static byte[] ReadCreatedEnvelope(string path,int expectedLength)
+    {
+        if(expectedLength<=0||expectedLength>1024*1024+4096 ||
+            (File.GetAttributes(path)&(FileAttributes.Directory|FileAttributes.ReparsePoint))!=0)
+            throw new InvalidDataException("Invalid saved ECU envelope.");
+        using var source=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read);
+        if(source.Length!=expectedLength)throw new InvalidDataException("Saved ECU envelope length changed.");
+        var data=new byte[expectedLength];
+        source.ReadExactly(data);
+        if(source.ReadByte()!=-1||source.Length!=expectedLength)
+            throw new InvalidDataException("Saved ECU envelope changed while reading.");
+        return data;
+    }
+
+    public async Task RequireOriginalBlocksIntactAsync(CancellationToken token)
+    {
+        await gate.WaitAsync(token);
+        try
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            if (appendFailed || backupInvalidated || !backupDirectoryCreated || savedEnvelopes.Count == 0 ||
+                (File.GetAttributes(backupDirectory) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidDataException("Original sector backup is unavailable.");
+            void RequireInventory()
+            {
+                RequireBackupDirectory();
+                if (!Directory.EnumerateFileSystemEntries(backupDirectory).Take(savedEnvelopes.Count+1)
+                    .ToHashSet(StringComparer.Ordinal).SetEquals(savedEnvelopes.Keys))
+                    throw new InvalidDataException("Original sector backup inventory changed.");
+            }
+            RequireJournalPrefixForBackupCheck();
+            RequireInventory();
+            foreach (var (path, expected) in savedEnvelopes)
+            {
+                token.ThrowIfCancellationRequested();
+                if ((File.GetAttributes(path) & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
+                    throw new InvalidDataException("Original sector backup is not a regular file.");
+                using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                if (input.Length != expected.Length)
+                    throw new InvalidDataException("Original sector backup length changed.");
+                using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                var buffer = new byte[8192];
+                var remaining = expected.Length;
+                while (remaining > 0)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var count = Math.Min(remaining, buffer.Length);
+                    await input.ReadExactlyAsync(buffer.AsMemory(0, count), token);
+                    sha.AppendData(buffer, 0, count);
+                    remaining -= count;
+                }
+                if (input.ReadByte() != -1 ||
+                    !CryptographicOperations.FixedTimeEquals(expected.Hash, sha.GetHashAndReset()))
+                    throw new InvalidDataException("Original sector backup envelope changed.");
+            }
+            RequireInventory();
+            RequireJournalPrefixForBackupCheck();
+            token.ThrowIfCancellationRequested();
+        }
+        catch
+        {
+            // Keep journal append available for the terminal RecoveryRequired marker.
+            backupInvalidated = true;
+            throw;
+        }
+        finally { gate.Release(); }
+    }
+
+    // A failed journal check is different from a failed backup check:
+    // even a RecoveryRequired append would target an untrusted prefix.
+    private void RequireJournalPrefixForBackupCheck()
+    {
+        try { ReadAcceptedPrefix(); }
+        catch { appendFailed = true; throw; }
     }
 
     public async Task AppendAsync(
@@ -110,6 +205,8 @@ internal sealed class NativeE39FileWriteJournal :
             ObjectDisposedException.ThrowIf(disposed, this);
             if (appendFailed)
                 throw new IOException("Previous journal append failed; retain the interrupted journal for assessment.");
+            if (backupInvalidated && evidence.Phase != NativeE39WriteSequence.Phase.RecoveryRequired)
+                throw new InvalidDataException("Original sector backup session was invalidated.");
             var entry = JsonSerializer.Serialize(new
             {
                 Schema = 3,
@@ -119,15 +216,25 @@ internal sealed class NativeE39FileWriteJournal :
                 Detail = evidence.Detail
             });
             var encoded = Encoding.UTF8.GetBytes(entry + "\n");
-            if (encoded.Length > MaximumJournalBytes - stream.Length)
+            if (encoded.Length > MaximumJournalBytes - acceptedLength)
                 throw new IOException("ECU journal size limit reached; refusing further programming.");
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
+                var prefix=ReadAcceptedPrefix();
+                cancellationToken.ThrowIfCancellationRequested();
+                stream.Position=acceptedLength;
                 await stream.WriteAsync(encoded, cancellationToken);
                 // Flush(true) propagates file buffers to the storage subsystem.
                 // Filesystem/drive caches are still a hardware-dependent boundary.
                 stream.Flush(flushToDisk: true);
+                using var hash=IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                hash.AppendData(prefix);hash.AppendData(encoded);
+                var nextDigest=hash.GetHashAndReset();
+                var nextLength=acceptedLength+encoded.Length;
+                RequireDigest(stream,nextLength,nextDigest);
+                RequirePathDigest(nextLength,nextDigest);
+                acceptedLength=nextLength;acceptedDigest=nextDigest;
             }
             catch
             {
@@ -143,12 +250,44 @@ internal sealed class NativeE39FileWriteJournal :
         }
     }
 
+    // Read from the held descriptor before append; reject a replaced path
+    // as well. A failed check poisons the writer rather than retrying an erase.
+    private byte[] ReadAcceptedPrefix()
+    {
+        var prefix=RequireDigest(stream,acceptedLength,acceptedDigest);
+        RequirePathDigest(acceptedLength,acceptedDigest);
+        return prefix;
+    }
+
+    private void RequirePathDigest(long length,byte[] digest)
+    {
+        if((File.GetAttributes(journalPath)&(FileAttributes.Directory|FileAttributes.ReparsePoint))!=0)
+            throw new IOException("ECU journal path is redirected or not a regular file.");
+        using var check=new FileStream(journalPath,FileMode.Open,FileAccess.Read,FileShare.ReadWrite);
+        RequireDigest(check,length,digest);
+    }
+
+    private static byte[] RequireDigest(FileStream input,long length,byte[] digest)
+    {
+        if(length<0||length>MaximumJournalBytes||input.Length!=length)
+            throw new IOException("ECU journal length changed.");
+        input.Position=0;
+        var bytes=new byte[(int)length];
+        input.ReadExactly(bytes);
+        if(input.ReadByte()!=-1||input.Length!=length||
+            !CryptographicOperations.FixedTimeEquals(SHA256.HashData(bytes),digest))
+            throw new IOException("ECU journal differs from the last durable accepted state.");
+        return bytes;
+    }
+
     internal static CompletionState Inspect(string path) => InspectDetailed(path).State;
 
     internal static Inspection InspectDetailed(string path)
     {
         if (!File.Exists(path))
             throw new FileNotFoundException("No ECU programming journal exists.", path);
+        if((File.GetAttributes(path)&(FileAttributes.Directory|FileAttributes.ReparsePoint))!=0)
+            return new(CompletionState.Interrupted,false);
         // Read a bounded snapshot, not an unbounded or changing text file.
         // A concurrently appended record may be absent from this snapshot;
         // the result is strictly evidence from the captured journal prefix.
@@ -163,6 +302,16 @@ internal sealed class NativeE39FileWriteJournal :
             try { source.ReadExactly(snapshot); }
             catch (EndOfStreamException) { return new(CompletionState.Interrupted, false); }
         }
+        return InspectSnapshot(snapshot);
+    }
+
+    /// <summary>Inspect exactly the bytes used by the caller to verify sector
+    /// evidence; no second journal read and no inference about a live ECU.</summary>
+    internal static Inspection InspectSnapshot(byte[] snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (snapshot.Length == 0) return new(CompletionState.NoEvents, true);
+        if (snapshot.Length > MaximumJournalBytes) return new(CompletionState.Interrupted, false);
         string text;
         try { text = new UTF8Encoding(false, true).GetString(snapshot); }
         catch (DecoderFallbackException) { return new(CompletionState.Interrupted, false); }

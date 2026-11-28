@@ -1,0 +1,267 @@
+#pragma once
+#include "interprocessor_link.h"
+#include "j1979_can_campaign.h"
+#include "j1979_freeze_sequence.h"
+#include "j1979_live_sequence.h"
+
+namespace cd { namespace readlink {
+// CI/2 application mailbox for scan/freeze; CI/3 for long raw live sessions.
+// CI/3 uses the previously reserved byte 7 for a 24-bit sequence. Neither
+// version is negotiated from incoming bytes: local session scope selects it.
+// Separate from CI/1 discovery; no implicit upgrade or fallback.
+// A board owner must establish an exclusive, qualified physical link before
+// constructing Endpoint, and independently stop it on any mailbox failure.
+// CRC/sequence detect corruption and stale replies, not authentication.
+static constexpr size_t Size=32, BodySize=20;
+static constexpr uint8_t ClassicVersion=2, LiveVersion=3;
+inline uint32_t sequenceLimit(uint8_t version){return version==LiveVersion?0xffffffu:0xffffu;}
+inline bool supportedVersion(uint8_t version){return version==ClassicVersion||version==LiveVersion;}
+// Bound all fragments, including the final fetch, by the original request.
+// No refresh on a Fetch packet, even if it has the correct sequence.
+static constexpr uint32_t MaximumExchangeMs=4000;
+inline bool beforeDeadline(uint32_t now,uint32_t start,uint32_t budget){return uint32_t(now-start)<budget;}
+enum class Op:uint8_t { Read=1, Fetch=2, Result=0x81, Chunk=0x82 };
+struct Packet {
+  Op op=Op::Read;
+  uint32_t seq=0;
+  uint8_t version=ClassicVersion;
+  uint8_t length=0;
+  uint8_t body[BodySize]{};
+};
+inline uint16_t get16(const uint8_t* p){return uint16_t(p[0])|(uint16_t(p[1])<<8);}
+inline void put16(uint8_t* p,uint16_t n){p[0]=uint8_t(n);p[1]=uint8_t(n>>8);}
+inline uint32_t get32(const uint8_t* p){
+  uint32_t n=0;for(unsigned i=0;i<4;++i)n|=uint32_t(p[i])<<(8*i);return n;
+}
+inline void put32(uint8_t* p,uint32_t n){for(unsigned i=0;i<4;++i)p[i]=uint8_t(n>>(8*i));}
+inline bool known(Op op){
+  return op==Op::Read||op==Op::Fetch||op==Op::Result||op==Op::Chunk;
+}
+inline bool encode(const Packet& p,uint8_t* out,size_t n){
+  if(!out||n!=Size||!known(p.op)||p.length>BodySize||
+     !supportedVersion(p.version)||p.seq>sequenceLimit(p.version))return false;
+  std::memset(out,0,n);out[0]='C';out[1]='I';out[2]=p.version;out[3]=uint8_t(p.op);
+  put16(out+4,uint16_t(p.seq));out[6]=p.length;out[7]=uint8_t(p.seq>>16);
+  std::memcpy(out+8,p.body,p.length);
+  put32(out+28,link::crc(out,28));return true;
+}
+inline bool decode(const uint8_t* in,size_t n,Packet& out){
+  out=Packet{};
+  if(!in||n!=Size||in[0]!='C'||in[1]!='I'||!supportedVersion(in[2])||(in[2]==ClassicVersion&&in[7])||
+     in[6]>BodySize||get32(in+28)!=link::crc(in,28))return false;
+  for(size_t i=8+in[6];i<28;++i)if(in[i])return false;
+  const auto op=static_cast<Op>(in[3]);if(!known(op))return false;
+  out.op=op;out.version=in[2];out.seq=uint32_t(get16(in+4))|(uint32_t(in[7])<<16);out.length=in[6];
+  std::memcpy(out.body,in+8,out.length);return true;
+}
+using Exchange=J1979CanReadExchange;
+using State=Exchange::State;
+inline uint8_t wireState(State s){
+  switch(s){
+    case State::Positive:return 1;case State::Raw:return 2;
+    case State::Negative:return 3;case State::Timeout:return 4;
+    case State::Fault:return 5;default:return 0;
+  }
+}
+inline State stateFromWire(uint8_t s){
+  switch(s){
+    case 1:return State::Positive;case 2:return State::Raw;
+    case 3:return State::Negative;case 4:return State::Timeout;
+    default:return State::Fault;
+  }
+}
+inline bool validResult(const uint8_t* req,size_t n,const Exchange::Result& r,
+    const J1979FreezeScope* freeze=nullptr,const J1979LiveScope* live=nullptr){
+  if(freeze&&live)return false;
+  const auto s=wireState(r.state);
+  if(!s||r.responseSize>4095||(s<=3)!=(r.responseSize>0))return false;
+  if(s>3)return true;
+  using R=J1979ReadEvidence::Result;
+  const auto evidence=freeze?J1979ReadEvidence::classifyFreeze(*freeze,req,n,r.response,r.responseSize):
+    live?J1979ReadEvidence::classifyLive(*live,req,n,r.response,r.responseSize):
+    J1979ReadEvidence::classify(J1979ReadEvidence::Variant::ClassicCan,req,n,r.response,r.responseSize);
+  return (s==1&&evidence==R::Positive)||(s==2&&evidence==R::Raw)||
+    (s==3&&evidence==R::Negative);
+}
+class Endpoint {
+ public:
+  using Admission=bool(*)();
+  Endpoint(J1979CanReadLink& bus,Exchange::Result& scratch,uint32_t tx,uint32_t rx,
+      bool ext,Admission admitted,const J1979FreezeScope* freeze=nullptr,const J1979LiveScope* live=nullptr):
+      bus_(bus),scratch_(scratch),tx_(tx),rx_(rx),ext_(ext),admitted_(admitted),
+      scoped_(freeze!=nullptr),scope_(freeze?*freeze:J1979FreezeScope{}),sequence_(scope_),
+      liveScoped_(live!=nullptr),liveScope_(live?*live:J1979LiveScope{}),liveSequence_(liveScope_){}
+  Endpoint(const Endpoint&)=delete;
+  Endpoint& operator=(const Endpoint&)=delete;
+  bool closed()const{return closed_;}
+  bool transact(const uint8_t* in,size_t n,uint8_t* out,size_t m){
+    Packet p,r;
+    if(closed_||!admitted_||!admitted_()||!bus_.active()||
+       !J1979CanReadSession::physicalPair(tx_,rx_,ext_)||(scoped_&&!scope_.valid())||
+       (liveScoped_&&!liveScope_.valid())||(scoped_&&liveScoped_)||!out||m!=Size||
+       !decode(in,n,p)||p.version!=version()||p.seq!=next_)return fail();
+    r.seq=p.seq;r.version=version();
+    if(p.op==Op::Read){
+      if(offset_!=scratchSize_||p.length<12||p.length>18)return fail();
+      exchangeStart_=bus_.monotonicMs();
+      const uint16_t timeout=get16(p.body);
+      const size_t reqSize=p.length-11;
+      // The peer's vehicle timeout excludes the SPI reserve. The receiver
+      // still applies a hard maximum to the whole exchange, not per chunk.
+      exchangeBudget_=MaximumExchangeMs;
+      if(timeout<1||timeout>4000||get32(p.body+2)!=tx_||
+         get32(p.body+6)!=rx_||p.body[10]!=(ext_?1:0)||
+         !(scoped_?sequence_.allows(p.body+11,reqSize):liveScoped_?liveScope_.allows(p.body+11,reqSize):
+           J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,p.body+11,reqSize)))
+        return fail();
+      if(liveScoped_){
+        const auto now=bus_.monotonicMs();
+        if(!liveBegun_){liveBegun_=liveSequence_.begin(now);if(!liveBegun_)return fail();}
+        if(!liveSequence_.admit(p.body+11,reqSize,now,timeout))return fail();
+      }
+      Exchange::run(bus_,tx_,rx_,ext_,p.body+11,reqSize,timeout,scratch_,scoped_?&scope_:nullptr,
+        liveScoped_?&liveScope_:nullptr);
+      if(!admitted_()||!bus_.active()||
+         !beforeDeadline(bus_.monotonicMs(),exchangeStart_,exchangeBudget_)||
+         scratch_.elapsedMs>timeout||
+         !validResult(p.body+11,reqSize,scratch_,scoped_?&scope_:nullptr,liveScoped_?&liveScope_:nullptr))return fail();
+      if(liveScoped_&&!liveSequence_.observe(p.body+11,reqSize,scratch_,bus_.monotonicMs()))return fail();
+      if(scoped_&&!sequence_.observe(p.body+11,reqSize,scratch_))return fail();
+      scratchSize_=scratch_.responseSize;offset_=0;
+      r.op=Op::Result;r.length=7;r.body[0]=wireState(scratch_.state);
+      put16(r.body+1,uint16_t(scratchSize_));put32(r.body+3,scratch_.elapsedMs);
+    }else if(p.op==Op::Fetch){
+      if(p.length!=2||get16(p.body)!=offset_||offset_>=scratchSize_||
+         !beforeDeadline(bus_.monotonicMs(),exchangeStart_,exchangeBudget_)||
+         (liveScoped_&&!liveSequence_.remaining(bus_.monotonicMs())))return fail();
+      const size_t remaining=scratchSize_-offset_;
+      const size_t count=remaining<BodySize-2?remaining:BodySize-2;
+      r.op=Op::Chunk;r.length=uint8_t(count+2);
+      put16(r.body,uint16_t(offset_));
+      std::memcpy(r.body+2,scratch_.response+offset_,count);offset_+=count;
+    }else return fail();
+    if(!admitted_()||!bus_.active()||
+       !beforeDeadline(bus_.monotonicMs(),exchangeStart_,exchangeBudget_)||
+       (liveScoped_&&!liveSequence_.remaining(bus_.monotonicMs()))||!encode(r,out,m))return fail();
+    if(next_==sequenceLimit(version())||scratch_.state==State::Fault)closed_=true;
+    else ++next_;
+    return true;
+  }
+ private:
+  uint8_t version()const{return liveScoped_?LiveVersion:ClassicVersion;}
+  bool fail(){closed_=true;return false;}
+  J1979CanReadLink& bus_;Exchange::Result& scratch_;
+  uint32_t tx_,rx_;bool ext_;Admission admitted_;
+  bool scoped_;const J1979FreezeScope scope_;
+  J1979FreezeSequence sequence_;
+  bool liveScoped_;const J1979LiveScope liveScope_;J1979LiveSequence liveSequence_;
+  bool liveBegun_=false;
+  size_t scratchSize_=0,offset_=0;
+  uint32_t exchangeStart_=0,exchangeBudget_=0;
+  uint32_t next_=0;bool closed_=false;
+};
+// Actual SPI master must enforce a bounded request/response transaction,
+// including chip select, response readiness and local session admission.
+// Failure is terminal; no automatic resend of any read or fetch packet.
+class Transport {
+ public:
+  virtual ~Transport()=default;
+  virtual bool active()=0;
+  virtual uint32_t monotonicMs()=0;
+  virtual bool exchange(const uint8_t* request,uint8_t* response,uint32_t timeoutMs)=0;
+};
+class Client final:public J1979CanCampaign::ApplicationLink {
+ public:
+  Client(Transport& transport,uint32_t tx,uint32_t rx,bool ext,const J1979FreezeScope* freeze=nullptr,
+      const J1979LiveScope* live=nullptr)
+    :transport_(transport),tx_(tx),rx_(rx),ext_(ext),scoped_(freeze!=nullptr),scope_(freeze?*freeze:J1979FreezeScope{}),
+      sequence_(scope_),liveScoped_(live!=nullptr),liveScope_(live?*live:J1979LiveScope{}),liveSequence_(liveScope_){}
+  Client(const Client&)=delete;
+  Client& operator=(const Client&)=delete;
+  bool closed()const{return closed_;}
+  bool active()override{
+    return !closed_&&J1979CanReadSession::physicalPair(tx_,rx_,ext_)&&
+      (!scoped_||scope_.valid())&&(!liveScoped_||liveScope_.valid())&&
+      !(scoped_&&liveScoped_)&&transport_.active();
+  }
+  bool matches(uint32_t tx,uint32_t rx,bool ext)const override{
+    return tx==tx_&&rx==rx_&&ext==ext_;
+  }
+  bool matchesFreeze(const J1979FreezeScope& scope)const override{return scoped_&&!liveScoped_&&scope_.same(scope);}
+  bool matchesLive(const J1979LiveScope& scope)const override{return liveScoped_&&!scoped_&&liveScope_.same(scope);}
+  uint32_t monotonicMs()override{return transport_.monotonicMs();}
+  void exchange(const uint8_t* req,size_t n,uint32_t timeout,Exchange::Result& out)override{
+    if(timeout>4000u||!read(req,n,uint16_t(timeout),out)){
+      out.state=State::Fault;out.responseSize=0;closed_=true;
+    }
+  }
+  bool read(const uint8_t* req,size_t n,uint16_t timeout,Exchange::Result& out){
+    out.state=State::Fault;out.responseSize=0;out.elapsedMs=0;
+    if(!active()||!req||n>7||timeout<2||timeout>4000||
+       !(scoped_?sequence_.allows(req,n):liveScoped_?liveScope_.allows(req,n):
+         J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,req,n)))return fail();
+    Packet p,r;p.op=Op::Read;p.length=uint8_t(n+11);
+    // Reserve part of the absolute exchange budget for mailbox overhead.
+    // Every chunk shares the same deadline; no per-fragment extension.
+    const uint32_t started=monotonicMs();
+    if(liveScoped_){
+      if(!liveBegun_){liveBegun_=liveSequence_.begin(started);if(!liveBegun_)return fail();}
+      if(!liveSequence_.admit(req,n,started,timeout))return fail();
+    }
+    const uint16_t reserve=timeout>400?100:uint16_t(timeout/2);
+    const uint16_t vehicleTimeout=uint16_t(timeout-reserve);
+    put16(p.body,vehicleTimeout);put32(p.body+2,tx_);put32(p.body+6,rx_);
+    p.body[10]=ext_?1:0;std::memcpy(p.body+11,req,n);
+    if(!request(p,Op::Result,r,started,timeout)||r.length!=7||
+       r.body[0]<1||r.body[0]>5)return fail();
+    const uint8_t state=r.body[0];const size_t total=get16(r.body+1);
+    if(total>4095||(state<=3)!=(total>0))return fail();
+    const uint32_t elapsed=get32(r.body+3);
+    if(elapsed>vehicleTimeout)return fail();
+    // A result claiming more fragments than the remaining sequence space
+    // cannot be partially consumed and must not be reused as evidence.
+    const uint32_t fragments=uint32_t((total+BodySize-3)/(BodySize-2));
+    if(fragments&& (closed_||fragments-1>sequenceLimit(version())-next_))return fail();
+    size_t offset=0;
+    while(offset<total){
+      Packet fetch,chunk;fetch.op=Op::Fetch;fetch.length=2;put16(fetch.body,uint16_t(offset));
+      if(!request(fetch,Op::Chunk,chunk,started,timeout)||chunk.length<=2||
+         get16(chunk.body)!=offset)return fail();
+      const size_t count=chunk.length-2;
+      const size_t remaining=total-offset;
+      if(count!=(remaining<BodySize-2?remaining:BodySize-2))return fail();
+      std::memcpy(out.response+offset,chunk.body+2,count);offset+=count;
+    }
+    out.state=stateFromWire(state);out.elapsedMs=elapsed;out.responseSize=total;
+    if(!validResult(req,n,out,scoped_?&scope_:nullptr,liveScoped_?&liveScope_:nullptr)){
+      out.state=State::Fault;out.responseSize=0;return fail();
+    }
+    if((scoped_&&!sequence_.observe(req,n,out))||
+       (liveScoped_&&!liveSequence_.observe(req,n,out,monotonicMs()))){
+      out.state=State::Fault;out.responseSize=0;return fail();
+    }
+    if(out.state==State::Fault)closed_=true;
+    return true;
+  }
+ private:
+  uint8_t version()const{return liveScoped_?LiveVersion:ClassicVersion;}
+  bool fail(){closed_=true;return false;}
+  bool request(Packet& p,Op expected,Packet& r,uint32_t started,uint32_t budget){
+    if(!active())return fail();
+    const uint32_t elapsed=uint32_t(monotonicMs()-started);
+    if(elapsed>=budget)return fail();
+    p.seq=next_;p.version=version();uint8_t tx[Size]{},rx[Size]{};
+    if(!encode(p,tx,Size)||!transport_.exchange(tx,rx,budget-elapsed)||
+       !transport_.active()||uint32_t(monotonicMs()-started)>=budget||
+       !decode(rx,Size,r)||r.version!=version()||r.op!=expected||r.seq!=next_)return fail();
+    if(next_==sequenceLimit(version()))closed_=true;else ++next_;
+    return true;
+  }
+  Transport& transport_;uint32_t tx_,rx_;bool ext_;
+  bool scoped_;const J1979FreezeScope scope_;
+  J1979FreezeSequence sequence_;
+  bool liveScoped_;const J1979LiveScope liveScope_;J1979LiveSequence liveSequence_;
+  bool liveBegun_=false;
+  uint32_t next_=0;bool closed_=false;
+};
+} }

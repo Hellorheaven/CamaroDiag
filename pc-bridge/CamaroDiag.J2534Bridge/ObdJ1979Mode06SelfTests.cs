@@ -61,6 +61,32 @@ internal static class ObdJ1979Mode06SelfTests
             ObdJ1979Mode06.DecodeTests([0x06, 0x20],
                 [0x46, 0x20, 0x80, 0x24, 0, 0, 0, 0, 0, 0]),
             "Availability MID is not decoded as test record.");
+        Check(records[0].Scaled is { Unit: "count", Value: 100,
+            Minimum: 0, Maximum: 200, NumericRelation: "WITHIN" },
+            "Known count scale is decoded independently from monitor verdict.");
+        Check(ObdJ1979Mode06.DecodeScale(0x90, 0xFFFF, 0x8000, 0x0000)
+            is { Unit: "ms", Value: -1, Minimum: -32768, Maximum: 0, NumericRelation: "WITHIN" },
+            "Signed monitor values and signed limits are interpreted as two's complement.");
+        Check(ObdJ1979Mode06.DecodeScale(0x24, 2, 3, 1)?.NumericRelation=="INVERTED_LIMITS",
+            "Inverted limits have no in-range comparison.");
+        Check(ObdJ1979Mode06.DecodeScale(0xFF, 1, 0, 2) is null,
+            "Unknown scaling remains raw.");
+        Check(Math.Abs(ObdJ1979Mode06.DecodeScale(0x0A, 1000, 0, 2000)!.Value - 122d)<1e-10,
+            "Voltage scale converts encoded counts into mV.");
+        Check(ObdJ1979Interpretation.Interpret([6,0x21],
+            [0x46,0x21,0x80,0x24,0,100,0,0,0,200]).Description.Contains("unit=count"),
+            "Windows console includes the decoded unit.");
+        Check(Enumerable.Range(0,256).Count(i=>ObdJ1979Mode06.DecodeScale((byte)i,0,0,1)!=null)==79,
+            "Historical Annex E definitions, excluding reserved codes.");
+        Check(ObdJ1979Mode06.DecodeScale(0x99,0,0,1)==null,
+            "Later revision identifiers are not implicitly recognized.");
+        Check(ObdJ1979Mode06.DecodeScale(0x16,400,0,1000) is
+            { Unit: "degC", Value: 0, Minimum: -40, Maximum: 60 },
+            "Unsigned temperature offset.");
+        Check(Math.Abs(ObdJ1979Mode06.DecodeScale(0x39,32768,0,65535)!.Value)<1e-9,
+            "Percentage offset.");
+        Check(ObdJ1979Mode06.DecodeScale(0x2E,2,0,1)==null,
+            "Reserved boolean encoding stays raw.");
         return checks;
     }
 }

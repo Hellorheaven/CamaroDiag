@@ -92,6 +92,8 @@ internal sealed partial class J2534Device : IDisposable
     public string ResponseCanIdLabel => _responseCanId.ToString(_can29Bit ? "X8" : "X3");
     public bool IsStandardObdReadEnabled => _opened && StandardObdPhysicalPolicy.SupportsChannel(
         _requestCanId, _responseCanId, _protocolNumber);
+    public bool IsPrimaryStandardObdChannel => _opened && StandardObdPhysicalPolicy.SupportsPrimaryChannel(
+        _requestCanId, _responseCanId, _protocolNumber);
     public bool IsMemoryReadEnabled => _memoryReadScope != null && _memoryReadVinVerified;
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -336,7 +338,7 @@ internal sealed partial class J2534Device : IDisposable
         // A response from the right CAN ID but another DID is stale.
         var echoLength = request[0] switch
         {
-            0x01 or 0x06 or 0x09 or 0x1A => 1,
+            0x01 or 0x06 or 0x08 or 0x09 or 0x1A => 1,
             0x02 => 2,
             0x22 => 2,
             0x10 or 0x19 or 0x3E => 1,
@@ -445,7 +447,7 @@ internal sealed partial class J2534Device : IDisposable
     internal void ClearStandardObdDtcs(bool locallyEnabled)
     {
         EnsureOpen();
-        if (!locallyEnabled || !IsStandardObdReadEnabled)
+        if (!locallyEnabled || !IsPrimaryStandardObdChannel)
             throw new UnauthorizedAccessException("Standard OBD clear is not enabled for this physical channel.");
         // No guessed engine state. Require actual zero-speed and zero-RPM
         // positive Mode 01 responses just before the irreversible reset.
@@ -453,12 +455,77 @@ internal sealed partial class J2534Device : IDisposable
         byte[] speed = Exchange([0x01,0x0D], 1800);
         ClearNativeReceiveQueue();
         byte[] rpm = Exchange([0x01,0x0C], 1800);
-        if (!StandardObdPhysicalPolicy.CanClear(locallyEnabled, IsStandardObdReadEnabled, speed, rpm))
+        if (!StandardObdPhysicalPolicy.CanClear(locallyEnabled, IsPrimaryStandardObdChannel, speed, rpm))
             throw new InvalidOperationException("Stop the vehicle and engine before an emissions diagnostic reset.");
         ClearNativeReceiveQueue();
         var ack = ExchangeCore([0x04], 2500, nativeBenchReply: false);
         if (!StandardObdPhysicalPolicy.IsClearAcknowledged(ack))
             throw new IOException("Standard OBD clear not confirmed by exact positive Mode 04 response.");
+    }
+
+    /// <summary>Explicit local Mode 02 campaign on an already opened physical
+    /// standard OBD channel. The generic bridge and console policies remain
+    /// unchanged. Flush stale responses before each correlated exchange.</summary>
+    internal ObdJ1979FreezeCampaign.Result RunStandardFreezeCampaign(
+        ObdJ1979FreezeCampaign.Plan requested, Action requireCurrent)
+    {
+        EnsureOpen();
+        if (!IsStandardObdReadEnabled || _memoryReadScope is not null)
+            throw new InvalidOperationException("A dedicated physical OBD channel is required.");
+        var plan = requested.Validate();
+        return ObdJ1979FreezeCampaign.Run(plan, (request, timeout) =>
+        {
+            if (!ObdJ1979FreezeCampaign.Allows(request, plan.Frames))
+                throw new InvalidOperationException("Request outside selected freeze frames.");
+            requireCurrent();
+            ClearNativeReceiveQueue();
+            requireCurrent();
+            return ExchangeCore(request, timeout, nativeBenchReply: false);
+        }, requireCurrent);
+    }
+
+    /// <summary>Local, separately authorized Mode 04 recipe, not the
+    /// network bridge's ordinary reset endpoint.</summary>
+    internal ObdJ1979ClearRecipe.Result RunStandardClearRecipe(string expectedVin,
+        bool warningAcknowledged, bool confirmedYes, Action requireCurrent, Action<ObdJ1979ClearRecipe.Result> saveBaseline)
+    {
+        EnsureOpen();
+        return ObdJ1979ClearRecipe.Run(expectedVin, IsPrimaryStandardObdChannel,
+            warningAcknowledged, confirmedYes, requireCurrent,
+            (request, timeout) =>
+            {
+                ClearNativeReceiveQueue();
+                requireCurrent();
+                return Exchange(request, timeout);
+            },
+            () =>
+            {
+                ClearNativeReceiveQueue();
+                requireCurrent();
+                return ExchangeCore([0x04], 2500, nativeBenchReply: false);
+            },saveBaseline);
+    }
+
+    /// <summary>Dedicated local EVAP test only. Never reachable from the
+    /// generic read or network bridge exchange methods.</summary>
+    internal ObdJ1979EvapTest.Result RunStandardEvapTest(string expectedVin,
+        bool warningAcknowledged, bool confirmedYes, Action requireCurrent)
+    {
+        EnsureOpen();
+        return ObdJ1979EvapTest.Run(expectedVin, IsPrimaryStandardObdChannel,
+            warningAcknowledged, confirmedYes, requireCurrent,
+            (request, timeout) =>
+            {
+                ClearNativeReceiveQueue();
+                requireCurrent();
+                return Exchange(request, timeout);
+            },
+            () =>
+            {
+                ClearNativeReceiveQueue();
+                requireCurrent();
+                return ExchangeCore([0x08, 0x01], 2500, nativeBenchReply: false);
+            });
     }
 
     public void SendOnly(byte[] payload)

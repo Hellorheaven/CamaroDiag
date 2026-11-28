@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cal_recovery_snapshot_sha256">SHA-256 des preuves inspectées</string>
+    <string name="cdj_expected_transaction">Transaction attendue (facultative, 32 caractères hex.)</string>
+    <string name="cdj_expected_manifest">SHA-256 du manifeste attendu (facultatif)</string>
+    <string name="cdj_open">Ouvrir un checkpoint CDJ/1</string>
+    <string name="cdj_reinspect">Analyser à nouveau</string>
+    <string name="cdj_inspecting">Analyse du checkpoint…</string>
+    <string name="cdj_corrupt">Checkpoint indisponible ou corrompu</string>
+    <string name="cdj_recovery">Évaluation de récupération requise</string>
+    <string name="cdj_blocked">Aucune action de récupération autorisée</string>
+    <string name="cdj_identity_mismatch">Identité du checkpoint discordante</string>
+    <string name="cdj_transaction">Transaction : %1$s</string>
+    <string name="cdj_manifest">SHA-256 du manifeste : %1$s</string>
+    <string name="cdj_changed">Les preuves ont changé. Analysez à nouveau.</string>
+    <string name="cdj_inspection_failed">Le checkpoint ne peut pas être analysé.</string>
+    <string name="cdj_unauthenticated">Preuves hors ligne non authentifiées.</string>
+    <string name="cdj_folder_authorized">Dossier CamaroDiag autorisé. Relancez l’export.</string>
+    <string name="cdj_folder_required">Sélectionnez le dossier de stockage CamaroDiag.</string>
+    <string name="cdj_export">Exporter le checkpoint JSON</string>
+    <string name="cdj_export_failed">Échec de l’export du rapport checkpoint.</string>
+    <string name="recovery_journal_counts">Journal : %1$d entrées · %2$d originaux · %3$d écrits vérifiés · %4$d relus</string>
+    <string name="recovery_journal_sha256">SHA-256 du journal</string>
+    <string name="recovery_envelope_sha256">SHA-256 de l’enveloppe</string>
+    <string name="recovery_source_changed">Les preuves ont changé. Sélectionnez et analysez de nouveau le dossier.</string>
+    <string name="recovery_history_title">Historique de récupération — du plus ancien au plus récent</string>
+    <string name="recovery_history_folder">%1$d. %2$s</string>
+    <string name="recovery_history_add">Ajouter un dossier instantané</string>
+    <string name="recovery_history_up">Monter</string>
+    <string name="recovery_history_down">Descendre</string>
+    <string name="recovery_history_remove">Retirer</string>
+    <string name="recovery_history_inspect">Comparer les instantanés</string>
+    <string name="recovery_history_duplicate">Sélectionnez un autre dossier instantané.</string>
+    <string name="recovery_history_verified">Continuité des journaux vérifiée</string>
+    <string name="recovery_history_rejected">Historique non vérifié</string>
+    <string name="recovery_history_failed_ordinal">Instantané refusé : %1$d</string>
+    <string name="recovery_history_snapshot">%1$d. %2$s — %3$d entrées</string>
+    <string name="recovery_history_transition">%1$d → %2$d : +%3$d entrées, +%4$d octets</string>
+    <string name="recovery_history_latest">Dernier état enregistré : %1$s</string>
+    <string name="recovery_history_invalid_selection">Sélectionnez 2 à 8 dossiers instantanés distincts.</string>
+    <string name="recovery_history_unverified_snapshot">Un journal ou ses secteurs originaux n’ont pas pu être vérifiés.</string>
+    <string name="recovery_history_original_changed">Les preuves des secteurs originaux diffèrent entre les instantanés.</string>
+    <string name="recovery_history_not_extension">Historique de journaux dupliqué, inversé ou divergent.</string>
+    <string name="recovery_history_terminal_extension">Un journal terminé ne peut pas avoir de suite.</string>
+</resources>

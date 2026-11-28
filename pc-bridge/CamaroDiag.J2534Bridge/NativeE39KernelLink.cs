@@ -34,6 +34,8 @@ internal sealed class NativeE39KernelLink : NativeE39WriteSequence.IKernelLink
         {
             token.ThrowIfCancellationRequested();
             var reply = await exchange([0x3D, 0x00], token);
+            // Probe must never mark an already-cancelled kernel session ready.
+            token.ThrowIfCancellationRequested();
             byte[] expected = [0x7D, 0x00, 0x43, 0x44, 0x33, 0x39, 1, 0, 28, 0];
             if (!reply.SequenceEqual(expected))
                 throw new InvalidDataException("Unrecognized, incompatible or recovery-required CD39 kernel.");
@@ -54,16 +56,26 @@ internal sealed class NativeE39KernelLink : NativeE39WriteSequence.IKernelLink
         try
         {
             token.ThrowIfCancellationRequested();
-            return await exchange(request.ToArray(), token);
+            var reply = await exchange(request.ToArray(), token);
+            // Fail closed even when an ECU adapter ignores the token and
+            // returns an apparent positive erase/write/read acknowledgement.
+            token.ThrowIfCancellationRequested();
+            return reply;
         }
         catch { failed = true; throw; }
     }
 
-    public Task<uint?> ReadSupplyMillivoltsAsync(CancellationToken token)
+    public async Task<uint?> ReadSupplyMillivoltsAsync(CancellationToken token)
     {
         RequireReady();
-        token.ThrowIfCancellationRequested();
-        return supply(token);
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            var millivolts = await supply(token);
+            token.ThrowIfCancellationRequested();
+            return millivolts;
+        }
+        catch { failed = true; throw; }
     }
 
     public async Task<byte[]> ReadFlashBytesAsync(uint address, int length, CancellationToken token)
@@ -86,6 +98,7 @@ internal sealed class NativeE39KernelLink : NativeE39WriteSequence.IKernelLink
                 Buffer.BlockCopy(reply, 1, bytes, offset, count);
                 offset += count;
             }
+            token.ThrowIfCancellationRequested();
             return bytes;
         }
         catch { failed = true; throw; }

@@ -82,8 +82,24 @@ internal static class ObdJ1979InterpretationSelfTests
             monitorTest.Description.Contains("TID=0x80") &&
             monitorTest.Description.Contains("UASID=0x24") &&
             monitorTest.Description.Contains("raw=100") &&
-            monitorTest.Description.Contains("no UASID conversion"),
-            "Mode 06 physical monitor test retains raw unit/scaling ID.");
+            monitorTest.Description.Contains("unit=count") &&
+            monitorTest.Description.Contains("no monitor pass verdict"),
+            "Mode 06 retains raw unit/scaling ID and exposes known engineering values.");
+        foreach (var encoded in new[]{"00800100","00001100","00010110","00080400","00080004"})
+        {
+            var baseline=Convert.FromHexString(encoded);
+            var cycle=ObdJ1979OperatingContext.DecodeCycle([0,(byte)(baseline[1]&8),1,0],baseline);
+            Check(cycle is {SupportVerified:false} && cycle.Monitors.All(x=>x.Supported is null),
+                "Malformed PID01 cannot establish monitor support.");
+        }
+        var ambiguous=ObdJ1979OperatingContext.Project(new ObdJ1979OperatingContext.Observation[]{
+            new("0101","410100010100","PASSED"),new("0101","410100","RAW"),
+            new("0141","414100010100","PASSED"),new("011D","411D30","PASSED"),
+            new("011D","411D3030","RAW"),new("0106","41068090","PASSED")});
+        Check(ambiguous.DriveCycle is {SupportVerified:false} &&
+            ambiguous.FuelTrims.Single().Signals[1].Number is null,
+            "Ambiguous operating context never establishes monitor or upper-bank support.");
+
         var readiness = ObdJ1979Interpretation.Interpret(
             [0x01, 0x01], [0x41, 0x01, 0x83, 0x08, 0xA5, 0x5A]);
         Check(readiness.Positive &&
@@ -213,6 +229,16 @@ internal static class ObdJ1979InterpretationSelfTests
             StandardProtocolCli.ParseIsoTp(args.Concat(
                 new[] { "--mode", "receive" }).ToArray()),
             "J1979 correlation needs outgoing request.");
+        var fuel=ObdJ1979Status.DecodeResponse([1,3],[0x41,3,2,3]);
+        Check(fuel is {Count:2}&&fuel[0].State=="CLOSED_FEEDBACK"&&fuel[1].State=="UNKNOWN",
+            "fuel status retains unknown code");
+        var boost=new byte[12];boost[0]=0x41;boost[1]=0x70;boost[2]=4;boost[11]=14;
+        var states=ObdJ1979Status.DecodeResponse([1,0x70],boost);
+        Check(states is {Count:1}&&states[0].State=="CLOSED_LOOP","boost mask isolates status A");
+        Check(ObdJ1979Interpretation.Interpret([1,0x70],boost).Description.Contains("CLOSED_LOOP"),
+            "console includes categorical fields");
+        boost[11]=0xFE;
+        Check(ObdJ1979Status.DecodeResponse([1,0x70],boost) is null,"reserved boost bits rejected");
         return checks;
     }
 }

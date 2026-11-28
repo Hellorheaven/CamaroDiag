@@ -1,0 +1,77 @@
+scope: protocol
+protocol: DoIP ISO 13400
+branch: chore/unified-ci
+pull_request: 117
+phase: final software acceptance; no claim of hardware qualification
+criteria:
+- UDP vehicle identification (IPv4/IPv6, VIN/EID, versions, gateway identity and status)
+- TCP/TLS routing activation, AliveCheck, diagnostic ACK/NACK, UDS NRC, deadlines and socket retirement
+- Read-only VIN, DID, DTC, ECU inventory and live DID monitoring through Android, Windows GUI/CLI and Python Connectors
+- Confirmed UDS sequence TX: separate OK/YES, immutable bytes, same-session VIN, exclusive route and no automatic retry
+- Sequence success only after TCP/TLS close, stable final gateway identity and trace close; partial failures retained
+- Scoped memory capture, double read, archive hash/CRC and offline integrity on supported platforms
+- Negative, cancellation, timeout, gateway substitution, concurrency and loopback regression suites
+- Debug Android/Windows/Connectors full validation with warnings treated as failures
+- No ECU hardware, bench, vehicle or Release tests at this stage
+C6 overall stays open; do not close other protocols or workstreams.
+
+attempt: 2 -- correction group after initial final gate
+previous_gate_sha: 09ff9fc32eb990f11ea337552ea97ac35f9ff2d5
+initial_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45799247412
+corrected:
+- Python: explicit two-DID monitoring fixture and per-ECU/final gateway revalidation expectations
+- Windows: eliminate Span-across-await and duplicate C# test variable declaration
+- Android: preserve two different DoIP extended-record labels under unique FR/EN resource keys
+correction_commits: 904fb7285775b354e6f1648d709a70840bfe0d5e, 64dc33b3eabb8a7c557868bc014f79a8330d43c6
+
+attempt: 3 -- second grouped closure fixes
+previous_gate_sha: 7c78d134deaf50a08253af02550839353721ed66
+previous_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45799781302
+corrected:
+- Windows DoIpVinReader: all fifteen decoder lambdas separate awaited byte array acquisition from ReadOnlySpan decoder arguments, plus VIN and DID decode
+- Android diagnostic Mode06: ObdCanMonitorRecords source and test use canonical Kotlin package, preserving referenced identity reassembler
+correction_commits: f80bb2ba516dbf796804d21f308a9bcf8a903b69, c4b750b7d3a90714298dc99535bb160afc8a0a07
+
+attempt: 4 -- grouped third-gate corrections
+previous_gate_sha: 199ac2bdbc9a9e9ad0b9fabec1406efd69966abf
+previous_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45800607732
+corrected:
+- Windows simulated DoIP ECU self-tests: six Decoders now consume byte arrays after await, preventing ReadOnlySpan across await
+- Android diagnostic unit tests: LFX simulated Obd2FeatureEngine uses explicit ObdCommandChannel constructor (new optional Boolean second argument)
+commits: 9fca7331b027f116569eb67f56fe6aec92242aa5, be041ae30259e6d7fe4dbaa8e722cc50f5c067ad
+
+attempt: 5 -- regrouped self-test and simulator fixes
+previous_gate_sha: 3b7bf0f10fcfb6246a1645ba7cd91db8db0ded62
+previous_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45801451727
+corrected:
+- Windows DoIP diagnostic sequence self-test must inspect custom 22 1234 frame with generic ReadAsync, not F190-only helper
+- Simulator LFX Mode01 replies inherit the same synthetic physical responder 7E8 advertised in support bitmap; no anonymous live data in physically attributed scan
+- Simulator test now explicitly requires stable physical responder for synthetic RPM evidence
+commits: e10c7de09024b7a2d061011adb664a6b7ec9c859, 77535af20df3a6f0a3e630a549b67c5f53f88990, 553f0130791adfe4aee7e94ac76f3c834e3668e9
+
+attempt: 6 -- grouped final DoIP gate
+previous_gate_sha: 32a3c84816a7bc4117dc46a73f9e482db1dcbbd9
+previous_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45802379339
+corrected:
+- Windows DoIP protocol CLI: compare output binary path to normalized Path.GetFullPath() (commit fd642d3)
+- Android simulator: consistent physical 7E8 provenance for Mode02 DTC, support bitmap and freeze-frame values
+- Regress Mode02 source continuity on the synthetic LFX simulator without relaxing strict real ECU attribution
+commits: fd642d3a2ab52643ad5d9f421a0c33939a630f89, e7720e438a082ba70e4b8fd804122db8228a6145, f07bb766dd01d2a53f39aa9079557ce8e548be54
+
+attempt: 7 -- final acceptance after correcting Mode02 Kotlin syntax
+previous_gate_sha: 279b0e790b3dbfbde032b548a16295d174c4adda
+previous_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45803467014
+previous_gate_status: Windows Debug and self-tests, Python 3.11/3.12/3.13, native, STM32 and ESP32 all passed; Android failed only at diagnostic Kotlin syntax.
+corrected:
+- Close the combined Mode01/Mode02 positive-response condition; preserve physical 7E8 source pinning and test.
+correction_commit: 520750dc9253748725c6092ec968a8435bd13a18
+
+attempt: 8 -- grouped DoIP closure; Android app integration after diagnostic passed
+previous_gate_sha: 80bc07e8e3de39f090e9fc5bdcfb5ae1b138b6ca
+previous_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45804010207
+previous_gate_status: Python 3.11/3.12/3.13, Windows, native and both firmware builds passed; Android diagnostic compiled and app compile failed on old UDS namespace (2) and missing Compose clickable import.
+corrected:
+- Android MainViewModel failure classification uses canonical com.camarodiag UdsNegativeResponseException and preserves numeric NRC
+- Android ObdScanScreen DTC card explicitly imports Compose clickable
+- C6: E39 kernel link exclusive operation plus simulated concurrency/cancellation regression added, scoped to one actual link, not a global ECU prohibition
+correction_commits: 7b6c904d8978bd97674ab130f5cbf40162c1e79d, e0730eacd59848e75ac7c7e648df5e825caa579a

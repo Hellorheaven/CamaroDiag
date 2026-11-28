@@ -15,21 +15,168 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.camarodiag.gen5.R
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import com.camarodiag.gen5.data.obd.EcuWriteConsentFlow
+import com.camarodiag.gen5.data.obd.LegacyMutationTarget
+import com.camarodiag.gen5.domain.model.VehicleProfile
 
 @Composable
 fun FunctionalTestsScreen(
     state: FunctionalTestState,
     onRunAll: () -> Unit,
     onStop: () -> Unit,
-    onExport: () -> Unit
+    onExport: () -> Unit,
+    onRunProtocol: (FunctionalProtocol, DoIpFunctionalTarget?) -> Unit,
+    vehicle: VehicleProfile,
+    connectionGeneration: Long,
+    evapAvailable: Boolean,
+    onRunEvap: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit,
+    onRunClear: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit,
+    legacyAvailableProtocol: Int?,
+    onRunLegacy: (LegacyMutationTarget, EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit,
+    onRunLegacyRead: (com.camarodiag.gen5.data.obd.LegacyReadTarget, Long, VehicleProfile) -> Unit,
+    liveProtocol: Int?,
+    onRunLive: (com.camarodiag.gen5.data.obd.J1979LivePlan,Long,VehicleProfile)->Unit,
+    onExportLiveCsv: ()->Unit,
+    onExportNativeScalar: (Boolean)->Unit,
+    onProjectCatalogue: (android.net.Uri,android.net.Uri,android.net.Uri,String,Long,VehicleProfile)->Unit,
+    onInspectNativePrefix: (android.net.Uri,Long,VehicleProfile)->Unit,
+    onInspectNativeFreezePrefix: (android.net.Uri,Long,VehicleProfile)->Unit,
+    onVerifyNativeFreezePrefix: (android.net.Uri,android.net.Uri,Long,VehicleProfile)->Unit,
+    onVerifyNativeScalar: (android.net.Uri,android.net.Uri,Long,VehicleProfile)->Unit,
+    onInspectNativeMaintenance: (android.net.Uri,Long,VehicleProfile)->Unit,
+    onInspectNativeMaintenancePrefix: (android.net.Uri,Long,VehicleProfile)->Unit,
+    onRunFreeze: (com.camarodiag.gen5.data.obd.J1979FreezePlan,Long,VehicleProfile)->Unit,
+    onRunNetwork: (com.camarodiag.gen5.data.obd.J1979NetworkPlan,Long,VehicleProfile)->Unit,
+    onRunNativeFreeze: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorFreezeCampaign.Target,
+        android.net.Uri,Long,VehicleProfile)->Unit,
+    onRunNativeMaintenance: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorMaintenanceCampaign.Target,
+        android.net.Uri, Long, VehicleProfile)->Unit,
+    onRunNativeLive: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.Target,
+        android.net.Uri,Long,VehicleProfile)->Unit,
+    nativeUsbEnabled: Boolean,
+    onRunNativeUsb: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.Target,
+        android.net.Uri, Long, VehicleProfile) -> Unit
 ) {
+    var selected by remember { mutableStateOf(FunctionalProtocol.J1979) }
+    var expanded by remember { mutableStateOf(false) }
+    var host by remember { mutableStateOf("") }
+    var tester by remember { mutableStateOf("") }
+    var ecu by remember { mutableStateOf("") }
+    var vin by remember { mutableStateOf("") }
+    var tls by remember { mutableStateOf(true) }
+    var physical by remember { mutableStateOf(false) }
+    var evapConfirmedProfile by remember { mutableStateOf(false) }
+    var evapPending by remember { mutableStateOf<Pair<Long, VehicleProfile>?>(null) }
+    var evapStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
+    var clearSelected by remember { mutableStateOf(false) }
+    var engineSource by remember { mutableStateOf("") }
+    var documentedSources by remember { mutableStateOf("") }
+    var legacyProfileConfirmed by remember { mutableStateOf(false) }
+    var readSource by remember { mutableStateOf("") }
+    var readProfileConfirmed by remember { mutableStateOf(false) }
+    var legacyPending by remember { mutableStateOf<Triple<Long, VehicleProfile, LegacyMutationTarget>?>(null) }
+    var legacyStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
+    LaunchedEffect(vehicle, connectionGeneration, legacyAvailableProtocol, selected) {
+        legacyPending = null
+        legacyProfileConfirmed = false
+        engineSource = ""
+        readSource = ""
+        readProfileConfirmed = false
+        documentedSources = ""
+        legacyStep = EcuWriteConsentFlow.Step.WARNING
+    }
+    fun parseSource(value: String): Int? =
+        value.trim().takeIf { it.matches(Regex("[0-9A-Fa-f]{2}")) }?.toIntOrNull(16)
+    val legacyProtocol = selected.expectedLegacyElmProtocol
+    val parsedEngine = parseSource(engineSource)
+    val parsedSources = documentedSources.split(",").map(::parseSource)
+    val legacyTarget = if (legacyProtocol != null && parsedEngine != null && parsedSources.all { it != null })
+        LegacyMutationTarget(legacyProtocol,parsedEngine,parsedSources.filterNotNull(),true) else null
+    val legacyReady = legacyAvailableProtocol == legacyProtocol && legacyTarget?.valid == true &&
+        legacyProfileConfirmed && !state.running && vehicle.vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
+    legacyPending?.let { (epoch, profile, target) ->
+        val warning = legacyStep == EcuWriteConsentFlow.Step.WARNING
+        AlertDialog(
+            onDismissRequest = { legacyPending = null; legacyProfileConfirmed = false },
+            title = { Text(stringResource(if (target.clear) R.string.functional_clear_run else R.string.functional_evap_run)) },
+            text = { Text(if (warning) stringResource(R.string.functional_legacy_mutation_scope) + "\n\n" +
+                stringResource(if (target.clear) R.string.functional_clear_warning else R.string.functional_evap_warning)
+                else stringResource(R.string.functional_legacy_mutation_confirm,profile.vin,
+                    target.sources.joinToString(",") { "%02X".format(java.util.Locale.ROOT,it) })) },
+            confirmButton = { TextButton(onClick = {
+                if (epoch != connectionGeneration || profile != vehicle ||
+                    legacyAvailableProtocol != target.protocol || selected.expectedLegacyElmProtocol != target.protocol ||
+                    legacyTarget?.copy(clear=target.clear) != target || !legacyReady) {
+                    legacyPending = null
+                    legacyProfileConfirmed = false
+                } else if (warning) {
+                    legacyStep = EcuWriteConsentFlow.afterWarningOk(legacyStep)
+                } else {
+                    EcuWriteConsentFlow.approvalForContext(legacyStep,true,epoch,connectionGeneration,profile==vehicle)
+                        ?.let { onRunLegacy(target,it,epoch,profile) }
+                    legacyPending = null
+                    legacyProfileConfirmed = false
+                }
+            }) { Text(stringResource(if (warning) R.string.functional_evap_ok else R.string.functional_evap_yes)) } },
+            dismissButton = { TextButton(onClick = {
+                legacyPending = null
+                legacyProfileConfirmed = false
+            }) { Text(stringResource(if (warning) R.string.functional_evap_cancel else R.string.functional_evap_no)) } })
+    }
+    LaunchedEffect(vehicle, connectionGeneration, evapAvailable) {
+        evapPending = null
+        evapConfirmedProfile = false
+        evapStep = EcuWriteConsentFlow.Step.WARNING
+        clearSelected = false
+    }
+    evapPending?.let { (epoch, profile) ->
+        val warning = evapStep == EcuWriteConsentFlow.Step.WARNING
+        AlertDialog(onDismissRequest = { evapPending = null; evapConfirmedProfile = false },
+            title = { Text(stringResource(if (clearSelected) R.string.functional_clear_run else R.string.functional_evap_run)) },
+            text = { Text(if (warning) stringResource(if (clearSelected) R.string.functional_clear_warning else R.string.functional_evap_warning)
+                else stringResource(if (clearSelected) R.string.functional_clear_confirm else R.string.functional_evap_confirm, profile.vin)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (epoch != connectionGeneration || profile != vehicle || !evapAvailable) {
+                        evapPending = null
+                    } else if (warning) {
+                        evapStep = EcuWriteConsentFlow.afterWarningOk(evapStep)
+                    } else {
+                        EcuWriteConsentFlow.approvalForContext(evapStep, true, epoch,
+                            connectionGeneration, profile == vehicle)?.let {
+                                if (clearSelected) onRunClear(it, epoch, profile) else onRunEvap(it, epoch, profile)
+                            }
+                        evapPending = null
+                        evapConfirmedProfile = false
+                    }
+                }) { Text(stringResource(if (warning) R.string.functional_evap_ok else R.string.functional_evap_yes)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { evapPending = null; evapConfirmedProfile = false }) {
+                    Text(stringResource(if (warning) R.string.functional_evap_cancel else R.string.functional_evap_no))
+                }
+            })
+    }
+    val doIp = DoIpFunctionalTarget(host.trim(), tester, ecu, vin, tls, physical)
     val fr = LocalConfiguration.current.locales[0].language == "fr"
     val passed = state.checks.count { it.outcome == FunctionalTestOutcome.PASSED }
     val failed = state.checks.count { it.outcome == FunctionalTestOutcome.FAILED }
@@ -39,6 +186,158 @@ fun FunctionalTestsScreen(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.functional_tests_title), style = MaterialTheme.typography.titleLarge)
                 Text(stringResource(R.string.functional_tests_readonly), style = MaterialTheme.typography.bodySmall)
+                Box {
+                    OutlinedButton(onClick = { expanded = true }, enabled = !state.running, modifier = Modifier.fillMaxWidth()) {
+                        Text(selected.title)
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        FunctionalProtocol.entries.forEach { protocol ->
+                            DropdownMenuItem(text = { Text(protocol.title + if (protocol.implemented) "" else
+                                " — " + stringResource(R.string.functional_protocol_pending)) }, onClick = {
+                                selected = protocol; expanded = false
+                            })
+                        }
+                    }
+                }
+                if (selected == FunctionalProtocol.J1979) Text(stringResource(R.string.functional_j1979_candidates))
+                selected.expectedLegacyElmProtocol?.let { number ->
+                    val candidate = when (number) {
+                        1 -> R.string.functional_legacy_pwm_candidates
+                        2 -> R.string.functional_legacy_vpw_candidates
+                        3 -> R.string.functional_legacy_iso9141_candidates
+                        else -> R.string.functional_legacy_kwp_candidates
+                    }
+                    Text(stringResource(candidate), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.functional_legacy_route_required), style = MaterialTheme.typography.bodySmall)
+                }
+                if (selected == FunctionalProtocol.DOIP) {
+                    Text(stringResource(R.string.functional_doip_candidates))
+                    OutlinedTextField(host, { host = it.take(80); physical = false },
+                        label = { Text(stringResource(R.string.functional_doip_host)) }, enabled = !state.running,
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(tester, { tester = it.uppercase().take(4); physical = false },
+                        label = { Text(stringResource(R.string.functional_doip_tester)) }, enabled = !state.running,
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(ecu, { ecu = it.uppercase().take(4); physical = false },
+                        label = { Text(stringResource(R.string.functional_doip_ecu)) }, enabled = !state.running,
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(vin, { vin = it.uppercase().take(17); physical = false },
+                        label = { Text(stringResource(R.string.functional_doip_vin)) }, enabled = !state.running,
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(tls, { tls = it; physical = false }, enabled = !state.running)
+                        Text(stringResource(R.string.functional_doip_tls))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(physical, { physical = it }, enabled = !state.running)
+                        Text(stringResource(R.string.functional_doip_confirm))
+                    }
+                }
+                Button(onClick = {
+                    onRunProtocol(selected, doIp.takeIf { selected == FunctionalProtocol.DOIP })
+                    if (selected == FunctionalProtocol.DOIP) physical = false
+                }, enabled = !state.running && selected.implemented &&
+                    (selected != FunctionalProtocol.DOIP || doIp.valid),
+                    modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.functional_protocol_run))
+                }
+                if (selected == FunctionalProtocol.J1979) {
+                    J1979NetworkPanel(liveProtocol?.takeIf { it in 6..9 },state,vehicle,connectionGeneration,onRunNetwork)
+                    J1979LivePanel(liveProtocol?.takeIf { it in 6..9 },state,vehicle,connectionGeneration,onRunLive,onExportLiveCsv)
+                    J1979CataloguePanel(!state.running,vehicle,connectionGeneration,onProjectCatalogue)
+                    J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativePrefix)
+                    J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativeFreezePrefix,freeze=true)
+                    J1979FreezePrefixVerifyPanel(!state.running,vehicle,connectionGeneration,onVerifyNativeFreezePrefix)
+                    J1979FreezePrefixVerifyPanel(!state.running,vehicle,connectionGeneration,onVerifyNativeScalar,scalar=true)
+                    J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativeMaintenance,maintenance=true)
+                    J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativeMaintenancePrefix,maintenance=true,interrupted=true)
+                    J1979FreezePanel(liveProtocol?.takeIf { it in 1..9 },state,vehicle,connectionGeneration,onRunFreeze)
+                    NativeUsbFunctionalPanel(nativeUsbEnabled && !state.running, connectionGeneration, vehicle, onRunNativeUsb,onRunFreeze=onRunNativeFreeze,onRunLive=onRunNativeLive,onRunMaintenance=onRunNativeMaintenance)
+                    Text(stringResource(R.string.functional_evap_scope), style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(evapConfirmedProfile, { evapConfirmedProfile = it },
+                            enabled = evapAvailable && !state.running)
+                        Text(stringResource(R.string.functional_evap_profile, vehicle.vin))
+                    }
+                    OutlinedButton(onClick = {
+                        clearSelected = false
+                        evapStep = EcuWriteConsentFlow.Step.WARNING
+                        evapPending = connectionGeneration to vehicle
+                    }, enabled = evapAvailable && !state.running && evapConfirmedProfile &&
+                        vehicle.vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")),
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.functional_evap_run))
+                    }
+                    OutlinedButton(onClick = {
+                        clearSelected = true
+                        evapStep = EcuWriteConsentFlow.Step.WARNING
+                        evapPending = connectionGeneration to vehicle
+                    }, enabled = evapAvailable && !state.running && evapConfirmedProfile &&
+                        vehicle.vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")),
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.functional_clear_run))
+                    }
+                }
+                if (legacyProtocol != null) {
+                    J1979LivePanel(liveProtocol?.takeIf { it==legacyProtocol },state,vehicle,connectionGeneration,onRunLive,onExportLiveCsv)
+                    val sourceTarget=parseSource(readSource)?.let {
+                        com.camarodiag.gen5.data.obd.LegacyReadTarget(legacyProtocol,it,vehicle.vin)
+                    }
+                    OutlinedTextField(readSource,{readSource=it.uppercase().take(2);readProfileConfirmed=false},
+                        label={Text(stringResource(R.string.legacy_read_source))},
+                        enabled=!state.running,singleLine=true,modifier=Modifier.fillMaxWidth())
+                    state.legacyDiscovery?.takeIf {
+                        it.protocol==legacyProtocol && state.context?.connectionGeneration==connectionGeneration &&
+                            state.context?.selectedVin==vehicle.vin
+                    }?.verifiedSources?.forEach { source ->
+                        OutlinedButton(onClick={readSource=source;readProfileConfirmed=false},enabled=!state.running) {
+                            Text(stringResource(R.string.legacy_read_select_source,source))
+                        }
+                    }
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Checkbox(readProfileConfirmed,{readProfileConfirmed=it},
+                            enabled=!state.running && legacyAvailableProtocol==legacyProtocol)
+                        Text(stringResource(R.string.legacy_read_confirm,vehicle.vin))
+                    }
+                    OutlinedButton(onClick={
+                        sourceTarget?.let { onRunLegacyRead(it,connectionGeneration,vehicle) }
+                        readProfileConfirmed=false
+                    },enabled=!state.running && legacyAvailableProtocol==legacyProtocol &&
+                        sourceTarget?.valid==true && readProfileConfirmed,
+                        modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.legacy_read_run)) }
+                    Text(stringResource(R.string.functional_legacy_mutation_scope),style=MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(engineSource,{ engineSource=it.uppercase().take(2);legacyProfileConfirmed=false },
+                        label={ Text(stringResource(R.string.functional_legacy_engine_source)) },
+                        singleLine=true,enabled=!state.running,modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(documentedSources,{ documentedSources=it.uppercase().take(127);legacyProfileConfirmed=false },
+                        label={ Text(stringResource(R.string.functional_legacy_documented_sources)) },
+                        singleLine=true,enabled=!state.running,modifier=Modifier.fillMaxWidth())
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Checkbox(legacyProfileConfirmed,{legacyProfileConfirmed=it},
+                            enabled=legacyAvailableProtocol==legacyProtocol && !state.running)
+                        Text(stringResource(R.string.functional_legacy_mutation_profile,vehicle.vin))
+                    }
+                    OutlinedButton(onClick={
+                        legacyTarget?.let {
+                            legacyStep=EcuWriteConsentFlow.Step.WARNING
+                            legacyPending=Triple(connectionGeneration,vehicle,it.copy(clear=true))
+                        }
+                    },enabled=legacyReady,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.functional_clear_run)) }
+                    OutlinedButton(onClick={
+                        legacyTarget?.let {
+                            legacyStep=EcuWriteConsentFlow.Step.WARNING
+                            legacyPending=Triple(connectionGeneration,vehicle,it.copy(clear=false))
+                        }
+                    },enabled=legacyReady,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.functional_evap_run)) }
+                }
+                state.legacyRead?.let { LegacyReadReportContent(it) }
+                state.legacyTarget?.let { Text(stringResource(if (it.clear) R.string.functional_clear_run else R.string.functional_evap_run)) }
+                state.legacyResult?.reason?.let { Text(it,style=MaterialTheme.typography.bodySmall) }
+                state.protocol?.let { Text(stringResource(R.string.functional_protocol_report, it.title)) }
+                if (state.evapCampaign) Text(stringResource(R.string.functional_evap_run))
+                state.evapResult?.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                if (state.clearCampaign) Text(stringResource(R.string.functional_clear_run))
+                state.clearResult?.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Button(onClick = onRunAll, enabled = !state.running) {
                         Text(stringResource(R.string.functional_tests_run))
@@ -60,6 +359,24 @@ fun FunctionalTestsScreen(
                         style = MaterialTheme.typography.bodySmall)
                     Text(evidence.adapterName + " • " + evidence.transport,
                         style = MaterialTheme.typography.bodySmall)
+                }
+                state.nativeMaintenanceEvidence?.let { native ->
+                    if(native.recoveryRequired) Text(stringResource(R.string.j1979_native_maintenance_recovery))
+                    else if(native.verified) Text(stringResource(R.string.j1979_native_maintenance_journal_checked))
+                    else Text(stringResource(R.string.j1979_native_maintenance_unverified))
+                }
+                state.nativeLiveEvidence?.let { native ->
+                    val summary=native.replay?.summary
+                    if(native.captureIntegrityVerified && summary!=null) {
+                        Text(stringResource(R.string.j1979_live_cycle_count,
+                            (summary["completed_cycles"] as? Number)?.toInt() ?: 0,native.target.cycles))
+                        Text(stringResource(R.string.j1979_native_live_samples,
+                            (summary["raw"] as? Number)?.toInt() ?: 0))
+                        OutlinedButton(onClick=onExportLiveCsv,enabled=!state.running && state.canExport) {
+                            Text(stringResource(R.string.j1979_live_export_csv))
+                        }
+                        J1979NativeScalarPanel(native,!state.running&&state.canExport,fr,onExportNativeScalar)
+                    }
                 }
                 if (state.checks.isNotEmpty()) {
                     Text(stringResource(R.string.functional_tests_summary, passed, failed, untested))
@@ -85,6 +402,117 @@ fun FunctionalTestsScreen(
                         }
                     )
                     Text(if (fr) check.detailFr else check.detailEn, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        val values = state.nativeUsbEvidence?.let { raw ->
+            runCatching { NativeUsbFunctionalEvidence.diagnosticValues(org.json.JSONObject(raw)) }.getOrNull()
+        }
+        if (values != null) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(stringResource(R.string.functional_native_usb_values),style=MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.functional_native_usb_observed_vin,
+                            values.observedVin ?: stringResource(R.string.obd_not_available)))
+                        for ((type,entries) in values.identity) {
+                            val label=when(type){
+                                4->R.string.functional_native_usb_calibration
+                                6->R.string.functional_native_usb_cvn
+                                else->R.string.functional_native_usb_ecu_name
+                            }
+                            Text(stringResource(label)+": "+entries.joinToString(", "))
+                        }
+                        Text(stringResource(R.string.functional_native_usb_freeze_trigger)+": "+when {
+                            values.freeze==null -> stringResource(R.string.obd_not_available)
+                            !values.freeze.present -> stringResource(R.string.functional_native_usb_freeze_absent)
+                            else -> values.freeze.dtc ?: stringResource(R.string.obd_not_available)
+                        })
+                        for ((mode,codes) in values.dtcs) {
+                            val caption = when(mode) {
+                                3 -> R.string.functional_native_usb_dtc_confirmed
+                                7 -> R.string.functional_native_usb_dtc_pending
+                                else -> R.string.functional_native_usb_dtc_permanent
+                            }
+                            Text(stringResource(caption)+": "+when {
+                                codes == null -> stringResource(R.string.obd_not_available)
+                                codes.isEmpty() -> stringResource(R.string.functional_native_usb_dtc_zero)
+                                else -> codes.joinToString(", ")
+                            })
+                        }
+                    }
+                }
+            }
+            val contextualRequests=values.contextualMeasurements.records.map { it.requestHex }.toSet()
+            items(values.measurements.filter { measurement ->
+                ("%02X%02X".format(java.util.Locale.ROOT,measurement.mode,measurement.pid)+
+                    if(measurement.mode==2)"00" else "") !in contextualRequests
+            },key={ "native-value:"+it.mode+":"+it.pid }) { value ->
+                Card(modifier=Modifier.fillMaxWidth()) {
+                    Column(modifier=Modifier.padding(12.dp)) {
+                        Text(stringResource(R.string.functional_native_usb_pid,
+                            "%02X".format(java.util.Locale.ROOT,value.mode),
+                            "%02X".format(java.util.Locale.ROOT,value.pid)))
+                        Text(value.name,style=MaterialTheme.typography.bodySmall)
+                        Text(java.text.NumberFormat.getNumberInstance().apply {
+                            maximumFractionDigits=3
+                        }.format(value.number)+" "+value.unit,style=MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
+        if(values!=null){
+            items(values.contextualMeasurements.records,key={"native-context:"+it.requestHex}) { record ->
+                Card(modifier=Modifier.fillMaxWidth()) {
+                    Column(modifier=Modifier.padding(12.dp)) {
+                        Text(record.requestHex)
+                        record.signals.forEach { signal ->
+                            Text(signal.name+": "+(signal.number?.toString() ?: stringResource(R.string.obd_not_available))+" "+signal.unit)
+                        }
+                    }
+                }
+            }
+            items(values.statusRecords,key={"native-state:"+it.requestHex}) { record ->
+                Card(modifier=Modifier.fillMaxWidth()) {
+                    Column(modifier=Modifier.padding(12.dp)) {
+                        Text(record.requestHex)
+                        record.states.forEach { state -> Text(state.name+": "+state.code) }
+                    }
+                }
+            }
+        }
+        if(values!=null&&values.pages.isNotEmpty()){
+            item { Text(stringResource(R.string.functional_native_usb_inventory),style=MaterialTheme.typography.titleMedium) }
+            items(values.pages,key={"native-page:"+it.mode+":"+it.base}) { page ->
+                Card(modifier=Modifier.fillMaxWidth()) {
+                    Column(modifier=Modifier.padding(12.dp)) {
+                        Text(stringResource(R.string.functional_native_usb_inventory_page,
+                            "%02X".format(java.util.Locale.ROOT,page.mode),"%02X".format(java.util.Locale.ROOT,page.base)))
+                        Text(if(page.ids.isEmpty()) stringResource(R.string.functional_native_usb_inventory_empty)
+                            else page.ids.joinToString(", ") { "%02X".format(java.util.Locale.ROOT,it) })
+                        if(page.next) Text(stringResource(R.string.functional_native_usb_inventory_next))
+                    }
+                }
+            }
+        }
+        values?.readiness?.let { ready ->
+            item {
+                Card(modifier=Modifier.fillMaxWidth()) {
+                    Column(modifier=Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                        Text(stringResource(R.string.functional_native_usb_readiness),style=MaterialTheme.typography.titleMedium)
+                        NativeUsbReadinessContent(ready)
+                    }
+                }
+            }
+        }
+        if (values != null && values.monitors.isNotEmpty()) {
+            item { Text(stringResource(R.string.functional_native_usb_monitors),style=MaterialTheme.typography.titleMedium) }
+            items(values.monitors.size,key={ "native-monitor:"+it }) { index ->
+                val monitor=values.monitors[index]
+                Card(modifier=Modifier.fillMaxWidth()) {
+                    Column(modifier=Modifier.padding(12.dp)) {
+                        NativeUsbMonitorContent(monitor)
+                    }
                 }
             }
         }

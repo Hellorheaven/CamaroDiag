@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_info_ipt_spark">In-use performance — spark ignition</string>
+    <string name="j1979_info_ipt_diesel">In-use performance — compression ignition</string>
+    <string name="j1979_info_ecu_name">ECU name</string>
+    <string name="j1979_info_serial">Engine serial number</string>
+    <string name="j1979_info_approval">Emissions type approval</string>
+    <string name="j1979_info_other">Other record</string>
+    <string name="j1979_info_counter_totals">OBD conditions: %1$d · Ignition cycles: %2$d</string>
+    <string name="j1979_info_counter_pair">%1$s: %2$d/%3$d · Ratio %4$s</string>
+    <string name="j1979_info_ratio_unavailable">N/A</string>
+    <string name="j1979_info_cat1">Catalyst bank 1</string>
+    <string name="j1979_info_cat2">Catalyst bank 2</string>
+    <string name="j1979_info_o21">Oxygen sensor bank 1</string>
+    <string name="j1979_info_o22">Oxygen sensor bank 2</string>
+    <string name="j1979_info_so21">Secondary oxygen sensor bank 1</string>
+    <string name="j1979_info_so22">Secondary oxygen sensor bank 2</string>
+    <string name="j1979_info_egr">EGR/VVT</string>
+    <string name="j1979_info_air">Secondary air</string>
+    <string name="j1979_info_evap">EVAP</string>
+    <string name="j1979_info_nmhc">NMHC catalyst</string>
+    <string name="j1979_info_scr">NOx/SCR catalyst</string>
+    <string name="j1979_info_adsorber">NOx adsorber</string>
+    <string name="j1979_info_pm">Particulate filter</string>
+    <string name="j1979_info_egs">Exhaust gas sensor</string>
+    <string name="j1979_info_boost">Boost pressure</string>
+    <string name="j1979_info_fuel">Fuel system</string>
+</resources>

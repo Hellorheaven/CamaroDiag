@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_native_prefix_title">Inspect interrupted CL/1 capture</string>
+    <string name="j1979_native_prefix_select">Select original CL/1 file</string>
+    <string name="j1979_native_prefix_confirm">Confirm independently known VIN %1$s</string>
+    <string name="j1979_native_prefix_run">Inspect and export partial report</string>
+    <string name="j1979_native_prefix_scope">Only complete records are checked. No completed recording or vehicle verification is claimed.</string>
+    <string name="j1979_native_prefix_saved">Partial recording report exported</string>
+    <string name="j1979_native_prefix_rejected">Interrupted capture inspection rejected</string>
+    <string name="j1979_freeze_prefix_title">Inspect interrupted CF/1 capture</string>
+    <string name="j1979_freeze_prefix_select">Select original CF/1 file</string>
+    <string name="j1979_freeze_prefix_scope">Only complete Mode 02 records are checked. No completed recording or vehicle verification is claimed.</string>
+    <string name="j1979_freeze_prefix_saved">Interrupted Mode 02 report exported</string>
+    <string name="j1979_freeze_prefix_rejected">Interrupted CF/1 capture rejected</string>
+    <string name="j1979_freeze_prefix_summary">%1$d provisional frames, %2$d complete observations, %3$d unverified tail bytes</string>
+    <string name="j1979_freeze_prefix_verify_title">Verify CF/1 partial report</string>
+    <string name="j1979_freeze_prefix_verify_capture">Select original CF/1 capture</string>
+    <string name="j1979_freeze_prefix_verify_report">Select saved JSON report</string>
+    <string name="j1979_freeze_prefix_verify_confirm">Confirm independently known VIN %1$s</string>
+    <string name="j1979_freeze_prefix_verify_run">Verify original recording and report</string>
+    <string name="j1979_freeze_prefix_verify_scope">The original capture is independently replayed. An interrupted recording is never marked complete.</string>
+    <string name="j1979_freeze_prefix_verify_saved">CF/1 partial report verification exported</string>
+    <string name="j1979_freeze_prefix_verify_rejected">CF/1 report does not match original capture</string>
+</resources>

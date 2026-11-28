@@ -35,4 +35,187 @@
   <data name="VinNotice" xml:space="preserve"><value>La concordance VIN ne constitue ni une authentification ECU ni une autorisation d’écriture.</value></data>
   <data name="InvalidLogical" xml:space="preserve"><value>Saisissez deux adresses logiques distinctes de quatre chiffres hexadécimaux.</value></data>
   <data name="InvalidCertificate" xml:space="preserve"><value>Le certificat client nécessite TLS et une empreinte hexadécimale valide de 40 chiffres.</value></data>
+  <data name="ReadDtcs" xml:space="preserve"><value>Lire les défauts ECU (UDS)</value></data>
+  <data name="DtcMask" xml:space="preserve"><value>Masque d’état DTC (hex)</value></data>
+  <data name="InvalidDtcMask" xml:space="preserve"><value>Saisissez exactement deux chiffres hexadécimaux pour le masque d’état DTC.</value></data>
+  <data name="DtcStarted" xml:space="preserve"><value>DoIP / {0} / UDS : lecture DTC via {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="DtcResult" xml:space="preserve"><value>Nombre de DTC={0} ; masque demandé=0x{1:X2} ; masque disponible=0x{2:X2} ; masque effectif=0x{3:X2}</value></data>
+  <data name="DtcBitFailed" xml:space="preserve"><value>Test en échec</value></data>
+  <data name="DtcBitFailedCycle" xml:space="preserve"><value>Échec pendant ce cycle</value></data>
+  <data name="DtcBitPending" xml:space="preserve"><value>En attente</value></data>
+  <data name="DtcBitConfirmed" xml:space="preserve"><value>Confirmé</value></data>
+  <data name="DtcBitIncompleteSinceClear" xml:space="preserve"><value>Test non terminé depuis le dernier effacement</value></data>
+  <data name="DtcBitFailedSinceClear" xml:space="preserve"><value>Échec depuis le dernier effacement</value></data>
+  <data name="DtcBitIncompleteCycle" xml:space="preserve"><value>Test non terminé pendant ce cycle</value></data>
+  <data name="DtcBitWarningRequested" xml:space="preserve"><value>Voyant demandé</value></data>
+  <data name="DtcStatusUnavailable" xml:space="preserve"><value>État indisponible</value></data>
+  <data name="DtcNoAssertedAvailableBits" xml:space="preserve"><value>Aucun bit d'état disponible positionné</value></data>
+  <data name="DtcNoAvailableFilter" xml:space="preserve"><value>Aucun bit d'état demandé n'est disponible ; ce résultat ne permet pas de conclure à l'absence de défauts.</value></data>
+  <data name="DtcEntry" xml:space="preserve"><value>DTC 0x{0:X6}, état 0x{1:X2}</value></data>
+  <data name="DtcNotice" xml:space="preserve"><value>Rapport en lecture seule ; aucun défaut effacé. Un résultat vide concerne uniquement les bits d’état demandés et disponibles.</value></data>
+  <data name="ReadDid" xml:space="preserve"><value>Lire donnée ECU</value></data>
+  <data name="DidLabel" xml:space="preserve"><value>Identifiant DID (hex)</value></data>
+  <data name="DidResult" xml:space="preserve"><value>DID 0x{0:X4} : {1}</value></data>
+  <data name="DidStarted" xml:space="preserve"><value>DoIP / {0} / UDS : lecture DID via {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="InvalidDid" xml:space="preserve"><value>Saisissez quatre chiffres hexadécimaux pour le DID.</value></data>
+  <data name="MonitorDid" xml:space="preserve"><value>Monitorer le DID</value></data>
+  <data name="MonitorInterval" xml:space="preserve"><value>Intervalle (ms)</value></data>
+  <data name="MonitorCount" xml:space="preserve"><value>Échantillons</value></data>
+  <data name="MonitorSample" xml:space="preserve"><value>N° {0} DID 0x{1:X4} : {2}</value></data>
+  <data name="MonitorComplete" xml:space="preserve"><value>Mesure terminée : {0} échantillons.</value></data>
+  <data name="Backup" xml:space="preserve"><value>Sauvegarder une zone ECU</value></data>
+  <data name="BackupProfile" xml:space="preserve"><value>Sélectionner le profil mémoire DoIP</value></data>
+  <data name="BackupMismatch" xml:space="preserve"><value>Le profil mémoire ne correspond pas à la cible DoIP sélectionnée.</value></data>
+  <data name="BackupExists" xml:space="preserve"><value>Choisissez un nouveau fichier : les sauvegardes ne sont jamais écrasées.</value></data>
+  <data name="BackupConfirm" xml:space="preserve"><value>Lire deux fois la zone ECU ? VIN {0}, ECU 0x{1:X4}, début 0x{2:X8}, {3} octets.</value></data>
+  <data name="BackupStarted" xml:space="preserve"><value>DoIP / {0} : sauvegarde sur {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="BackupProgress" xml:space="preserve"><value>Lecture {0}/2 : {1}/{2} octets</value></data>
+  <data name="BackupSaved" xml:space="preserve"><value>Sauvegarde de zone vérifiée : {0} octets, SHA-256 {1}, {2}</value></data>
+  <data name="BackupVerify" xml:space="preserve"><value>Vérifier une sauvegarde DoIP</value></data>
+  <data name="BackupVerified" xml:space="preserve"><value>Intégrité de l’archive vérifiée : {0} octets, SHA-256 {1}. Provenance matérielle non attestée par ce contrôle.</value></data>
+  <data name="ExpectedVin" xml:space="preserve"><value>VIN attendu (laisser IP vide pour rechercher)</value></data>
+  <data name="InvalidExpectedVin" xml:space="preserve"><value>Saisissez un VIN valide de 17 caractères.</value></data>
+  <data name="VinDiscoveryStarted" xml:space="preserve"><value>Recherche de la passerelle DoIP du VIN {0}</value></data>
+  <data name="TraceIncomplete" xml:space="preserve"><value>Historique DoIP incomplet : limite du tampon de réception dépassée.</value></data>
+  <data name="Exchange" xml:space="preserve"><value>Envoyer commande(s) UDS</value></data>
+  <data name="Payload" xml:space="preserve"><value>Commande(s) UDS (hex ; séparateur ;)</value></data>
+  <data name="InvalidPayload" xml:space="preserve"><value>Saisissez 1 à 16 commandes hexadécimales séparées par des points-virgules.</value></data>
+  <data name="ExpectedVinRequired" xml:space="preserve"><value>Saisissez le VIN attendu et identifiez la passerelle correspondante avant l’envoi.</value></data>
+  <data name="ExchangeTarget" xml:space="preserve"><value>VIN {0}, passerelle {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, {4}, commande {5}</value></data>
+  <data name="ExchangeWarning" xml:space="preserve"><value>Cette commande peut modifier ou effacer les données du calculateur et le rendre inutilisable. Cliquez sur OK pour accéder à la confirmation distincte.</value></data>
+  <data name="ExchangeWarningTitle" xml:space="preserve"><value>Avertissement commande ECU</value></data>
+  <data name="ExchangeConfirm" xml:space="preserve"><value>Envoyer exactement cette séquence au calculateur sélectionné ? Arrêt à la première erreur. Non annule sans émission.</value></data>
+  <data name="ExchangeStarted" xml:space="preserve"><value>DoIP / {0} / UDS : commande à {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="ExchangeResult" xml:space="preserve"><value>Réponse ECU : {0}</value></data>
+  <data name="CountDtcs" xml:space="preserve"><value>Compter les DTC</value></data>
+  <data name="DtcCountResult" xml:space="preserve"><value>Nombre de DTC={0} ; masque demandé=0x{1:X2} ; disponible=0x{2:X2} ; format=0x{3:X2} ; masque effectif=0x{4:X2}</value></data>
+  <data name="Snapshot" xml:space="preserve"><value>Lire instantané</value></data>
+  <data name="Extended" xml:space="preserve"><value>Lire données étendues</value></data>
+  <data name="DetailDtc" xml:space="preserve"><value>DTC (6 chiffres hex)</value></data>
+  <data name="DetailRecord" xml:space="preserve"><value>Enregistrement (hex)</value></data>
+  <data name="InvalidDetail" xml:space="preserve"><value>Saisissez un DTC hexadécimal sur six chiffres et un enregistrement non nul sur deux chiffres.</value></data>
+  <data name="DetailResult" xml:space="preserve"><value>DTC 0x{0:X6} ; statut 0x{1:X2} ; enregistrements bruts : {2}</value></data>
+  <data name="SequenceReply" xml:space="preserve"><value>Commande n°{0} : réponse ECU {1}</value></data>
+  <data name="SequenceComplete" xml:space="preserve"><value>Séquence terminée : {0} réponses.</value></data>
+  <data name="ObdIdentify" xml:space="preserve"><value>Identifier OBDonUDS</value></data>
+  <data name="ObdRead" xml:space="preserve"><value>Lire DID OBDonUDS</value></data>
+  <data name="ObdInvalidDid" xml:space="preserve"><value>Sélectionnez un DID réglementaire de F400 à F8FF.</value></data>
+  <data name="ObdVerified" xml:space="preserve"><value>OBDonUDS confirmé (F810={0:X2}) ; VIN {1}.</value></data>
+  <data name="ObdUnknown" xml:space="preserve"><value>OBDonUDS non confirmé (F810={0:X2}) ; VIN {1}.</value></data>
+  <data name="ObdMonitor" xml:space="preserve"><value>Surveiller un DID OBDonUDS</value></data>
+  <data name="ObdMonitorSample" xml:space="preserve"><value>Mesure OBDonUDS {0} : DID {1:X4} = {2}</value></data>
+  <data name="ObdMonitorComplete" xml:space="preserve"><value>Monitoring OBDonUDS terminé : {0} mesures, identité ECU revérifiée.</value></data>
+  <data name="SessionP2" xml:space="preserve"><value>P2 (ms, vide = total)</value></data>
+  <data name="SessionP2Star" xml:space="preserve"><value>P2* (ms, vide = total)</value></data>
+  <data name="RoutingType" xml:space="preserve"><value>Type de routage (hex)</value></data>
+  <data name="RoutingOem" xml:space="preserve"><value>Données OEM (8 hex, facultatif)</value></data>
+  <data name="InvalidSessionOptions" xml:space="preserve"><value>Paramètres de session invalides. Vérifier délais et routage.</value></data>
+  <data name="SessionSummary" xml:space="preserve"><value>Délai {0} ms ; P2 {1} ms ; P2* {2} ms ; routage {3:X2} ; OEM {4}</value></data>
+  <data name="WwhMask" xml:space="preserve"><value>Lire les défauts WWH</value></data>
+  <data name="WwhPermanent" xml:space="preserve"><value>Lire les défauts permanents WWH</value></data>
+  <data name="WwhReadiness" xml:space="preserve"><value>Lire les défauts du groupe WWH</value></data>
+  <data name="WwhSeverity" xml:space="preserve"><value>Masque sévérité WWH (hex)</value></data>
+  <data name="WwhGroup" xml:space="preserve"><value>Groupe de préparation WWH (hex)</value></data>
+  <data name="WwhResult" xml:space="preserve"><value>WWH 0x{0:X2} : {1} défauts ; masque statut 0x{2:X2} ; format 0x{3:X2}</value></data>
+  <data name="WwhMetadata" xml:space="preserve"><value>Disponibilité sévérité : {0} ; groupe : {1}</value></data>
+  <data name="WwhFilters" xml:space="preserve"><value>État demandé/effectif : 0x{0:X2} / 0x{1:X2} · sévérité demandée/effective : 0x{2:X2} / 0x{3:X2}</value></data>
+  <data name="WwhFilterUnavailable" xml:space="preserve"><value>Au moins un filtre WWH est indisponible ; ce résultat ne permet pas de conclure à l’absence de défauts d’émissions.</value></data>
+  <data name="WwhRecord" xml:space="preserve"><value>DTC {0:X6} ; statut {1:X2} ; sévérité {2}</value></data>
+  <data name="MultiLayout" xml:space="preserve"><value>Longueurs DID (0xHHHH:octets, ...)</value></data>
+  <data name="MultiRead" xml:space="preserve"><value>Lire plusieurs DID UDS</value></data>
+  <data name="ObdMultiRead" xml:space="preserve"><value>Lire plusieurs DID OBD</value></data>
+  <data name="InvalidMultiLayout" xml:space="preserve"><value>Liste DID invalide ou DID OBD non réglementaire.</value></data>
+  <data name="MultiResult" xml:space="preserve"><value>DID {0:X4} ({1} octets) : {2}</value></data>
+  <data name="ScalingDid" xml:space="preserve"><value>Lire les données de mise à l’échelle UDS</value></data>
+  <data name="ScalingResult" xml:space="preserve"><value>DID {0:X4}, données de mise à l’échelle (brutes) : {1}</value></data>
+  <data name="ObdDtcs" xml:space="preserve"><value>Lire les DTC OBDonUDS</value></data>
+  <data name="ObdCount" xml:space="preserve"><value>Compter les DTC OBDonUDS</value></data>
+  <data name="ObdSnapshot" xml:space="preserve"><value>Snapshot OBDonUDS</value></data>
+  <data name="ObdExtended" xml:space="preserve"><value>Données étendues OBDonUDS</value></data>
+  <data name="SupportedDtcs" xml:space="preserve"><value>DTC pris en charge</value></data>
+  <data name="LegacyMirrorDtcs" xml:space="preserve"><value>DTC miroir historiques</value></data>
+  <data name="LegacyMirrorCount" xml:space="preserve"><value>Comptage DTC miroir historiques</value></data>
+  <data name="LegacyMirrorExtended" xml:space="preserve"><value>Données étendues miroir historiques</value></data>
+  <data name="LegacyEmissionsDtcs" xml:space="preserve"><value>DTC émissions UDS historiques</value></data>
+  <data name="LegacyEmissionsCount" xml:space="preserve"><value>Comptage DTC émissions historiques</value></data>
+  <data name="LegacyMirrorResult" xml:space="preserve"><value>Mémoire miroir UDS historique</value></data>
+  <data name="LegacyEmissionsResult" xml:space="preserve"><value>Émissions UDS historiques</value></data>
+  <data name="StoredRecord" xml:space="preserve"><value>Lire les données DTC mémorisées par numéro</value></data>
+  <data name="InvalidStoredRecord" xml:space="preserve"><value>Choisir un enregistrement 00..FE.</value></data>
+  <data name="StoredRecordResult" xml:space="preserve"><value>Enregistrement mémorisé 0x{0:X2}</value></data>
+  <data name="StoredRecordCount" xml:space="preserve"><value>Nombre de DID annoncé : {0}</value></data>
+  <data name="AllStoredRecords" xml:space="preserve"><value>Lire tous les enregistrements</value></data>
+  <data name="StoredCatalog" xml:space="preserve"><value>Longueurs DID documentées (F40C:2,F40D:1)</value></data>
+  <data name="InvalidStoredCatalog" xml:space="preserve"><value>Renseigner les longueurs DID documentées.</value></data>
+  <data name="AllStoredResult" xml:space="preserve"><value>Enregistrements mémorisés : {0}</value></data>
+  <data name="DecodedExtended" xml:space="preserve"><value>Données étendues UDS décodées</value></data>
+  <data name="ObdDecodedExtended" xml:space="preserve"><value>Données étendues OBDonUDS décodées</value></data>
+  <data name="ExtendedCatalog" xml:space="preserve"><value>Longueurs documentées des enregistrements (01:2,90:1)</value></data>
+  <data name="InvalidExtendedCatalog" xml:space="preserve"><value>Renseigner les longueurs documentées et un numéro valide.</value></data>
+  <data name="DecodedExtendedResult" xml:space="preserve"><value>DTC {0:X6} — statut {1:X2} — enregistrements : {2}</value></data>
+  <data name="DecodedExtendedEntry" xml:space="preserve"><value>Enregistrement 0x{0:X2} : {1}</value></data>
+  <data name="MemoryDecodedSnapshot" xml:space="preserve"><value>Snapshots décodés de la mémoire</value></data>
+  <data name="MemoryDecodedExtended" xml:space="preserve"><value>Données étendues décodées de la mémoire</value></data>
+  <data name="DecodedSnapshot" xml:space="preserve"><value>Snapshots UDS décodés</value></data>
+  <data name="ObdDecodedSnapshot" xml:space="preserve"><value>Snapshots OBDonUDS décodés</value></data>
+  <data name="DecodedSnapshotResult" xml:space="preserve"><value>DTC {0:X6} — statut {1:X2} — snapshots : {2}</value></data>
+  <data name="SnapshotRecordResult" xml:space="preserve"><value>Snapshot 0x{0:X2}</value></data>
+  <data name="DecodedStoredRecord" xml:space="preserve"><value>Enregistrement mémorisé décodé</value></data>
+  <data name="StoredRecordEmpty" xml:space="preserve"><value>Aucune donnée mémorisée pour cet enregistrement</value></data>
+  <data name="ExtendedRecordSupport" xml:space="preserve"><value>DTC prenant en charge cet enregistrement</value></data>
+  <data name="ExtendedRecordSize" xml:space="preserve"><value>Longueur uniforme documentée (octets)</value></data>
+  <data name="ExtendedRecordData" xml:space="preserve"><value>Lire les données étendues</value></data>
+  <data name="InvalidExtendedRecord" xml:space="preserve"><value>Sélectionner un enregistrement 01..EF et une longueur documentée valide.</value></data>
+  <data name="ExtendedRecordResult" xml:space="preserve"><value>Enregistrement 0x{0:X2} : {1} DTC</value></data>
+  <data name="ExtendedRecordMask" xml:space="preserve"><value>Masque de statut disponible 0x{0:X2}</value></data>
+  <data name="MemorySelection" xml:space="preserve"><value>Mémoire DTC (hex)</value></data>
+  <data name="MemoryDtcs" xml:space="preserve"><value>Lire les DTC de la mémoire</value></data>
+  <data name="MemorySnapshot" xml:space="preserve"><value>Snapshot de la mémoire</value></data>
+  <data name="MemoryExtended" xml:space="preserve"><value>Données étendues de la mémoire</value></data>
+  <data name="InvalidMemorySelection" xml:space="preserve"><value>Sélecteur de mémoire DTC invalide.</value></data>
+  <data name="MemoryResult" xml:space="preserve"><value>Mémoire DTC 0x{0:X2}</value></data>
+  <data name="MemoryDetailResult" xml:space="preserve"><value>DTC 0x{0:X6}, statut 0x{1:X2}, enregistrements bruts {2}</value></data>
+  <data name="PermanentDtcs" xml:space="preserve"><value>DTC permanents UDS</value></data>
+  <data name="PermanentResult" xml:space="preserve"><value>DTC permanents : {0} ; masque disponible 0x{1:X2}</value></data>
+  <data name="SnapshotIndex" xml:space="preserve"><value>Index des snapshots</value></data>
+  <data name="SupportedResult" xml:space="preserve"><value>DTC pris en charge : {0} ; masque disponible 0x{1:X2}</value></data>
+  <data name="SnapshotIndexResult" xml:space="preserve"><value>Enregistrements snapshot disponibles : {0}</value></data>
+  <data name="SnapshotIndexEntry" xml:space="preserve"><value>DTC 0x{0:X6}, enregistrement 0x{1:X2}</value></data>
+  <data name="MultiMonitor" xml:space="preserve"><value>Monitoring multi-DID UDS</value></data>
+  <data name="ObdMultiMonitor" xml:space="preserve"><value>Monitoring multi-DID OBDonUDS</value></data>
+  <data name="MultiMonitorSample" xml:space="preserve"><value>Échantillon provisoire {0} : {1}</value></data>
+  <data name="MultiMonitorComplete" xml:space="preserve"><value>Échantillons multi-DID vérifiés : {0}</value></data>
+  <data name="FirstFailed" xml:space="preserve"><value>Premier DTC détecté</value></data>
+  <data name="FirstConfirmed" xml:space="preserve"><value>Premier DTC confirmé</value></data>
+  <data name="RecentFailed" xml:space="preserve"><value>Dernier DTC détecté</value></data>
+  <data name="RecentConfirmed" xml:space="preserve"><value>Dernier DTC confirmé</value></data>
+  <data name="NoHistoricalDtc" xml:space="preserve"><value>Aucun DTC historique correspondant</value></data>
+  <data name="FaultCounters" xml:space="preserve"><value>Compteurs de détection des défauts</value></data>
+  <data name="FaultCountersResult" xml:space="preserve"><value>Compteurs de détection : {0} enregistrements</value></data>
+  <data name="FaultCounterEntry" xml:space="preserve"><value>DTC 0x{0:X6}, compteur {1}</value></data>
+  <data name="SeverityMask" xml:space="preserve"><value>Masque de sévérité UDS (hex)</value></data>
+  <data name="SeverityCount" xml:space="preserve"><value>Nombre par sévérité</value></data>
+  <data name="SeverityList" xml:space="preserve"><value>DTC par sévérité</value></data>
+  <data name="SeverityInfo" xml:space="preserve"><value>Sévérité du DTC</value></data>
+  <data name="SeverityCountResult" xml:space="preserve"><value>DTC correspondants : {0} ; disponibilité 0x{1:X2} ; format 0x{2:X2}</value></data>
+  <data name="SeverityListResult" xml:space="preserve"><value>Enregistrements de sévérité : {0} ; disponibilité 0x{1:X2}</value></data>
+  <data name="SeverityRecord" xml:space="preserve"><value>DTC 0x{0:X6} — sévérité 0x{1:X2}, unité 0x{2:X2}, statut 0x{3:X2}</value></data>
+  <data name="Inventory" xml:space="preserve"><value>Inventaire ECU</value></data>
+  <data name="InventoryAddresses" xml:space="preserve"><value>Adresses ECU (hex, séparées par virgules)</value></data>
+  <data name="InventoryStarted" xml:space="preserve"><value>Vérification des adresses explicites : {0}</value></data>
+  <data name="InventoryVerified" xml:space="preserve"><value>ECU 0x{0:X4} : VIN vérifié ({1})</value></data>
+  <data name="InventoryUnverified" xml:space="preserve"><value>ECU 0x{0:X4} : non vérifié (absence non prouvée)</value></data>
+  <data name="InventoryComplete" xml:space="preserve"><value>Inventaire terminé : {0}/{1} VIN vérifiés</value></data>
+  <data name="ObdInventory" xml:space="preserve"><value>Inventaire ECU OBDonUDS</value></data>
+  <data name="InventoryObdSupported" xml:space="preserve"><value>ECU 0x{0:X4} : OBDonUDS identifié (0x{1:X2})</value></data>
+  <data name="InventoryObdUnrecognized" xml:space="preserve"><value>ECU 0x{0:X4} : OBDonUDS non identifié (F810 = 0x{1:X2})</value></data>
+  <data name="MonitorPartial" xml:space="preserve"><value>Capture partielle : {0}/{1} échantillons vérifiés.</value></data>
+  <data name="InventoryProgress" xml:space="preserve"><value>Inventaire : {0}/{1} cibles interrogées (partiel)</value></data>
+  <data name="InventoryReasonTimeout" xml:space="preserve"><value>Délai de réponse dépassé.</value></data>
+  <data name="InventoryReasonIdentity" xml:space="preserve"><value>Identité ECU ou réponse diagnostique invalide.</value></data>
+  <data name="InventoryReasonCommunication" xml:space="preserve"><value>Échec de communication ou de vérification de l’identité.</value></data>
+  <data name="InventoryReasonNrc" xml:space="preserve"><value>Réponse UDS négative du calculateur.</value></data>
+  <data name="InventoryReasonHeader" xml:space="preserve"><value>En-tête DoIP rejeté.</value></data>
+  <data name="InventoryReasonRouting" xml:space="preserve"><value>Activation du routage DoIP refusée.</value></data>
+  <data name="InventoryReasonAck" xml:space="preserve"><value>Acquittement diagnostique DoIP négatif.</value></data>
 </root>

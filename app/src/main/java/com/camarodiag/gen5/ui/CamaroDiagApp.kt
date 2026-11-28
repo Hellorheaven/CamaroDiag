@@ -197,10 +197,14 @@ fun CamaroDiagApp(
     val modules by viewModel.modules.collectAsState()
     val dtcs by viewModel.dtcs.collectAsState()
     val livePids by viewModel.livePids.collectAsState()
+    val detectedLiveSensors by viewModel.detectedLiveSensors.collectAsState()
+    val dtcScanNotice by viewModel.dtcScanNotice.collectAsState()
     val isStreaming by viewModel.isStreamingLive.collectAsState()
     val liveRecording by viewModel.liveRecordingState.collectAsState()
     val liveTelemetryMessage by viewModel.liveTelemetryMessage.collectAsState()
     val mileageReport by viewModel.mileageReport.collectAsState()
+    val observedStandardVin by viewModel.observedStandardVin.collectAsState()
+    val observedObdResponders by viewModel.observedObdResponders.collectAsState()
     val savedSessions by viewModel.savedSessions.collectAsState()
     val calibrationWorkspace by viewModel.calibrationWorkspace.collectAsState()
     val liveCanMonitorState by viewModel.liveCanMonitorState.collectAsState()
@@ -273,8 +277,9 @@ fun CamaroDiagApp(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
         if (results.values.all { it }) {
-            viewModel.refreshPairedDevices()
-            pendingBluetoothMac?.let(viewModel::connectRealBluetooth)
+            val selected = pendingBluetoothMac
+            if (selected == null) viewModel.refreshPairedDevices()
+            else viewModel.connectRealBluetooth(selected)
         }
         pendingBluetoothMac = null
     }
@@ -283,8 +288,9 @@ fun CamaroDiagApp(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            viewModel.refreshPairedDevices()
-            pendingBluetoothMac?.let(viewModel::connectRealBluetooth)
+            val selected = pendingBluetoothMac
+            if (selected == null) viewModel.refreshPairedDevices()
+            else viewModel.connectRealBluetooth(selected)
         }
         pendingBluetoothMac = null
     }
@@ -300,8 +306,8 @@ fun CamaroDiagApp(
         if (required.all {
             ContextCompat.checkSelfPermission(permissionContext, it) == PackageManager.PERMISSION_GRANTED
         }) {
-            viewModel.refreshPairedDevices()
-            mac?.let(viewModel::connectRealBluetooth)
+            if (mac == null) viewModel.refreshPairedDevices()
+            else viewModel.connectRealBluetooth(mac)
         } else {
             pendingBluetoothMac = mac
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -343,6 +349,36 @@ fun CamaroDiagApp(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let { viewModel.importCalibrationFile(it) }
+    }
+
+    var pendingDoIpProfile by remember { mutableStateOf<Triple<String, Long, VehicleProfile>?>(null) }
+    val doIpProfilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val context = pendingDoIpProfile
+        pendingDoIpProfile = null
+        if (uri != null && context != null && viewModel.canResumeExport(context.second, context.first) &&
+            viewModel.vehicle.value == context.third) viewModel.importDoIpBackupProfile(uri)
+    }
+
+    var pendingDoIpArchive by remember {
+        mutableStateOf<Pair<Triple<String, Long, VehicleProfile>, com.camarodiag.gen5.data.obd.DoIpMemoryBackup.Scope>?>(null)
+    }
+    val doIpArchivePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val pending = pendingDoIpArchive
+        pendingDoIpArchive = null
+        if (uri != null && pending != null && viewModel.canResumeExport(pending.first.second, pending.first.first) &&
+            viewModel.vehicle.value == pending.first.third)
+            viewModel.verifyDirectDoIpBackup(uri, pending.second)
+    }
+
+    var pendingPhysicalRecovery by remember {
+        mutableStateOf<Pair<Pair<String, Long>, PhysicalRecoveryIdentity>?>(null)
+    }
+    val physicalRecoveryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val pending = pendingPhysicalRecovery
+        pendingPhysicalRecovery = null
+        if (uri != null && pending != null && viewModel.canResumeExport(pending.first.second, pending.first.first)) {
+            viewModel.inspectPhysicalRecoveryFolder(uri, pending.second)
+        }
     }
 
     val ecuBackupPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -413,7 +449,9 @@ fun CamaroDiagApp(
                             letterSpacing = 1.6.sp
                         )
                         Text(
-                            text = "${localizedGenerationName(vehicle.generation)} • ${vehicle.modelYear} • ${vehicle.engine.rpo} • ${vehicle.market.code}",
+                            text = observedStandardVin?.takeUnless(VehicleVinMatcher::isCamaroCandidate)?.let {
+                                stringResource(R.string.obd_connected_other_vehicle, it)
+                            } ?: "${localizedGenerationName(vehicle.generation)} • ${vehicle.modelYear} • ${vehicle.engine.rpo} • ${vehicle.market.code}",
                             fontSize = 12.sp,
                             color = TextMuted
                         )
@@ -646,7 +684,11 @@ fun CamaroDiagApp(
                     // Physical CDJ/USB checkpoint capture is not implemented (C5): never enable it as a working export.
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
-                DiagTab.MODULES -> ModulesScreen(modules)
+                DiagTab.MODULES -> ModulesScreen(
+                    modules, obdScanReport, isObdScanning, { viewModel.runFullObdScan() },
+                    FunctionalTestPlanner.currentResponders(functionalTests, connectionGeneration, vehicle.vin),
+                    obdScanMessage, observedObdResponders
+                )
                 DiagTab.LICENSE -> {
                     if (LicenseRolloutConfig.ENABLED) {
                         LicenseScreen(licenseLevel, onRefreshLicense)
@@ -660,7 +702,57 @@ fun CamaroDiagApp(
                 DiagTab.FUNCTIONAL_TESTS -> {
                     if (ownerTestsAllowed) FunctionalTestsScreen(
                         state = functionalTests,
+                        vehicle = vehicle,
+                        connectionGeneration = connectionGeneration,
+                        evapAvailable = adapter.tier != AdapterTier.DISCONNECTED &&
+                            !calibrationWorkspace.isJ2534BridgeConnected && viewModel.canRunFunctionalEvapTest(),
+                        onRunEvap = { approval, epoch, profile ->
+                            viewModel.runFunctionalEvapTest(approval, epoch, profile)
+                        },
+                        onRunClear = { approval, epoch, profile ->
+                            viewModel.runFunctionalClearTest(approval, epoch, profile)
+                        },
+                        legacyAvailableProtocol = viewModel.functionalLegacyMutationProtocol(),
+                        onRunLegacy = { target, approval, epoch, profile ->
+                            viewModel.runFunctionalLegacyMutation(target, approval, epoch, profile)
+                        },
+                        onRunLegacyRead = { target, epoch, profile ->
+                            viewModel.runFunctionalLegacyRead(target,epoch,profile)
+                        },
+                        liveProtocol = viewModel.functionalLiveProtocol(),
+                        onRunLive = { plan,epoch,profile -> viewModel.runFunctionalLive(plan,epoch,profile) },
+                        onExportLiveCsv = { withExportFolder { viewModel.exportFunctionalLiveCsv() } },
+                        onExportNativeScalar = { csv -> withExportFolder { viewModel.exportFunctionalNativeScalar(csv) } },
+                        onInspectNativeMaintenancePrefix = { source,epoch,profile ->
+                            withExportFolder { viewModel.inspectFunctionalNativeMaintenancePrefix(source,epoch,profile) }
+                        },
+                        onInspectNativeMaintenance = { source,epoch,profile ->
+                            withExportFolder { viewModel.inspectFunctionalNativeMaintenance(source,epoch,profile) }
+                        },
+                        onInspectNativePrefix = { source,epoch,profile ->
+                            withExportFolder { viewModel.inspectFunctionalNativeLivePrefix(source,epoch,profile) }
+                        },
+                        onInspectNativeFreezePrefix = { source,epoch,profile ->
+                            withExportFolder { viewModel.inspectFunctionalNativeFreezePrefix(source,epoch,profile) }
+                        },
+                        onVerifyNativeFreezePrefix = { capture,report,epoch,profile ->
+                            withExportFolder { viewModel.verifyFunctionalNativeFreezePrefix(capture,report,epoch,profile) }
+                        },
+                        onVerifyNativeScalar = { capture,report,epoch,profile ->
+                            withExportFolder { viewModel.verifyFunctionalNativeScalar(capture,report,epoch,profile) }
+                        },
+                        onProjectCatalogue = { catalogue,reference,report,pin,epoch,profile ->
+                            withExportFolder { viewModel.projectFunctionalCatalogue(catalogue,reference,report,pin,epoch,profile) }
+                        },
+                        onRunFreeze = { plan,epoch,profile -> viewModel.runFunctionalFreeze(plan,epoch,profile) },
+                        onRunNetwork = { plan,epoch,profile -> viewModel.runFunctionalNetwork(plan,epoch,profile) },
+                        nativeUsbEnabled = adapter.tier == AdapterTier.DISCONNECTED && !calibrationWorkspace.isJ2534BridgeConnected,
+                        onRunNativeUsb = viewModel::runNativeUsbFunctionalTest,
+                        onRunNativeFreeze = viewModel::runNativeFreezeFunctionalTest,
+                        onRunNativeMaintenance = viewModel::runNativeMaintenanceFunctionalTest,
+                        onRunNativeLive = viewModel::runNativeLiveFunctionalTest,
                         onRunAll = { viewModel.runFunctionalTests() },
+                        onRunProtocol = { protocol, target -> viewModel.runFunctionalTests(protocol, target) },
                         onStop = { viewModel.cancelFunctionalTests() },
                         onExport = {
                             withExportFolder {
@@ -676,16 +768,12 @@ fun CamaroDiagApp(
                     recording = liveRecording,
                     telemetryMessage = liveTelemetryMessage,
                     accountUid = accountUid,
-                    vehicleIdentity = selectedSavedVehicleId?.let { "garage_$it" }
-                        ?: vehicle.vin.trim().uppercase(Locale.ROOT)
-                            .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
-                            ?.let { "vin_$it" },
-                    catalogSignals = calibrationWorkspace.nativeSignals
-                        .filterNot { it.hidden }
-                        .map { LiveSensorDefinition("ECU:" + it.id, it.name, it.name) } +
-                        calibrationWorkspace.obdbSignals
-                            .filterNot { it.hidden }
-                            .map { LiveSensorDefinition("OBDB:" + it.id, it.name, it.name) },
+                    vehicleIdentity = observedStandardVin?.let { observed ->
+                        if (VehicleVinMatcher.normalize(vehicle.vin) == observed && selectedSavedVehicleId != null)
+                            "garage_$selectedSavedVehicleId" else "vin_$observed"
+                    },
+                    detectedSensors = detectedLiveSensors,
+                    connectionGeneration = connectionGeneration,
                     onToggleStream = { viewModel.toggleLiveStream() },
                     onToggleUnits = {
                         viewModel.setUnitSystem(if (units == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC)
@@ -702,12 +790,14 @@ fun CamaroDiagApp(
                 DiagTab.CAN_SNIFFER -> CanSnifferScreen(
                     state = liveCanMonitorState,
                     isAvailable = viewModel.canMonitorAvailable(),
+                    availableRawCanProfiles = viewModel.availableRawCanProfiles(),
                     canReadObdAvailable = viewModel.canConsoleReadObd(),
                     canTransmitAvailable = adapter.supportsCanTransmit,
                     canExportAvailable = viewModel.canExportCanCapture(),
                     knownModules = modules,
                     onStart = { can29Bit -> viewModel.startCanMonitor(can29Bit = can29Bit) },
-                    onStop = { viewModel.stopCanMonitor() },
+                    onBitrateChange = viewModel::setCanConsoleBitrate,
+                    onStop = { if (liveCanMonitorState.isDoIpActive) viewModel.cancelDirectDoIp() else viewModel.stopCanMonitor() },
                     onSendRequest = { viewModel.sendCanConsoleInput(it) },
                     onConfirmRawFrame = { frame, epoch, approval ->
                         viewModel.confirmRawCanConsoleFrame(frame, epoch, approval)
@@ -715,7 +805,7 @@ fun CamaroDiagApp(
                     onClearHistory = { viewModel.clearCanConsoleHistory() },
                     onExport = { withExportFolder { viewModel.exportCanCapture("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") } }
                 )
-                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, connectionGeneration, { viewModel.scanDtcs() }, { approval, epoch, confirmedVehicle -> viewModel.clearDtcs(approval, epoch, confirmedVehicle) })
+                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, connectionGeneration, dtcScanNotice, { viewModel.scanDtcs() }, { approval, epoch, confirmedVehicle -> viewModel.clearDtcs(approval, epoch, confirmedVehicle) })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { withExportFolder { viewModel.saveCurrentSession() } })
                 DiagTab.ABOUT -> LazyColumn {
                     item { AboutUpdateCard() }
@@ -729,11 +819,21 @@ fun CamaroDiagApp(
                     vehicle = vehicle,
                     accountUid = accountUid,
                     savedVehicleId = selectedSavedVehicleId,
-                    onRunScan = { viewModel.runFullObdScan() }
+                    onRunScan = { viewModel.runFullObdScan() },
+                    onExport = { report -> withExportFolder { viewModel.exportFullObdScan(report) } },
+                    nativeUsbPanel = if(ownerTestsAllowed && adapter.tier==AdapterTier.DISCONNECTED &&
+                        !calibrationWorkspace.isJ2534BridgeConnected) {
+                        { NativeUsbFunctionalPanel(!isBusy&&!isObdScanning&&!functionalTests.running,connectionGeneration,
+                            vehicle,viewModel::runNativeUsbObdScan,asScan=true) }
+                    } else null,
+                    onStopNativeScan = if(functionalTests.running && isObdScanning &&
+                        functionalTests.context?.transport=="NATIVE_USB_CU1") viewModel::cancelFunctionalTests else null
                 )
                 DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
                     state = calibrationWorkspace,
+                    consoleBusy = liveCanMonitorState.isCapturing || liveCanMonitorState.isSendingRequest,
                     canReadEnhancedUds = viewModel.canReadEnhancedUds(),
+                    availableUdsReadProfiles = viewModel::availableUdsReadProfiles,
                     vehicleLabel = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${localizedGenerationName(vehicle.generation)}",
                     ecmType = vehicle.engine.ecmType,
                     isConnected = !adapter.deviceName.contains("Demo", ignoreCase = true) &&
@@ -757,6 +857,34 @@ fun CamaroDiagApp(
                     onSyncVehicleVinFromEcu = { viewModel.syncVehicleVinFromEcu(it) },
                     onReadUdsDid = { requestId, responseId, did, protocol -> viewModel.readUdsDid(requestId, responseId, did, protocol) },
                     onReadUdsDtcs = { requestId, responseId, protocol -> viewModel.readUdsDtcs(requestId, responseId, protocol) },
+                    onReadDirectDoIp = { host, tester, ecu, did, tls, operation, certificate, options ->
+                        viewModel.readDirectDoIp(host, tester, ecu, did, tls, operation, certificate = certificate, options = options)
+                    },
+                    doIpAccountUid = accountUid,
+                    doIpContextGeneration = liveCanMonitorState.consoleContextGeneration,
+                    onConfirmDoIpCommand = viewModel::confirmDirectDoIpCommand,
+                    onMonitorDirectDoIp = { host, tester, ecu, did, tls, samples, interval, operation, certificate, options ->
+                        viewModel.readDirectDoIp(host, tester, ecu, did, tls,
+                            operation, samples, interval, certificate = certificate, options = options)
+                    },
+                    onCancelDirectDoIp = viewModel::cancelDirectDoIp,
+                    onInspectDoIpGateway = viewModel::inspectDirectDoIpGateway,
+                    onExportDoIpMonitoring = { report -> withExportFolder { viewModel.exportDoIpMonitoring(report) } },
+                    onImportDoIpBackupProfile = {
+                        viewModel.activeAccountUid.value?.let { owner ->
+                            pendingDoIpProfile = Triple(owner, viewModel.exportAccountGeneration(), viewModel.vehicle.value)
+                            doIpProfilePicker.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                        }
+                    },
+                    onVerifyDoIpBackup = { scope ->
+                        viewModel.activeAccountUid.value?.let { owner ->
+                            pendingDoIpArchive = Triple(owner, viewModel.exportAccountGeneration(), viewModel.vehicle.value) to scope
+                            doIpArchivePicker.launch(arrayOf("application/zip", "application/octet-stream"))
+                        }
+                    },
+                    onCaptureDoIpBackup = { host, tester, ecu, tls, scope, certificate, options ->
+                        withExportFolder { viewModel.captureDirectDoIpBackup(host, tester, ecu, tls, scope, certificate, options) }
+                    },
                     onConnectJ2534Bridge = { host, port, token, requestId, responseId, baud ->
                         viewModel.connectJ2534Bridge(host, port, token, requestId, responseId, baud)
                     },
@@ -785,6 +913,21 @@ fun CamaroDiagApp(
                         }
                     },
                     onReadObdbSignal = { signalId, profile -> viewModel.readObdbSignal(signalId, profile) },
+                    onExportPhysicalRecovery = { identity, report ->
+                        withExportFolder { viewModel.exportPhysicalRecoveryInspection(identity, report) }
+                    },
+                    onInspectPhysicalRecoveryHistory = { identity, trees ->
+                        viewModel.inspectPhysicalRecoveryHistory(identity, trees)
+                    },
+                    onExportPhysicalRecoveryHistory = { report ->
+                        withExportFolder { viewModel.exportPhysicalRecoveryHistory(report) }
+                    },
+                    onInspectPhysicalRecovery = { identity ->
+                        viewModel.activeAccountUid.value?.let { owner ->
+                            pendingPhysicalRecovery = (owner to viewModel.exportAccountGeneration()) to identity
+                            physicalRecoveryPicker.launch(null)
+                        }
+                    },
                     onVerifyEcuBackup = { ecuBackupPicker.launch(arrayOf("application/zip", "application/octet-stream")) },
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
                     onImportTrace = { canTracePicker.launch(arrayOf("text/*", "text/csv", "application/vnd.ms-excel", "*/*")) },
@@ -1061,11 +1204,14 @@ fun AdapterScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        if (isJ2534BridgeConnected) stringResource(R.string.adapter_j2534_bridge_connected)
-                        else adapter.deviceName,
+                        when {
+                            isJ2534BridgeConnected -> stringResource(R.string.adapter_j2534_bridge_connected)
+                            adapter.tier == AdapterTier.DISCONNECTED -> stringResource(R.string.adapter_tier_disconnected)
+                            else -> adapter.deviceName
+                        },
                         fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp
                     )
-                    if (!isJ2534BridgeConnected) {
+                    if (!isJ2534BridgeConnected && adapter.tier != AdapterTier.DISCONNECTED) {
                         Text(localizedAdapterTierName(adapter.tier), fontSize = 13.sp)
                     }
                     if (isJ2534BridgeConnected || adapter.tier != AdapterTier.DISCONNECTED) {
@@ -1083,19 +1229,38 @@ fun AdapterScreen(
                             fontSize = 12.sp, color = TextMuted
                         )
                     } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
-                            BadgeChip("CAN TX", adapter.supportsCanTransmit)
-                            BadgeChip(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
-                            BadgeChip(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            AdapterCapabilityLine(stringResource(R.string.adapter_can_headers), adapter.supportsCanHeaders)
+                            AdapterCapabilityLine(stringResource(R.string.adapter_can_tx_label), adapter.supportsCanTransmit)
+                            AdapterCapabilityLine(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
+                            AdapterCapabilityLine(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
                         }
                     }
-                    if (adapter.rawProbeLog.isNotEmpty()) {
-                        Spacer(Modifier.height(6.dp))
-                        adapter.rawProbeLog.forEach { line ->
-                            Text(line, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
+                    if (adapter.acceptedElmProtocols.isNotEmpty()) {
+                        val names = adapter.acceptedElmProtocols.sorted().mapNotNull { number ->
+                            when (number) {
+                                1 -> "J1850 PWM"
+                                2 -> "J1850 VPW"
+                                3 -> "ISO 9141-2"
+                                4 -> "KWP2000 5-baud"
+                                5 -> "KWP2000 fast init"
+                                6 -> "CAN 11-bit / 500k"
+                                7 -> "CAN 29-bit / 500k"
+                                8 -> "CAN 11-bit / 250k"
+                                9 -> "CAN 29-bit / 250k"
+                                10 -> "J1939"
+                                else -> null
+                            }
                         }
+                        Text(stringResource(R.string.adapter_config_accepted, names.joinToString(", ")),
+                            fontSize = 11.sp, color = TextMuted)
                     }
+                    // if (adapter.rawProbeLog.isNotEmpty()) {
+                    //     Spacer(Modifier.height(6.dp))
+                    //     adapter.rawProbeLog.forEach { line ->
+                    //         Text(line, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
+                    //     }
+                    // }
                 }
             }
         }
@@ -1209,10 +1374,10 @@ fun AdapterScreen(
         }
         item {
             Text(stringResource(R.string.adapter_simulation_profiles), fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { onSelectSim("MX_PLUS") }, enabled = !isBusy) { Text("OBDLink MX+") }
-                OutlinedButton(onClick = { onSelectSim("ELM_15") }, enabled = !isBusy) { Text("ELM327 v1.5") }
-                OutlinedButton(onClick = { onSelectSim("CLONE") }, enabled = !isBusy) { Text(stringResource(R.string.adapter_tier_clone_elm)) }
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedButton(onClick = { onSelectSim("MX_PLUS") }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text("OBDLink MX+") }
+                OutlinedButton(onClick = { onSelectSim("ELM_15") }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text("ELM327 v1.5") }
+                OutlinedButton(onClick = { onSelectSim("CLONE") }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.adapter_tier_clone_elm)) }
             }
         }
     }
@@ -1354,10 +1519,47 @@ fun VehicleControlsScreen(vehicle: VehicleProfile) {
 }
 
 @Composable
-fun ModulesScreen(modules: List<EcuModule>) {
+fun ModulesScreen(
+    modules: List<EcuModule>,
+    report: com.camarodiag.gen5.data.obd.ObdScanReport? = null,
+    scanning: Boolean = false,
+    onScan: (() -> Unit)? = null,
+    testedResponders: List<String> = emptyList(),
+    scanMessage: String? = null,
+    observedResponders: List<String> = emptyList()
+) {
+    val respondingAddresses = (report?.respondingEcuAddresses ?: (observedResponders + testedResponders)).distinct().sorted()
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             SectionTitle(stringResource(R.string.modules_vehicle_title))
+            if (onScan != null) {
+                Button(onClick = onScan, enabled = !scanning, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.obd_run_full_scan))
+                }
+            }
+            scanMessage?.let { Text(it, color = TextMuted, fontSize = 12.sp) }
+            if (modules.isEmpty() && respondingAddresses.isEmpty()) {
+                Text(stringResource(R.string.modules_no_observed_responders), color = TextMuted)
+            }
+        }
+        if (respondingAddresses.isNotEmpty()) {
+            item {
+                SectionTitle(stringResource(R.string.modules_obd_responders))
+                if (report?.adapterInfo?.get("IDENTIFICATION").orEmpty().contains("SIMULATED", ignoreCase = true)) {
+                    Text(stringResource(R.string.obd_offline_simulation_notice), color = CamaroAmber)
+                }
+            }
+            items(respondingAddresses) { address ->
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(address, color = CamaroBlue, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.modules_oem_identity_unknown), color = TextMuted)
+                        report?.supportedPidsByResponder?.get(address)?.let { pids ->
+                            Text(stringResource(R.string.obd_pid_count_by_ecu, address) + ": " + pids.size)
+                        }
+                    }
+                }
+            }
         }
         items(modules) { mod ->
             val statusColor = when (mod.status) {
@@ -1427,7 +1629,8 @@ fun LiveDataScreen(
     telemetryMessage: String?,
     vehicleIdentity: String?,
     accountUid: String?,
-    catalogSignals: List<LiveSensorDefinition>,
+    detectedSensors: List<LiveSensorDefinition>,
+    connectionGeneration: Long,
     onToggleStream: () -> Unit,
     onToggleUnits: () -> Unit,
     onToggleRecording: () -> Unit,
@@ -1443,16 +1646,16 @@ fun LiveDataScreen(
             preferences.getString(key, null)?.split(",")?.filter(String::isNotBlank)?.toSet()
         }
     }
-    var selectedPidIds by remember(storageKey) {
+    // Without a verified VIN, a selection belongs only to this connection.
+    val transientConnection = connectionGeneration.takeIf { storageKey == null }
+    var selectedPidIds by remember(storageKey, transientConnection) {
         mutableStateOf<Set<String>?>(storedSelection)
     }
-    var choosingSensors by remember(storageKey) { mutableStateOf(false) }
-    val allPidIds = pids.map { it.id }.toSet()
-    val liveCatalog = remember(pids, catalogSignals) {
-        LiveSensorCatalog.entriesWithObserved(
-            catalogSignals + pids.map { LiveSensorDefinition(it.id, it.labelEn, it.labelFr) }
-        )
+    var choosingSensors by remember(storageKey, connectionGeneration) { mutableStateOf(false) }
+    val liveCatalog = remember(detectedSensors) {
+        LiveSensorCatalog.availableEntries(detectedSensors)
     }
+    val allPidIds = liveCatalog.map { it.id }.toSet()
     val localeFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
     // Android resources are authoritative for known signals. Legacy bilingual labels
     // remain a fallback only for signals discovered outside the known catalog.
@@ -1462,6 +1665,8 @@ fun LiveDataScreen(
         "STFT" to R.string.live_pid_stft,
         "LTFT" to R.string.live_pid_ltft,
         "BAT" to R.string.live_pid_bat,
+        "HYBRID_BAT_LIFE" to R.string.live_pid_hybrid_bat_life,
+        "ODOMETER" to R.string.live_pid_odometer,
         "SPD" to R.string.live_pid_speed,
         "TPS" to R.string.live_pid_throttle,
         "LOAD" to R.string.live_pid_load,
@@ -1502,12 +1707,15 @@ fun LiveDataScreen(
         signal.id to (sensorLabelResources[signal.id]?.let(sensorContext::getString)
             ?: if (localeFrench) signal.labelFr else signal.labelEn)
     }
-    val activePidIds = selectedPidIds ?: allPidIds
+    val activePidIds = (selectedPidIds ?: allPidIds).intersect(allPidIds)
     val visiblePids = pids.filter { it.id in activePidIds }
 
-    if (choosingSensors) {
-        var sensorQuery by remember(storageKey, choosingSensors) { mutableStateOf("") }
-        var pendingIds by remember(storageKey, choosingSensors) {
+    LaunchedEffect(allPidIds) {
+        if (allPidIds.isEmpty()) choosingSensors = false
+    }
+    if (choosingSensors && allPidIds.isNotEmpty()) {
+        var sensorQuery by remember(storageKey, connectionGeneration, choosingSensors) { mutableStateOf("") }
+        var pendingIds by remember(storageKey, connectionGeneration, choosingSensors) {
             mutableStateOf(activePidIds)
         }
         AlertDialog(
@@ -1530,29 +1738,15 @@ fun LiveDataScreen(
                             },
                             key = { it.id }
                         ) { signal ->
-                            val measured = LiveSensorCatalog.isMeasured(signal.id, allPidIds)
-                            Row(
-                                Modifier.fillMaxWidth().clickable(enabled = measured) {
-                                    pendingIds = if (signal.id in pendingIds) pendingIds - signal.id
-                                        else pendingIds + signal.id
-                                },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = signal.id in pendingIds,
-                                    enabled = measured,
-                                    onCheckedChange = { checked ->
-                                        pendingIds = if (checked) pendingIds + signal.id
-                                            else pendingIds - signal.id
-                                    }
-                                )
-                                Column {
+                            val updateChecked: (Boolean) -> Unit = { checked ->
+                                pendingIds = if (checked) pendingIds + signal.id else pendingIds - signal.id
+                            }
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = signal.id in pendingIds, onCheckedChange = updateChecked)
+                                Column(Modifier.weight(1f).clickable { updateChecked(signal.id !in pendingIds) }) {
                                     Text(sensorLabels[signal.id] ?: signal.id)
                                     Text(signal.id, color = TextMuted, fontSize = 11.sp)
-                                    if (!measured) {
-                                        Text(stringResource(R.string.obd_sensor_not_measured),
-                                            color = TextMuted, fontSize = 11.sp)
-                                    }
+                                    // Only session-observed signals are listed; no disabled catalogue rows.
                                 }
                             }
                         }
@@ -1561,9 +1755,10 @@ fun LiveDataScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    selectedPidIds = pendingIds.toSet()
+                    val accepted = pendingIds.intersect(allPidIds)
+                    selectedPidIds = accepted
                     storageKey?.let { key ->
-                        preferences.edit { putString(key, pendingIds.sorted().joinToString(",")) }
+                        preferences.edit { putString(key, accepted.sorted().joinToString(",")) }
                     }
                     choosingSensors = false
                 }) { Text(stringResource(R.string.obd_sensor_ok)) }
@@ -1630,10 +1825,10 @@ fun LiveDataScreen(
                         telemetryMessage?.takeIf { it.isNotBlank() }?.let {
                             Text(it, color = WarnRed, fontSize = 11.sp)
                         }
-                        Text(
-                            stringResource(R.string.live_recording_notice),
-                            color = TextMuted, fontSize = 10.sp
-                        )
+                        // Text(
+                            // stringResource(R.string.live_recording_notice),
+                            // color = TextMuted, fontSize = 10.sp
+                        // )
                     }
                 }
             }
@@ -1642,11 +1837,11 @@ fun LiveDataScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        stringResource(R.string.live_selected_sensors, visiblePids.size, pids.size),
+                        stringResource(R.string.live_selected_sensors, activePidIds.size, allPidIds.size),
                         color = CamaroAmber,
                         fontWeight = FontWeight.Bold
                     )
-                    Button(onClick = { choosingSensors = true }, modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = { choosingSensors = true }, enabled = liveCatalog.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.obd_choose_sensors))
                     }
                     TextButton(onClick = {
@@ -1664,7 +1859,15 @@ fun LiveDataScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                        Text(localizedLivePidLabel(pid), color = TextMuted, fontSize = 13.sp)
+                        val source = Regex("\\[([0-9A-F]{3}|[0-9A-F]{8})\\]$").find(pid.labelEn)?.groupValues?.get(1)
+                        val label = if (pid.labelEn.contains("(DEMO)", ignoreCase = true))
+                            localizedLivePidLabel(pid)
+                        else sensorLabels[pid.id] ?: localizedLivePidLabel(pid)
+                        Column(Modifier.weight(1f)) {
+                            Text(label, color = TextMuted, fontSize = 13.sp)
+                            source?.let { Text(stringResource(R.string.obd_value_source, it),
+                                color = TextMuted, fontSize = 11.sp) }
+                        }
                         Text(
                             text = "${String.format(Locale.getDefault(), "%.1f", displayVal)} $displayUnit",
                             fontSize = 22.sp,
@@ -1687,11 +1890,13 @@ fun LiveDataScreen(
 fun CanSnifferScreen(
     state: LiveCanMonitorState,
     isAvailable: Boolean,
+    availableRawCanProfiles: Set<Int>,
     canReadObdAvailable: Boolean,
     canTransmitAvailable: Boolean,
     canExportAvailable: Boolean,
     knownModules: List<EcuModule>,
     onStart: (Boolean) -> Unit,
+    onBitrateChange: (Int) -> Unit,
     onStop: () -> Unit,
     onSendRequest: (String) -> Unit,
     onConfirmRawFrame: (String, Long, EcuWriteConsentFlow.Approval) -> Unit,
@@ -1701,6 +1906,7 @@ fun CanSnifferScreen(
     var requestInput by remember { mutableStateOf("01 0C") }
     var monitorCan29Bit by remember { mutableStateOf(false) }
     var monitorFormatMenuExpanded by remember { mutableStateOf(false) }
+    // var bitrateMenuExpanded by remember { mutableStateOf(false) }
     var pendingRawFrameInput by remember { mutableStateOf<Pair<String, Long>?>(null) }
     var writeConsentStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
     var frameSearch by remember { mutableStateOf("") }
@@ -1734,16 +1940,37 @@ fun CanSnifferScreen(
     }
     // Only identify a module by name if its actual CAN responder was observed
     // during a verified physical scan, not from the predicted vehicle topology.
-    val physicallyIdentifiedModules = remember(knownModules, observedCanIds) {
+    val physicallyIdentifiedModules = remember(knownModules, observedCanIds, state.bitrate) {
+        // A CAN ID on SW-CAN/250k is not the same physical responder as on HS-CAN 500k.
         knownModules.filter { module ->
-            module.status == ModuleStatus.ACCESSIBLE &&
+            state.bitrate == 500_000 && module.status == ModuleStatus.ACCESSIBLE &&
                 module.notesEn.startsWith("Observed ") &&
                 observedCanIds.any { it.hex.equals(module.rxHeader, ignoreCase = true) }
         }.associateBy { module ->
             observedCanIds.first { it.hex.equals(module.rxHeader, ignoreCase = true) }
         }
     }
-    val rawCanFrameInput = remember(requestInput) { RawCanFrameParser.parse(requestInput) != null }
+    val parsedRawFrame = remember(requestInput) { RawCanFrameParser.parse(requestInput) }
+    val rawCanFrameInput = parsedRawFrame != null
+    fun profile(extended: Boolean, bitrate: Int) =
+        com.camarodiag.gen5.data.obd.DiagnosticRouteSelector.rawCanProfile(extended, bitrate)
+    fun speedForProfile(selected: Int) = when (selected) {
+        61, 62 -> 33_333
+        8, 9 -> 250_000
+        else -> 500_000
+    }
+    val selectedMonitorProfile = profile(monitorCan29Bit, state.bitrate)
+    val rawProfileAvailable = state.bitrate != 33_333 && parsedRawFrame?.let {
+        profile(it.isExtended, state.bitrate) in availableRawCanProfiles
+    } == true
+    LaunchedEffect(availableRawCanProfiles, state.bitrate, state.isCapturing, state.isSendingRequest) {
+        if (!state.isDoIpActive && !state.isCapturing && !state.isSendingRequest &&
+            selectedMonitorProfile !in availableRawCanProfiles && availableRawCanProfiles.size == 1) {
+            val selected = availableRawCanProfiles.single()
+            monitorCan29Bit = selected in setOf(7, 9, 62)
+            onBitrateChange(speedForProfile(selected))
+        }
+    }
     val unsafeRawCanInput = remember(requestInput) {
         RawCanFrameParser.parse(requestInput)?.let {
             !SafeRawCanTransmitPolicy.allows(it)
@@ -1779,47 +2006,44 @@ fun CanSnifferScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SectionTitle(stringResource(R.string.can_sniffer_title))
-                    Text(stringResource(R.string.can_sniffer_description), color = TextMuted, fontSize = 12.sp)
+                    if (state.isDoIpActive) Text(stringResource(R.string.cal_doip_console_active), color = CamaroAmber, fontSize = 11.sp)
+                    // Text(stringResource(R.string.can_sniffer_description), color = TextMuted, fontSize = 12.sp)
                     Text(stringResource(R.string.can_sniffer_safety), color = CamaroAmber, fontSize = 11.sp)
                     Text(stringResource(R.string.can_sniffer_bus_limit), color = TextMuted, fontSize = 10.sp)
                     Text(stringResource(R.string.can_sniffer_stn_filter_notice), color = TextMuted, fontSize = 10.sp)
                     Box {
-                        OutlinedButton(
-                            onClick = { monitorFormatMenuExpanded = true },
-                            enabled = !state.isCapturing && !state.isSendingRequest,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(stringResource(
-                                if (monitorCan29Bit) R.string.can_monitor_format_29
-                                else R.string.can_monitor_format_11
-                            ))
+                        OutlinedButton(onClick = { monitorFormatMenuExpanded = true },
+                            enabled = !state.isDoIpActive && !state.isCapturing && !state.isSendingRequest && availableRawCanProfiles.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth()) {
+                            Text(if (selectedMonitorProfile in availableRawCanProfiles)
+                                if (state.bitrate == 33_333) stringResource(R.string.can_console_swcan_profile, if (monitorCan29Bit) 29 else 11)
+                                else stringResource(R.string.can_console_capture_profile, state.bitrate / 1000, if (monitorCan29Bit) 29 else 11)
+                            else stringResource(R.string.cal_choose_compatible_profile))
                         }
-                        DropdownMenu(
-                            expanded = monitorFormatMenuExpanded,
-                            onDismissRequest = { monitorFormatMenuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.can_monitor_format_11)) },
-                                onClick = {
-                                    monitorCan29Bit = false
+                        DropdownMenu(expanded = monitorFormatMenuExpanded,
+                            onDismissRequest = { monitorFormatMenuExpanded = false }) {
+                            availableRawCanProfiles.sorted().forEach { selected ->
+                                val extended = selected in setOf(7, 9, 62)
+                                val speed = speedForProfile(selected)
+                                DropdownMenuItem(text = {
+                                    Text(if (speed == 33_333) stringResource(R.string.can_console_swcan_profile, if (extended) 29 else 11)
+                                        else stringResource(R.string.can_console_capture_profile, speed / 1000, if (extended) 29 else 11))
+                                }, onClick = {
+                                    monitorCan29Bit = extended
+                                    onBitrateChange(speed)
                                     monitorFormatMenuExpanded = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.can_monitor_format_29)) },
-                                onClick = {
-                                    monitorCan29Bit = true
-                                    monitorFormatMenuExpanded = false
-                                }
-                            )
+                                })
+                            }
                         }
                     }
                     Text(stringResource(R.string.can_monitor_format_notice),
                         color = TextMuted, fontSize = 10.sp)
+                    if (state.bitrate == 33_333)
+                        Text(stringResource(R.string.can_console_swcan_receive_only), color = CamaroAmber, fontSize = 11.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = { onStart(monitorCan29Bit) },
-                            enabled = isAvailable && !state.isCapturing && !state.isSendingRequest,
+                            enabled = isAvailable && selectedMonitorProfile in availableRawCanProfiles && !state.isDoIpActive && !state.isCapturing && !state.isSendingRequest,
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Filled.PlayArrow, contentDescription = null)
@@ -1828,7 +2052,7 @@ fun CanSnifferScreen(
                         }
                         OutlinedButton(
                             onClick = onStop,
-                            enabled = state.isCapturing,
+                            enabled = state.isCapturing || state.isDoIpActive,
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Filled.Stop, contentDescription = null)
@@ -1871,7 +2095,7 @@ fun CanSnifferScreen(
                         }
                         TextButton(
                             onClick = onClearHistory,
-                            enabled = !state.isCapturing && !state.isSendingRequest &&
+                            enabled = !state.isDoIpActive && !state.isCapturing && !state.isSendingRequest &&
                                 (state.consoleHistory.isNotEmpty() || state.rawText.isNotBlank())
                         ) {
                             Text(stringResource(R.string.can_console_clear), color = CamaroBlue)
@@ -1937,10 +2161,10 @@ fun CanSnifferScreen(
                             }
                         }
                     }
-                    Text(
-                        stringResource(R.string.can_console_filter_observed_note),
-                        color = TextMuted, fontSize = 10.sp
-                    )
+                    // Text(
+                        // stringResource(R.string.can_console_filter_observed_note),
+                        // color = TextMuted, fontSize = 10.sp
+                    // )
                     if (state.consoleHistory.isNotEmpty()) {
                         Text(
                             stringResource(R.string.can_console_history_recent_scope),
@@ -1998,7 +2222,7 @@ fun CanSnifferScreen(
                         label = { Text(stringResource(R.string.can_console_input_label)) },
                         placeholder = { Text("7E0 02 01 0C  •  01 0C") }
                     )
-                    Text(stringResource(R.string.can_console_input_hint), color = TextMuted, fontSize = 10.sp)
+                    // Text(stringResource(R.string.can_console_input_hint), color = TextMuted, fontSize = 10.sp)
                     if (rawCanFrameInput && !canTransmitAvailable) {
                         Text(stringResource(R.string.can_console_tx_unverified), color = WarnRed, fontSize = 11.sp)
                     }
@@ -2018,11 +2242,11 @@ fun CanSnifferScreen(
                         },
                         enabled = CanConsoleCapabilityPolicy.canSubmit(
                             rawCanFrame = rawCanFrameInput,
-                            monitorAvailable = isAvailable,
+                            monitorAvailable = isAvailable && rawProfileAvailable,
                             canTransmit = canTransmitAvailable,
                             readObdAvailable = canReadObdAvailable,
                             inputPresent = requestInput.isNotBlank(),
-                            busy = state.isCapturing || state.isSendingRequest
+                            busy = state.isDoIpActive || state.isCapturing || state.isSendingRequest
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -2324,9 +2548,11 @@ fun CanSnifferScreen(
             frame = RawCanFrameParser.parse(frame),
             pendingContextGeneration = pendingEpoch,
             currentContextGeneration = state.consoleContextGeneration,
-            monitorAvailable = isAvailable,
+            monitorAvailable = isAvailable && state.bitrate != 33_333 && RawCanFrameParser.parse(frame)?.let {
+                profile(it.isExtended, state.bitrate) in availableRawCanProfiles
+            } == true,
             canTransmit = canTransmitAvailable,
-            busy = state.isCapturing || state.isSendingRequest
+            busy = state.isDoIpActive || state.isCapturing || state.isSendingRequest
         )
         AlertDialog(
             onDismissRequest = {
@@ -2480,7 +2706,7 @@ private fun localizedDtcDescription(dtc: DiagnosticDtc): String {
 }
 
 @Composable
-fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, connectionGeneration: Long, onScan: () -> Unit, onClear: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit) {
+fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, connectionGeneration: Long, scanNotice: String?, onScan: () -> Unit, onClear: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     var pendingClearGeneration by remember { mutableStateOf<Long?>(null) }
     var pendingClearVehicle by remember { mutableStateOf<VehicleProfile?>(null) }
@@ -2594,9 +2820,13 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
                 )
             }
         }
+        if (scanNotice != null && scanNotice.isNotEmpty()) {
+            item { Text(scanNotice, color = CamaroAmber) }
+        }
         if (dtcs.isEmpty()) {
             item {
-                Text(stringResource(R.string.dtc_none_returned), color = OkGreen)
+                if (scanNotice == "") Text(stringResource(R.string.dtc_none_returned), color = OkGreen)
+                else if (scanNotice == null) Text(stringResource(R.string.obd_data_unavailable), color = CamaroAmber)
             }
         } else {
             items(dtcs) { dtc ->
@@ -2782,7 +3012,8 @@ fun MileageScreen(
                 Card(colors = CardDefaults.cardColors(containerColor = if (rep.hasDiscrepancy) Color(0xFF3B1518) else SurfaceElevated)) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = stringResource(R.string.mileage_engineering_summary, rep.vin),
+                            text = stringResource(R.string.mileage_engineering_summary,
+                                rep.vin.ifBlank { stringResource(R.string.obd_not_available) }),
                             fontWeight = FontWeight.Bold,
                             color = if (rep.hasDiscrepancy) WarnRed else OkGreen
                         )
@@ -2790,7 +3021,10 @@ fun MileageScreen(
                     }
                 }
             }
-            items(rep.readings) { item ->
+            // Keep all evidence in the saved report. Hide unqueried or
+            // unavailable sources when a usable reading exists, not the caveat.
+            val usable = rep.readings.any { it.kmValue?.let { km -> km.isFinite() && km >= 0 } == true }
+            items(rep.readings.filter { !usable || it.kmValue != null }) { item ->
                 val confColor = when (item.confidence) {
                     ConfidenceLevel.HIGH -> OkGreen
                     ConfidenceLevel.MODERATE -> CamaroAmber
@@ -2808,7 +3042,10 @@ fun MileageScreen(
                             )
                         }
                         Text(localizedMileageDetails(item), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
-                        Text(localizedMileageConfidence(item.confidence), color = confColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text(if (item.moduleId == "ECM_A6" && item.kmValue != null)
+                            stringResource(R.string.mileage_reported_odometer_confidence)
+                        else localizedMileageConfidence(item.confidence),
+                            color = confColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         Text(localizedMileageCaveat(item), fontSize = 12.sp, color = TextMuted)
                     }
                 }
@@ -2984,7 +3221,7 @@ fun SettingsScreen(
                             }
                         }
                     }
-                    Text(stringResource(R.string.system_language_hint), color = TextMuted, fontSize = 12.sp)
+                    // Text(stringResource(R.string.system_language_hint), color = TextMuted, fontSize = 12.sp)
                     Text(stringResource(R.string.settings_current_vehicle), fontWeight = FontWeight.Bold)
                     Text(currentVehicle, color = TextMuted, fontSize = 12.sp)
                     Text(stringResource(R.string.settings_current_adapter), fontWeight = FontWeight.Bold)
@@ -3029,6 +3266,18 @@ fun SettingsScreen(
 @Composable
 fun SectionTitle(text: String) {
     Text(text, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+}
+
+@Composable
+private fun AdapterCapabilityLine(label: String, active: Boolean) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(label, modifier = Modifier.weight(0.6f), fontSize = 13.sp)
+        // Constrain the chip too, so translated status text cannot starve the label.
+        Box(Modifier.weight(0.4f), contentAlignment = Alignment.CenterEnd) {
+            BadgeChip(stringResource(if (active) R.string.adapter_capability_detected else R.string.adapter_capability_unverified), active)
+        }
+    }
 }
 
 @Composable

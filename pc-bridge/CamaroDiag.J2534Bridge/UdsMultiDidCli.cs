@@ -42,6 +42,30 @@ internal static class UdsMultiDidCli
         return parsed;
     }
 
+    internal static void RequireIdentity(IReadOnlyList<(ushort Did, byte[] Data)> values,
+        string expectedVin, bool obd)
+    {
+        foreach (var value in values)
+        {
+            if (value.Did == (obd ? 0xF802 : 0xF190) &&
+                !value.Data.SequenceEqual(System.Text.Encoding.ASCII.GetBytes(expectedVin)))
+                throw new InvalidDataException("Sample VIN differs from selected ECU.");
+            if (obd && value.Did == 0xF810 && !value.Data.SequenceEqual(new byte[] { 1 }))
+                throw new InvalidDataException("Sample protocol differs from verified OBDonUDS.");
+        }
+    }
+
+    internal static IReadOnlyList<Entry> ValidateMonitor(IReadOnlyList<Entry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        var frozen = entries.ToArray();
+        if (frozen.Length is < 2 or > 16 || frozen.Any(e => e.Length is < 1 or > 4095) ||
+            frozen.Select(e => e.Did).Distinct().Count() != frozen.Length ||
+            1 + frozen.Sum(e => 2 + e.Length) > 4096)
+            throw new ArgumentException("Invalid multi-DID monitoring layout or sample exceeds 4096 bytes.");
+        return frozen;
+    }
+
     internal static byte[] BuildRequest(IReadOnlyList<Entry> entries) =>
         UdsStandardServices.ReadDids(entries.Select(e => e.Did).ToArray());
 

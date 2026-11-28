@@ -22,16 +22,21 @@ object ObdTransportFailurePolicy {
         var current: Throwable? = error
         var hasIoFailure = false
         var hasUnsafeAdapterState = false
+        var hasExplicitDisconnect = false
+        var hasPromptTimeout = false
         while (current != null && visited.add(current)) {
             // A late failure from an already replaced connection is not a
             // failure of the currently connected physical adapter.
             if (current is ObdSupersededSessionException) return false
             if (current is CanCaptureArchiveWriteException) return false
-            if (current is SocketTimeoutException) return false
+            if (current is SocketTimeoutException) hasPromptTimeout = true
+            if (current is ObdTransportDisconnectedException) hasExplicitDisconnect = true
             if (current is IOException) hasIoFailure = true
             if (current is CanAdapterRestorationException) hasUnsafeAdapterState = true
             current = current.cause
         }
-        return hasIoFailure || hasUnsafeAdapterState
+        // A timeout from an uncertain write can explicitly retire a socket.
+        // A plain prompt timeout, even wrapped in IOException, is different.
+        return hasExplicitDisconnect || hasUnsafeAdapterState || (hasIoFailure && !hasPromptTimeout)
     }
 }

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="VerifyOriginalButton" xml:space="preserve"><value>Comparer le BIN original</value></data>
+  <data name="ChooseOriginalTitle" xml:space="preserve"><value>Sélectionner le BIN E39 original complet</value></data>
+  <data name="OriginalBinFilter" xml:space="preserve"><value>Image ECU (*.bin)|*.bin|Tous les fichiers (*.*)|*.*</value></data>
+  <data name="OriginalBinName" xml:space="preserve"><value>BIN original sélectionné : {0}</value></data>
+  <data name="OriginalBinMatched" xml:space="preserve"><value>BIN original conforme aux {0} secteur(s) physiques sauvegardés.</value></data>
+  <data name="OriginalBinRejected" xml:space="preserve"><value>Comparaison du BIN original refusée : {0}</value></data>
+  <data name="FailedSector" xml:space="preserve"><value>Premier secteur ECU incohérent : 0x{0:X8}</value></data>
+  <data name="OfflineNotice" xml:space="preserve"><value>Analyse hors ligne uniquement : aucune autorisation de programmation ou restauration ECU.</value></data>
+  <data name="ExportAssessment" xml:space="preserve"><value>Exporter le rapport JSON</value></data>
+  <data name="AssessmentJsonFilter" xml:space="preserve"><value>Rapport JSON (*.json)|*.json</value></data>
+  <data name="Inspecting" xml:space="preserve"><value>Analyse des preuves…</value></data>
+  <data name="EvidenceChanged" xml:space="preserve"><value>Les preuves ont changé ou ne peuvent être vérifiées. Rouvrez le journal.</value></data>
+  <data name="AssessmentExported" xml:space="preserve"><value>Rapport exporté.</value></data>
+  <data name="JournalName" xml:space="preserve"><value>Journal : {0}</value></data>
+  <data name="JournalState" xml:space="preserve"><value>État du journal : {0}</value></data>
+  <data name="JournalCounts" xml:space="preserve"><value>Préparés : {0} · écrits et vérifiés : {1} · relus : {2}</value></data>
+  <data name="JournalInvalid" xml:space="preserve"><value>Séquence du journal non validée.</value></data>
+  <data name="LastStage" xml:space="preserve"><value>Dernière étape : {0}</value></data>
+  <data name="Unknown" xml:space="preserve"><value>Inconnu</value></data>
+  <data name="TargetIdentity" xml:space="preserve"><value>Identité déclarée : {0} · VIN {1} · OSID {2}</value></data>
+  <data name="TargetUnverified" xml:space="preserve"><value>Identité non vérifiée : {0}</value></data>
+  <data name="BackupStatus" xml:space="preserve"><value>Secteurs sauvegardés : {0} · {1}/{2}</value></data>
+  <data name="IntegrityVerified" xml:space="preserve"><value>Intègres</value></data>
+  <data name="IntegrityUnverified" xml:space="preserve"><value>Non vérifiés</value></data>
+  <data name="Snapshot" xml:space="preserve"><value>SHA-256 des preuves : {0}</value></data>
+  <data name="GeometryMatches" xml:space="preserve"><value>Géométrie silicium cohérente ; carte ECU non qualifiée.</value></data>
+  <data name="GeometryUnqualified" xml:space="preserve"><value>Géométrie incohérente ou non qualifiée.</value></data>
+  <data name="Sector" xml:space="preserve"><value>Original 0x{0:X8} · {1} octets · SHA-256 {2}</value></data>
+  <data name="RecoveryTab" xml:space="preserve"><value>Récupération ECU</value></data>
+  <data name="RecoveryInstructions" xml:space="preserve"><value>Analyse hors ligne. Conservez le BIN original et le journal.</value></data>
+  <data name="OpenJournal" xml:space="preserve"><value>Ouvrir un journal de programmation</value></data>
+  <data name="OpenCheckpoint" xml:space="preserve"><value>Ouvrir un checkpoint CDJ/1</value></data>
+  <data name="NoSelection" xml:space="preserve"><value>Aucune preuve sélectionnée.</value></data>
+  <data name="JournalFilter" xml:space="preserve"><value>Journal ECU (*.jsonl)|*.jsonl|Tous les fichiers (*.*)|*.*</value></data>
+  <data name="CheckpointFilter" xml:space="preserve"><value>Checkpoint binaire (*.bin)|*.bin|Tous les fichiers (*.*)|*.*</value></data>
+  <data name="InspectionFailed" xml:space="preserve"><value>Preuves indisponibles ; aucune conclusion sur l’état physique du calculateur.</value></data>
+  <data name="ExportFailed" xml:space="preserve"><value>Export impossible. Choisissez un nouveau fichier accessible.</value></data>
+  <data name="CheckpointState" xml:space="preserve"><value>État CDJ/1 : {0}</value></data>
+  <data name="CheckpointStage" xml:space="preserve"><value>Étape : {0} · séquence : {1}</value></data>
+  <data name="CheckpointTransaction" xml:space="preserve"><value>Transaction : {0}</value></data>
+  <data name="CheckpointManifest" xml:space="preserve"><value>SHA-256 du manifeste : {0}</value></data>
+  <data name="CheckpointUnauthenticated" xml:space="preserve"><value>Checkpoint non authentifié.</value></data>
+  <data name="Checkpoint_UnavailableOrCorrupt" xml:space="preserve"><value>Indisponible ou corrompu</value></data>
+  <data name="Checkpoint_RecoveryRequired" xml:space="preserve"><value>Évaluation de récupération requise</value></data>
+  <data name="Checkpoint_SafeButBlocked" xml:space="preserve"><value>Aucune action de récupération autorisée</value></data>
+  <data name="Checkpoint_IdentityMismatch" xml:space="preserve"><value>Identité discordante</value></data>
+  <data name="StateNoEvents" xml:space="preserve"><value>Aucune opération enregistrée</value></data>
+  <data name="StateCompleted" xml:space="preserve"><value>Fin de transaction enregistrée</value></data>
+  <data name="StateRecoveryRequired" xml:space="preserve"><value>Récupération / évaluation requise</value></data>
+  <data name="StateInterrupted" xml:space="preserve"><value>Interrompu ou journal incomplet</value></data>
+  <data name="RecoveryEvidenceOnly" xml:space="preserve"><value>Les preuves décrivent la transaction enregistrée, pas l’état physique actuel du calculateur.</value></data>
+  <data name="OpenHistory" xml:space="preserve"><value>Comparer les instantanés de récupération</value></data>
+  <data name="HistoryTitle" xml:space="preserve"><value>Historique de récupération — du plus ancien au plus récent</value></data>
+  <data name="HistoryAdd" xml:space="preserve"><value>Ajouter un journal</value></data>
+  <data name="HistoryRemove" xml:space="preserve"><value>Retirer</value></data>
+  <data name="HistoryUp" xml:space="preserve"><value>Monter</value></data>
+  <data name="HistoryDown" xml:space="preserve"><value>Descendre</value></data>
+  <data name="HistoryInspect" xml:space="preserve"><value>Analyser l’historique</value></data>
+  <data name="HistoryCancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="HistoryVerified" xml:space="preserve"><value>Continuité des journaux vérifiée : {0} instantanés</value></data>
+  <data name="HistoryRejected" xml:space="preserve"><value>Historique non vérifié</value></data>
+  <data name="HistorySnapshot" xml:space="preserve"><value>{0}. {1} · {2} entrées · {3}</value></data>
+  <data name="HistoryTransition" xml:space="preserve"><value>{0} → {1} : +{2} entrées, +{3} octets</value></data>
+  <data name="HistoryLatestState" xml:space="preserve"><value>Dernier état enregistré : {0}</value></data>
+  <data name="HistoryFailedOrdinal" xml:space="preserve"><value>Instantané refusé : {0}</value></data>
+  <data name="HistoryProblem_SnapshotCount" xml:space="preserve"><value>Sélectionnez 2 à 8 journaux distincts.</value></data>
+  <data name="HistoryProblem_DuplicatePath" xml:space="preserve"><value>Le même journal a été sélectionné deux fois.</value></data>
+  <data name="HistoryProblem_NotRegularJournal" xml:space="preserve"><value>Un journal est lié ou n’est pas un fichier ordinaire.</value></data>
+  <data name="HistoryProblem_JournalSize" xml:space="preserve"><value>Journal vide ou de taille supérieure à la limite.</value></data>
+  <data name="HistoryProblem_CombinedJournalSize" xml:space="preserve"><value>La taille cumulée des journaux dépasse la limite.</value></data>
+  <data name="HistoryProblem_IncompleteJournal" xml:space="preserve"><value>Entrée de journal incomplète.</value></data>
+  <data name="HistoryProblem_UnverifiedSnapshot" xml:space="preserve"><value>Secteurs originaux ou métadonnées non vérifiés.</value></data>
+  <data name="HistoryProblem_InvalidSequence" xml:space="preserve"><value>Séquence du journal invalide.</value></data>
+  <data name="HistoryProblem_JournalChanged" xml:space="preserve"><value>Le journal a changé pendant l’analyse.</value></data>
+  <data name="HistoryProblem_OriginalEvidenceChanged" xml:space="preserve"><value>Les métadonnées ou les secteurs originaux diffèrent.</value></data>
+  <data name="HistoryProblem_NotStrictExtension" xml:space="preserve"><value>Historique dupliqué, inversé ou divergent.</value></data>
+  <data name="HistoryProblem_TerminalExtension" xml:space="preserve"><value>Un journal terminal ne peut pas avoir de suite.</value></data>
+  <data name="HistoryProblem_NoCompleteNewRecord" xml:space="preserve"><value>Aucune nouvelle entrée complète.</value></data>
+  <data name="HistoryProblem_EvidenceChanged" xml:space="preserve"><value>Les preuves ont changé pendant l’analyse.</value></data>
+  <data name="HistoryProblem_Cancelled" xml:space="preserve"><value>Analyse annulée.</value></data>
+  <data name="HistoryProblem_EvidenceUnavailable" xml:space="preserve"><value>Preuves indisponibles ou illisibles.</value></data>
+  <data name="HistoryProblem_ProtectedDestination" xml:space="preserve"><value>Choisissez un emplacement hors des preuves originales.</value></data>
+</root>

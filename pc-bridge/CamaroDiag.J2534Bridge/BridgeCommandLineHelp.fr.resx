@@ -12,9 +12,30 @@ Utilisation :
   CamaroDiag.J2534Bridge.exe --list-ports
   CamaroDiag.J2534Bridge.exe --self-test
   CamaroDiag.J2534Bridge.exe --probe-drivers
+  CamaroDiag.J2534Bridge.exe --j1979-legacy --adapter-index 0 --variant 2 --source 10 --confirm-legacy-profile --output legacy-vpw.json
+  CamaroDiag.J2534Bridge.exe --j1979-network --adapter-index 0 --protocol 33 --discover-only --confirm-functional-pid00 --output can-sources.json
+  CamaroDiag.J2534Bridge.exe --j1979-legacy-freeze --adapter-index 0 --variant 2 --source 10 --vin DOCUMENTED_VIN --frame 00 --pid 0C --confirm-legacy-profile --confirm-functional-scope --output legacy-freeze.json
+  CamaroDiag.J2534Bridge.exe --j1979-freeze-native --port COM5 --key-file host.key --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --frame 00 --confirm-physical-channel --capture freeze.cf --output freeze.json
+  CamaroDiag.J2534Bridge.exe --inspect-j1979-freeze-native freeze.cf inspected.json
+  CamaroDiag.J2534Bridge.exe --inspect-j1979-freeze-native-prefix interrupted.cf DOCUMENTED_VIN partial.json
+  CamaroDiag.J2534Bridge.exe --verify-j1979-freeze-native-prefix interrupted.cf partial.json verified.json DOCUMENTED_VIN
+  CamaroDiag.J2534Bridge.exe --j1979-live-native --port COM5 --key-file host.key --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --pid 05 --pid 0C --cycles 30 --interval-ms 1000 --confirm-physical-channel --capture live.cl --output live.json
+  CamaroDiag.J2534Bridge.exe --inspect-j1979-live-native live.cl DOCUMENTED_VIN inspected.json
+  CamaroDiag.J2534Bridge.exe --export-j1979-live-native-csv live.cl DOCUMENTED_VIN live.csv
+  CamaroDiag.J2534Bridge.exe --project-j1979-live-native live.cl DOCUMENTED_VIN scalar.json
+  CamaroDiag.J2534Bridge.exe --export-j1979-live-native-values-csv live.cl DOCUMENTED_VIN values.csv
+  CamaroDiag.J2534Bridge.exe --verify-j1979-live-native-projection live.cl DOCUMENTED_VIN scalar.json [proof.json]
+  CamaroDiag.J2534Bridge.exe --inspect-j1979-live-prefix interrupted.cl DOCUMENTED_VIN partial.json
+  CamaroDiag.J2534Bridge.exe --j1979-freeze --adapter-index 0 --protocol 33 --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --frame 00 --frame 01 --pid 0C --confirm-physical-channel --output freeze.json
+  CamaroDiag.J2534Bridge.exe --j1979-live --adapter-index 0 --protocol 33 --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --pid 05 --pid 0C --cycles 30 --interval-ms 1000 --confirm-physical-channel --output live.json --csv live.csv
+  CamaroDiag.J2534Bridge.exe --j1979-legacy-live --adapter-index 0 --variant 2 --source 10 --vin DOCUMENTED_VIN --pid 05 --pid 0C --confirm-legacy-profile --confirm-functional-scope --output legacy-live.json --csv legacy-live.csv
+  Catalogue PID documenté hors ligne (capture live --raw-only, empreinte SHA-256 de la référence saisie indépendamment) :
+  CamaroDiag.J2534Bridge.exe --j1979-project-catalogue --catalogue catalogue.json --reference reference.pdf --reference-sha256 REFERENCE_SHA256 --report raw-live.json --vin DOCUMENTED_VIN --output projection.json
+  CamaroDiag.J2534Bridge.exe --j1979-network --adapter-index 0 --protocol 33 --source 7E8 --source 7E9 --confirm-functional-pid00 --confirm-physical-channels --output can-network.json
+    Lecture antipollution legacy sur une source de réponse documentée. Variante 1=PWM, 2=VPW, 3=ISO9141, 4=KWP slow, 5=KWP fast. Nouveau JSON requis ; aucun effacement/actionnement.
   CamaroDiag.J2534Bridge.exe --discover-connector COM5
   CamaroDiag.J2534Bridge.exe --inspect-connector-checkpoint checkpoint.bin
-  CamaroDiag.J2534Bridge.exe --inspect-write-journal attempt.jsonl
+  CamaroDiag.J2534Bridge.exe --inspect-write-journal attempt.jsonl original-3MiB.bin
   CamaroDiag.J2534Bridge.exe --inspect-e39-image original-3MiB.bin
   CamaroDiag.J2534Bridge.exe --port 35001
   CamaroDiag.J2534Bridge.exe --port 35001 --memory-read-profile profile.json
@@ -25,14 +46,16 @@ Utilisation :
   CamaroDiag.J2534Bridge.exe --doip-discover --broadcast-ip 192.168.1.255
   CamaroDiag.J2534Bridge.exe --doip-discover --host 192.0.2.10 --vin 1G1FA1RXXR0123456
   CamaroDiag.J2534Bridge.exe --doip-status --host 192.0.2.10 --doip-version 3
+  CamaroDiag.J2534Bridge.exe --doip-backup --host 192.0.2.10 --profile ecu-doip.json --archive backup.zip --confirm-read true
+  CamaroDiag.J2534Bridge.exe --doip-verify-backup --profile ecu-doip.json --archive backup.zip
   CamaroDiag.J2534Bridge.exe --doip-exchange --host 192.0.2.10 --tester 0E80 --ecu 1234 --payload 22F190 --uds-p2-ms 100 --uds-p2-star-ms 2000
 
 Exemples :
   --self-test                 Tests logiciels simulés, sans adaptateur ni calculateur.
   --probe-drivers             Liste des pilotes J2534 Windows, sans accès calculateur.
   --discover-connector COM5   Découverte série CD/1 d'une carte prototype isolée.
-  --inspect-write-journal attempt.jsonl
-                              Analyse d'un journal hors ligne, sans reprise ou effacement.
+  --inspect-write-journal attempt.jsonl [original-3MiB.bin]
+                              Analyse journal, blocs physiques et BIN original facultatif, sans accès au calculateur.
   --port 35001                Démarre le pont J2534 local avec appairage TLS.
                               Une vérification de mise à jour peut avoir lieu.
                               Ne jamais exposer ce port sur Internet.
@@ -50,13 +73,74 @@ Exemples :
                               vérifier la passerelle avant --doip-version.
   --doip-status               État passerelle ou --power-mode true par UDP.
                               --doip-version 2, 3 ou 4 ; 255 réservé à la découverte.
+  --doip-backup               Deux lectures de la zone ECU décrite par --profile JSON ;
+                              --host, --archive ZIP, --confirm-read true obligatoires.
+                              TLS par défaut ; --tls false explicite ; --certificate facultatif.
+                              --trace-file NOUVEAU.jsonl conserve les deux passes.
+                              Options --uds-p2-ms, --uds-p2-star-ms,
+                              --routing-activation-type, --routing-oem-data.
+  --doip-verify-backup        Contrôle hors ligne du ZIP et du profil ; aucun accès réseau.
   --doip-exchange             Diagnostic UDS par TCP/TLS : --host, --tester, --ecu,
                               --payload hexadécimal ; --tls true vérifie le serveur
                               et refuse le repli en clair ; --uds-p2-ms et
                               --uds-p2-star-ms fixent les délais.
                               Peut modifier l'ECU : identité et consentement
-                              explicite obligatoires ; ni contournement OEM ni
-                              flash ou récupération qualifiés sur véhicule.
+                              explicite obligatoires ; --trace-file NOUVEAU.jsonl
+                              journalise les datagrammes UDP et les PDU TCP/TLS,
+                              UTC, TX/RX et cible ; disponible en découverte/état,
+                              conservé en cas d'échec ; --sequence "22F190;1901FF"
+                              --expected-vin VIN : 1 à 16 commandes sur une session,
+                              TLS par défaut, arrêt sur erreur et consentement interactif.
+                              --ecu-inventory 1234,1235 avec --expected-vin VIN :
+                              vérifie 1 à 16 adresses explicites au lieu de --ecu,
+                              lecture seule, aucun balayage ; non vérifié ne veut pas dire absent.
+                              --obd-ecu-inventory 1234,1235 : vérifie F802/F810 stables ;
+                              VIN vérifié distinct de la reconnaissance OBDonUDS.
+                              --monitor-did F190 ou --obd-monitor-did F40C
+                              avec --expected-vin VIN, --samples 10, --interval-ms 1000.
+                              Monitoring en lecture seule, sur le même ECU, TLS par défaut.
+                              --uds-p2-ms et --uds-p2-star-ms facultatifs dans le délai global.
+                              Mesures provisoires avant vérification finale de l’identité.
+                              --monitor-dids 0xF40C:2,0xF40D:1 ou --obd-monitor-dids
+                              0xF40C:2,0xF40D:1 : mêmes délais, une requête par mesure.
+                              --obd-identify --expected-vin VIN vérifie une identité F802/F810
+                              stable, même si OBDonUDS n'est pas confirmé.
+                              Lectures OBD typées avec --expected-vin VIN : F802/F810
+                              avant/après. --uds-dids 0xF40C:2,0xF40D:1 peut ajouter
+                              --obd-verified true ; longueurs ECU réelles requises.
+                              --uds-did F187 ou --uds-scaling-did F40C avec
+                              --expected-vin VIN vérifie F190 avant/après.
+                              Octets ECU bruts, sans coefficients supposés.
+                              DTC UDS génériques avec le même VIN vérifié : --uds-dtc-mask 0xFF,
+                              --uds-dtc-count-mask 0xFF, --uds-snapshot 0x123456
+                              --uds-snapshot-record 1 ou --uds-extended-dtc 0x123456
+                              --uds-extended-record 2.
+                              --uds-severity-count 0x80 ou --uds-severity-list 0x80
+                              avec --uds-severity-status 0x08 ; --uds-severity-info 0x123456.
+                              Toutes exigent --expected-vin VIN.
+                              --uds-fault-counters avec --expected-vin VIN : compteurs FDC signés.
+                              --uds-historical-dtc 0x0B/0x0C/0x0D/0x0E (un seul choix)
+                              avec --expected-vin VIN : premier/dernier DTC détecté/confirmé.
+                              --uds-supported-dtcs ou --uds-snapshot-index avec
+                              --expected-vin VIN : inventaire des DTC ou index des snapshots.
+                              --uds-permanent-dtcs avec --expected-vin VIN : DTC permanents UDS.
+                              --uds-memory 0x02 avec --uds-memory-mask 0x08, ou
+                              --uds-memory-snapshot 0x123456 / --uds-memory-extended 0x123456
+                              avec --uds-memory-record 1. --expected-vin explicite requis.
+                              --uds-stored-record 0x01 avec --expected-vin VIN : enregistrement mémorisé individuel.
+                              --uds-all-stored-records F40C:2,F40D:1 avec --expected-vin VIN : catalogue DID documenté, tous les enregistrements.
+                              --uds-stored-record 0x01 --stored-did-lengths F40D:1 : décodage d’un enregistrement individuel, VIN obligatoire.
+                              --snapshot-did-lengths F40C:2,F40D:1 avec --uds-snapshot ou --obd-snapshot et numéro explicite : snapshots décodés.
+                              --extended-record-lengths 01:2,90:1 avec --uds-extended-dtc ou --obd-extended-dtc et numéro explicite : données étendues décodées.
+                              --uds-memory-snapshot ou --uds-memory-extended avec mémoire, numéro et catalogue correspondant : décodage de la mémoire sélectionnée.
+                              --uds-extended-record-support 0x01 ou --uds-extended-record-data 0x01
+                              avec --uds-extended-record-size 2 (longueur uniforme documentée).
+                              Les deux exigent --expected-vin VIN.
+                              UDS historique : --uds-mirror-mask 0x08 ou --uds-mirror-count 0x08 ;
+                              --uds-mirror-extended 0x010203 avec --uds-mirror-record 1 ;
+                              --uds-legacy-emissions-mask 0x08 ou --uds-legacy-emissions-count 0x08.
+                              --expected-vin VIN explicite ; aucun repli automatique.
+                              Ni contournement OEM ni flash ou récupération qualifiés.
 
 Chaque commande nécessite ses paramètres exacts. Utiliser --help seul :
 une invocation mélangeant aide et programmation est refusée sans accès matériel.

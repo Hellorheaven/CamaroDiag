@@ -1,6 +1,8 @@
 package com.camarodiag.gen5.data.obd
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class CanConsoleLiveDiagnosticCorrelationTest {
@@ -20,6 +22,30 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         correlation.append("7E8 08 10 0A 62 F1 90 31 32 33\r\n", 10)
         correlation.append("7E8 05 21 34 35 36 37\r\n", 210)
         assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(211))
+    }
+
+    @Test fun extendedFunctionalBroadcastCorrelatesEachResponderIndependently() {
+        val request = frame("18DB33F1 03 22 F1 90")
+        val correlation = CanConsoleLiveDiagnosticCorrelation(request)
+        correlation.append("18DAF110 08 10 0A 62 F1 90 31 32 33\r\n", 10L)
+        correlation.append("18DAF111 05 21 34 35 36 37\r\n", 20L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(21L))
+        correlation.append("18DAF110 05 21 34 35 36 37\r\n", 30L)
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(31L))
+        assertEquals(3, correlation.recentReceivedRecords().size)
+        assertFalse(CanConsoleAdapterReplyPolicy.hasMatchedDiagnosticResponse(
+            "18DAF110 08 10 0A 62 F1 90 31 32 33\r\n18DAF111 05 21 34 35 36 37", request))
+        assertTrue(CanConsoleAdapterReplyPolicy.hasMatchedDiagnosticResponse(
+            "18DAF110 04 03 62 F1 90", request))
+    }
+
+    @Test fun rawNonDiagnosticFramesKeepRxWithoutCreatingDiagnosticMatchers() {
+        val request = frame("7E0 10 01 02 03 04 05 06 07")
+        val correlation = CanConsoleLiveDiagnosticCorrelation(request)
+        correlation.append("7E8 04 03 62 F1 90\r\nOK\r\n", 20L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(21L))
+        assertTrue(correlation.hasExplicitAdapterAck())
+        assertEquals(2, correlation.recentReceivedRecords().size)
     }
 
     @Test fun functionalResponsesAreAssembledIndependentlyPerEcu() {

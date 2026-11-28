@@ -8,10 +8,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -43,6 +46,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
+import android.app.Activity
+import android.content.ContextWrapper
+import android.security.KeyChain
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import com.camarodiag.gen5.data.obd.DoIpClientTls
+import com.camarodiag.gen5.data.obd.DoIpClientCertificateSelection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import com.camarodiag.gen5.R
@@ -61,6 +73,9 @@ import com.camarodiag.gen5.ui.theme.TextMuted
 import com.camarodiag.gen5.ui.theme.TextPrimary
 import com.camarodiag.gen5.ui.theme.WarnRed
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
+import com.camarodiag.gen5.data.obd.DoIpDirectRead
+import com.camarodiag.gen5.data.obd.EcuWriteConsentFlow
+import com.camarodiag.gen5.data.obd.DoIpMemoryBackup
 import com.camarodiag.gen5.data.obd.J2534BridgePairingCodeFormat
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
@@ -110,6 +125,18 @@ data class CalibrationWorkspaceState(
     val udsDidResponse: String = "",
     val udsDtcResponse: String = "",
     val udsMessage: String = "",
+    val doIpReading: Boolean = false,
+    val doIpGatewayReading: Boolean = false,
+    val doIpDiscoveredVin: String = "",
+    val doIpGatewayHost: String = "",
+    val doIpGatewayIdentity: DoIpDirectRead.Gateway? = null,
+    val doIpGatewayResult: String = "",
+    val doIpResult: String = "",
+    val doIpTrace: List<String> = emptyList(),
+    val doIpBackupScope: DoIpMemoryBackup.Scope? = null,
+    val doIpBackupBytes: Int = 0,
+    val doIpLiveSamples: List<DoIpMonitorRow> = emptyList(),
+    val doIpMonitorReport: DoIpMonitorReport? = null,
     val isJ2534BridgeConnecting: Boolean = false,
     val isJ2534BridgeConnected: Boolean = false,
     val isJ2534MemoryReadAvailable: Boolean = false,
@@ -128,6 +155,16 @@ data class CalibrationWorkspaceState(
     val traceMessage: String = "",
     val canTraceReport: CanTraceAnalysisReport? = null,
     val archiveVerification: ArchiveVerification? = null,
+    val physicalRecoveryReading: Boolean = false,
+    val physicalRecoveryExporting: Boolean = false,
+    val physicalRecoveryFolderUri: android.net.Uri? = null,
+    val physicalRecoveryResult: com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report? = null,
+    val physicalRecoveryIdentity: PhysicalRecoveryIdentity? = null,
+    val physicalRecoveryHistory: PhysicalRecoveryHistory.Report? = null,
+    val physicalRecoveryHistoryUris: List<android.net.Uri> = emptyList(),
+    val physicalRecoveryHistoryMessage: String? = null,
+    val physicalRecoveryFailed: Boolean = false,
+    val physicalRecoveryExportMessage: String? = null,
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
@@ -230,14 +267,21 @@ private fun localizedInspectionFormat(format: String): String = stringResource(
     }
 )
 
+data class DoIpConsoleCommand(val host: String, val tester: String, val ecu: String,
+    val tls: Boolean, val payload: String, val vehicle: VehicleProfile, val generation: Long,
+    val certificate: DoIpClientCertificateSelection? = null,
+    val options: DoIpDirectRead.SessionOptions = DoIpDirectRead.SessionOptions())
+
 // Keep static UI copy in Android resources so this screen follows the active system locale.
 @Composable
 fun CalibrationWorkspaceScreen(
     state: CalibrationWorkspaceState,
+    consoleBusy: Boolean,
     vehicleLabel: String,
     ecmType: String,
     isConnected: Boolean,
     canReadEnhancedUds: Boolean,
+    availableUdsReadProfiles: (String, String) -> Set<Int>,
     onReadIdentification: () -> Unit,
     onReadGmlanIdentification: () -> Unit,
     onReadLfx2012FuelSnapshot: () -> Unit,
@@ -247,6 +291,17 @@ fun CalibrationWorkspaceScreen(
     onSyncVehicleVinFromEcu: (String) -> Unit,
     onReadUdsDid: (String, String, String, String) -> Unit,
     onReadUdsDtcs: (String, String, String) -> Unit,
+    onReadDirectDoIp: (String, String, String, String, Boolean, DoIpDirectRead.Operation, DoIpClientCertificateSelection?, DoIpDirectRead.SessionOptions) -> Unit,
+    doIpAccountUid: String?,
+    doIpContextGeneration: Long,
+    onConfirmDoIpCommand: (DoIpConsoleCommand, EcuWriteConsentFlow.Approval) -> Unit,
+    onInspectDoIpGateway: (String, DoIpDirectRead.GatewayOperation, String?) -> Unit,
+    onCancelDirectDoIp: () -> Unit,
+    onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int, DoIpDirectRead.Operation, DoIpClientCertificateSelection?, DoIpDirectRead.SessionOptions) -> Unit,
+    onExportDoIpMonitoring: (DoIpMonitorReport) -> Unit,
+    onImportDoIpBackupProfile: () -> Unit,
+    onVerifyDoIpBackup: (DoIpMemoryBackup.Scope) -> Unit,
+    onCaptureDoIpBackup: (String, String, String, Boolean, DoIpMemoryBackup.Scope, DoIpClientCertificateSelection?, DoIpDirectRead.SessionOptions) -> Unit,
     onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
     onDisconnectJ2534Bridge: () -> Unit,
     onCaptureJ2534Memory: (String, String, Int, EcuBackupCoverage.Region) -> Unit,
@@ -254,6 +309,10 @@ fun CalibrationWorkspaceScreen(
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
     onVerifyEcuBackup: () -> Unit,
+    onInspectPhysicalRecovery: (PhysicalRecoveryIdentity) -> Unit,
+    onInspectPhysicalRecoveryHistory: (PhysicalRecoveryIdentity, List<android.net.Uri>) -> Unit,
+    onExportPhysicalRecoveryHistory: (PhysicalRecoveryHistory.Report) -> Unit,
+    onExportPhysicalRecovery: (PhysicalRecoveryIdentity, com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report) -> Unit,
     onImportTrace: () -> Unit,
     onImportComparisonFile: () -> Unit,
     onPreviewPartialWrite: (Long, Int, Int) -> Unit,
@@ -267,10 +326,77 @@ fun CalibrationWorkspaceScreen(
     onExportFile: () -> Unit,
     onClearFile: () -> Unit
 ) {
-    var udsRequestCanId by remember { mutableStateOf("") }
-    var udsResponseCanId by remember { mutableStateOf("") }
+    var doIpHost by remember(vehicle) { mutableStateOf("") }
+    var doIpDiscoveryEid by remember(vehicle) { mutableStateOf("") }
+    var doIpDiscoveryInterface by remember(vehicle) { mutableStateOf("") }
+    var doIpDiscoveryAdvanced by remember(vehicle) { mutableStateOf(false) }
+    var doIpNetworkMenu by remember(vehicle) { mutableStateOf(false) }
+    var doIpNetworkInterfaces by remember(vehicle) { mutableStateOf(emptyList<DoIpDirectRead.DiscoveryInterface>()) }
+    var doIpNetworkLoading by remember(vehicle) { mutableStateOf(false) }
+    var doIpNetworkError by remember(vehicle) { mutableStateOf(false) }
+    val doIpNetworkScope = rememberCoroutineScope()
+    LaunchedEffect(state.doIpGatewayHost, state.doIpDiscoveredVin) {
+        if (doIpHost.isBlank() && state.doIpDiscoveredVin.isNotBlank() &&
+            state.doIpDiscoveredVin == vehicle.vin.uppercase() && state.doIpGatewayHost.isNotBlank()) {
+            doIpHost = state.doIpGatewayHost
+        }
+    }
+    var doIpTester by remember(vehicle) { mutableStateOf("") }
+    var doIpEcu by remember(vehicle) { mutableStateOf("") }
+    var doIpInventoryAddresses by remember(vehicle) { mutableStateOf("") }
+    LaunchedEffect(state.doIpBackupScope, vehicle.vin) {
+        val scope = state.doIpBackupScope
+        if (scope != null && scope.vin == vehicle.vin.uppercase()) {
+            // Import explicitly selects the logical addresses in this ECU profile.
+            doIpTester = "%04X".format(scope.tester)
+            doIpEcu = "%04X".format(scope.ecu)
+        }
+    }
+    var doIpDid by remember(vehicle) { mutableStateOf("F190") }
+    var doIpDtcMask by remember(vehicle) { mutableStateOf("FF") }
+    var doIpMultiLayout by remember(vehicle) { mutableStateOf("") }
+    var doIpWwhSeverity by remember(vehicle) { mutableStateOf("FF") }
+    var doIpSeverityMask by remember(vehicle) { mutableStateOf("FF") }
+    var doIpWwhReadiness by remember(vehicle) { mutableStateOf("") }
+    var doIpDetailDtc by remember(vehicle) { mutableStateOf("") }
+    var doIpDetailRecord by remember(vehicle) { mutableStateOf("01") }
+    var doIpStoredCatalog by remember(vehicle) { mutableStateOf("") }
+    var doIpExtendedCatalog by remember(vehicle) { mutableStateOf("") }
+    var doIpDtcMemory by remember(vehicle) { mutableStateOf("") }
+    var doIpExtendedRecordSize by remember(vehicle) { mutableStateOf("") }
+    var doIpCommand by remember(vehicle) { mutableStateOf("") }
+    var pendingDoIpCommand by remember(vehicle, doIpContextGeneration) { mutableStateOf<DoIpConsoleCommand?>(null) }
+    var doIpConsentStep by remember(vehicle, doIpContextGeneration) { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
+    var doIpTls by remember(vehicle) { mutableStateOf(true) }
+    var doIpOptionsExpanded by remember(vehicle) { mutableStateOf(false) }
+    var doIpTimeout by remember(vehicle) { mutableStateOf("5000") }
+    var doIpP2 by remember(vehicle) { mutableStateOf("5000") }
+    var doIpP2Star by remember(vehicle) { mutableStateOf("5000") }
+    var doIpRouting by remember(vehicle) { mutableStateOf("00") }
+    var doIpOem by remember(vehicle) { mutableStateOf("") }
+    val doIpOptions = remember(doIpTimeout, doIpP2, doIpP2Star, doIpRouting, doIpOem) {
+        runCatching { DoIpDirectRead.SessionOptions.parse(doIpTimeout, doIpP2, doIpP2Star, doIpRouting, doIpOem) }.getOrNull()
+    }
+    val certContext = LocalContext.current
+    val certActivity = remember(certContext) {
+        generateSequence(certContext) { (it as? ContextWrapper)?.baseContext?.takeUnless { base -> base === it } }
+            .filterIsInstance<Activity>().firstOrNull()
+    }
+    val certCoroutine = rememberCoroutineScope()
+    // Bind to the selected account/vehicle/host. A changed target cannot reuse a stale alias.
+    var doIpCertificate by remember(doIpAccountUid, vehicle, doIpHost, doIpTls) {
+        mutableStateOf<DoIpClientCertificateSelection?>(null)
+    }
+    var doIpCertificateBusy by remember(doIpAccountUid, vehicle, doIpHost, doIpTls) { mutableStateOf(false) }
+    var doIpCertificateError by remember(doIpAccountUid, vehicle, doIpHost, doIpTls) { mutableStateOf(false) }
+    var doIpSampleCount by remember(vehicle) { mutableStateOf("10") }
+    var doIpInterval by remember(vehicle) { mutableStateOf("1000") }
+    var pendingDoIpBackup by remember(vehicle) { mutableStateOf<DoIpMemoryBackup.Scope?>(null) }
+    var udsRequestCanId by remember(vehicle) { mutableStateOf("") }
+    var udsResponseCanId by remember(vehicle) { mutableStateOf("") }
     var udsDid by remember { mutableStateOf("F190") }
     var udsCanProtocol by remember { mutableStateOf("33") }
+    var udsProfileMenuExpanded by remember { mutableStateOf(false) }
     var j2534Host by remember { mutableStateOf("192.168.1.100") }
     var j2534Port by remember { mutableStateOf("35001") }
     var j2534Token by remember { mutableStateOf("") }
@@ -280,6 +406,7 @@ fun CalibrationWorkspaceScreen(
     var memoryReadRegion by remember { mutableStateOf(EcuBackupCoverage.Region.OTHER) }
     var memoryReadRegionMenuExpanded by remember { mutableStateOf(false) }
     var expertExpanded by remember { mutableStateOf(false) }
+    var doIpExpanded by remember { mutableStateOf(false) }
     var expertControllerFamily by remember { mutableStateOf("") }
     var expertChipMarking by remember { mutableStateOf("") }
     var expertProgrammerName by remember { mutableStateOf("") }
@@ -300,7 +427,18 @@ fun CalibrationWorkspaceScreen(
     var selectedObdbSignalId by remember { mutableStateOf("") }
     val selectedObdbSignal = state.obdbSignals.firstOrNull { it.id == selectedObdbSignalId }
         ?: state.obdbSignals.firstOrNull()
-    val profileUses29BitIds = udsCanProtocol in setOf("34", "36", "64")
+    val compatibleUdsProfiles = availableUdsReadProfiles(udsRequestCanId, udsResponseCanId)
+    val profileAvailable = udsCanProtocol.toIntOrNull() in compatibleUdsProfiles
+    val signalProfiles = selectedObdbSignal?.let { signal ->
+        availableUdsReadProfiles(signal.requestCanId?.toString(16).orEmpty(),
+            signal.responseCanId?.toString(16).orEmpty()).intersect(setOf(33, 35))
+    }.orEmpty()
+    val signalProfile = udsCanProtocol.toIntOrNull()?.takeIf { it in signalProfiles }
+        ?: signalProfiles.singleOrNull()
+    LaunchedEffect(compatibleUdsProfiles, canReadEnhancedUds) {
+        if (canReadEnhancedUds && !profileAvailable && compatibleUdsProfiles.size == 1)
+            udsCanProtocol = compatibleUdsProfiles.single().toString()
+    }
     val canIdsMatchProfile = J2534CanProfileValidation.isValid(
         udsRequestCanId, udsResponseCanId, udsCanProtocol
     )
@@ -314,15 +452,748 @@ fun CalibrationWorkspaceScreen(
     val allProfiles = remember { CamaroCalibrationCatalog.profiles }
     val yearProfiles = remember(vehicle.modelYear) { CamaroCalibrationCatalog.forYear(vehicle.modelYear) }
 
+    val listState = rememberLazyListState()
+    val navigationScope = rememberCoroutineScope()
+    var navigationOpen by remember { mutableStateOf(false) }
+    val showDoIp = doIpExpanded || state.doIpReading || state.doIpGatewayReading
+    val hasLfxPanel = vehicle.modelYear == 2012 && vehicle.engine.rpo == "LFX"
+    // Count the optional panels before the keyed sections; keep all controls and warnings.
+    val sectionOffset = (if (showDoIp) 1 else 0) + (if (hasLfxPanel) 1 else 0)
+    val sections = listOf(
+        R.string.cal_section_vehicle to 1 + (if (showDoIp) 1 else 0),
+        R.string.cal_ecu_identification to 3 + sectionOffset,
+        R.string.cal_section_signals to 4 + sectionOffset,
+        R.string.cal_trace_title to 6 + sectionOffset,
+        R.string.calibration_files to 7 + sectionOffset,
+        R.string.cal_table_editor to 8 + sectionOffset,
+        R.string.cal_ecu_memory_read_write to 9 + sectionOffset,
+        R.string.cal_expert_title to 10 + sectionOffset
+    )
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { navigationOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.cal_section_navigation))
+            }
+            DropdownMenu(expanded = navigationOpen, onDismissRequest = { navigationOpen = false }) {
+                sections.forEach { (label, index) ->
+                    DropdownMenuItem(text = { Text(stringResource(label)) }, onClick = {
+                        navigationOpen = false
+                        navigationScope.launch { listState.scrollToItem(index) }
+                    })
+                }
+                DropdownMenuItem(text = { Text(stringResource(R.string.cal_doip_title)) }, onClick = {
+                    navigationOpen = false
+                    doIpExpanded = true
+                    navigationScope.launch { listState.scrollToItem(0) }
+                })
+            }
+        }
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        state = listState,
+        modifier = Modifier.weight(1f).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item(key = "workspace") {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(stringResource(R.string.cal_workspace_title), color = CamaroAmber, fontWeight = FontWeight.ExtraBold)
+                // Text(stringResource(R.string.cal_workspace_navigation_hint), color = TextMuted, fontSize = 12.sp)
+                OutlinedButton(onClick = { doIpExpanded = !doIpExpanded }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(if (doIpExpanded) R.string.cal_hide_doip_advanced else R.string.cal_show_doip_advanced))
+                }
+            }
+        }
+        if (showDoIp) item(key = "doip") {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.cal_doip_title), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    val idle = !consoleBusy && !state.doIpReading && !state.isUdsReading && !state.isObdbSignalReading &&
+                        !state.isJ2534MemoryCapturing
+                    OutlinedTextField(doIpHost, { doIpHost = it.trim().take(64) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_host)) })
+                    val vinReady = vehicle.vin.uppercase().matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
+                    if (doIpHost.isNotBlank()) {
+                        OutlinedTextField(doIpDiscoveryEid, { doIpDiscoveryEid = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(12) },
+                            enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.cal_doip_discovery_eid)) })
+                    }
+                    OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.DISCOVER,
+                        doIpDiscoveryEid.takeIf { doIpHost.isNotBlank() && it.isNotEmpty() }) },
+                        enabled = idle && (doIpHost.isNotBlank() || vinReady) &&
+                            (doIpHost.isBlank() || doIpDiscoveryEid.length in setOf(0, 12)), modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(if (doIpHost.isBlank()) R.string.cal_doip_discover_by_vin
+                            else R.string.cal_doip_discover))
+                    }
+                    if (doIpHost.isBlank()) {
+                        TextButton(onClick = { doIpDiscoveryAdvanced = !doIpDiscoveryAdvanced }, enabled = idle) {
+                            Text(stringResource(R.string.cal_doip_discovery_advanced))
+                        }
+                        if (doIpDiscoveryAdvanced) {
+                            OutlinedButton(onClick = { onInspectDoIpGateway("", DoIpDirectRead.GatewayOperation.LISTEN_IPV4, null) },
+                                enabled = idle && vinReady, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(R.string.cal_doip_listen_ipv4))
+                            }
+                            OutlinedTextField(doIpDiscoveryInterface, { doIpDiscoveryInterface = it.filter(Char::isDigit).take(10) },
+                                enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                label = { Text(stringResource(R.string.cal_doip_ipv6_interface)) })
+                            Box {
+                                OutlinedButton(onClick = {
+                                    doIpNetworkLoading = true
+                                    doIpNetworkError = false
+                                    doIpNetworkInterfaces = emptyList()
+                                    doIpNetworkScope.launch {
+                                        try {
+                                            doIpNetworkInterfaces = DoIpDirectRead.availableDiscoveryInterfaces()
+                                            doIpNetworkMenu = true
+                                        } catch (cancelled: CancellationException) { throw cancelled }
+                                        catch (_: Exception) { doIpNetworkError = true }
+                                        finally { doIpNetworkLoading = false }
+                                    }
+                                }, enabled = idle && !doIpNetworkLoading, modifier = Modifier.fillMaxWidth()) {
+                                    Text(stringResource(R.string.cal_doip_select_interface))
+                                }
+                                DropdownMenu(expanded = doIpNetworkMenu, onDismissRequest = { doIpNetworkMenu = false }) {
+                                    if (doIpNetworkInterfaces.isEmpty()) {
+                                        DropdownMenuItem(text = { Text(stringResource(R.string.cal_doip_no_interfaces)) },
+                                            onClick = { doIpNetworkMenu = false })
+                                    }
+                                    doIpNetworkInterfaces.forEach { network ->
+                                        DropdownMenuItem(text = { Text("${network.name} (#${network.index})") },
+                                            onClick = {
+                                                doIpDiscoveryInterface = network.index.toString()
+                                                doIpNetworkMenu = false
+                                            })
+                                    }
+                                }
+                            }
+                            if (doIpNetworkError)
+                                Text(stringResource(R.string.cal_doip_interface_error), color = WarnRed, fontSize = 12.sp)
+                            val interfaceReady = (doIpDiscoveryInterface.toIntOrNull() ?: 0) > 0
+                            OutlinedButton(onClick = { onInspectDoIpGateway(doIpDiscoveryInterface, DoIpDirectRead.GatewayOperation.DISCOVER_IPV6, null) },
+                                enabled = idle && vinReady && interfaceReady, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(R.string.cal_doip_discover_ipv6))
+                            }
+                            OutlinedButton(onClick = { onInspectDoIpGateway(doIpDiscoveryInterface, DoIpDirectRead.GatewayOperation.LISTEN_IPV6, null) },
+                                enabled = idle && vinReady && interfaceReady, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(R.string.cal_doip_listen_ipv6))
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.STATUS, null) },
+                            enabled = idle && doIpHost.isNotBlank(), modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_gateway_status_button))
+                        }
+                        OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.POWER, null) },
+                            enabled = idle && doIpHost.isNotBlank(), modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_power))
+                        }
+                    }
+                    if ((state.doIpGatewayHost == doIpHost || doIpHost.isBlank()) && state.doIpGatewayResult.isNotBlank())
+                        Text(state.doIpGatewayResult, color = TextPrimary, fontSize = 12.sp)
+                    OutlinedTextField(doIpTester, { doIpTester = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(4) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_tester)) })
+                    OutlinedTextField(doIpEcu, { doIpEcu = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(4) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_ecu)) })
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = doIpTls, onCheckedChange = { doIpTls = it }, enabled = idle)
+                        Text(stringResource(R.string.cal_doip_tls))
+                    }
+                    if (doIpTls) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = {
+                                try { certActivity?.startActivity(KeyChain.createInstallIntent()) }
+                                catch (_: Exception) { doIpCertificateError = true }
+                            }, enabled = idle && !doIpCertificateBusy && certActivity != null,
+                                modifier = Modifier.weight(1f)) {
+                                Text(stringResource(R.string.cal_doip_cert_install))
+                            }
+                            OutlinedButton(onClick = {
+                                val activity = certActivity ?: return@OutlinedButton
+                                val host = doIpHost
+                                val vin = vehicle.vin.uppercase()
+                                doIpCertificateBusy = true
+                                doIpCertificateError = false
+                                // Clear the old choice: a cancelled/failed new selection must not reuse it.
+                                doIpCertificate = null
+                                try {
+                                    KeyChain.choosePrivateKeyAlias(activity, { alias ->
+                                        certCoroutine.launch {
+                                            try {
+                                                if (alias != null && alias != "android:alias-selection-denied")
+                                                    doIpCertificate = DoIpClientTls.select(certContext, alias, host, vin)
+                                                else doIpCertificateError = true
+                                            } catch (cancelled: CancellationException) {
+                                                throw cancelled
+                                            } catch (_: Exception) { doIpCertificateError = true }
+                                            finally { doIpCertificateBusy = false }
+                                        }
+                                    }, null, null, host, 3496, null)
+                                } catch (_: Exception) {
+                                    doIpCertificateBusy = false
+                                    doIpCertificateError = true
+                                }
+                            }, enabled = idle && !doIpCertificateBusy && certActivity != null && vinReady && doIpHost.isNotBlank(),
+                                modifier = Modifier.weight(1f)) {
+                                Text(stringResource(R.string.cal_doip_cert_select))
+                            }
+                        }
+                        doIpCertificate?.let { selected ->
+                            Text(stringResource(R.string.cal_doip_cert_selected, selected.alias, selected.fingerprint),
+                                fontSize = 12.sp)
+                            TextButton(onClick = { doIpCertificate = null }, enabled = idle && !doIpCertificateBusy) {
+                                Text(stringResource(R.string.cal_doip_cert_clear))
+                            }
+                        } ?: Text(stringResource(R.string.cal_doip_cert_none), fontSize = 12.sp)
+                        if (doIpCertificateError) {
+                            Text(stringResource(R.string.cal_doip_tls_error), color = WarnRed, fontSize = 12.sp)
+                            TextButton(onClick = { doIpCertificate = null; doIpCertificateError = false }, enabled = idle) {
+                                Text(stringResource(R.string.cal_doip_cert_clear))
+                            }
+                        }
+                    }
+                    TextButton(onClick = { doIpOptionsExpanded = !doIpOptionsExpanded }, enabled = idle) {
+                        Text(stringResource(R.string.cal_doip_advanced_session))
+                    }
+                    if (doIpOptionsExpanded) {
+                        OutlinedTextField(doIpTimeout, { doIpTimeout = it.filter(Char::isDigit).take(5) },
+                            enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            label = { Text(stringResource(R.string.cal_doip_total_ms)) })
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(doIpP2, { doIpP2 = it.filter(Char::isDigit).take(5) },
+                                enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                label = { Text(stringResource(R.string.cal_doip_p2_ms)) })
+                            OutlinedTextField(doIpP2Star, { doIpP2Star = it.filter(Char::isDigit).take(5) },
+                                enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                label = { Text(stringResource(R.string.cal_doip_p2_star_ms)) })
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(doIpRouting, { doIpRouting = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                                enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
+                                label = { Text(stringResource(R.string.cal_doip_routing_type)) })
+                            OutlinedTextField(doIpOem, { doIpOem = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(8) },
+                                enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
+                                label = { Text(stringResource(R.string.cal_doip_routing_oem)) })
+                        }
+                    }
+                    if (doIpOptions == null)
+                        Text(stringResource(R.string.cal_doip_invalid_session), color = WarnRed, fontSize = 12.sp)
+                    OutlinedTextField(doIpDid, { doIpDid = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(4) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_uds_did)) })
+                    val targetReady = idle && doIpOptions != null && !doIpCertificateBusy && !doIpCertificateError && (doIpHost.isNotBlank() || vinReady) && doIpTester.length == 4 &&
+                        doIpEcu.length == 4 && doIpTester != doIpEcu
+                    OutlinedTextField(doIpInventoryAddresses, { doIpInventoryAddresses =
+                        it.uppercase().filter { c -> c in "0123456789ABCDEF," }.take(79) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_inventory_addresses)) })
+                    val inventoryAddresses = runCatching {
+                        DoIpDirectRead.parseInventoryAddresses(doIpInventoryAddresses)
+                    }.getOrNull()
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester,
+                        "%04X".format(requireNotNull(inventoryAddresses).first()), doIpInventoryAddresses, doIpTls,
+                        DoIpDirectRead.Operation.INVENTORY, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = idle && vinReady && doIpOptions != null && !doIpCertificateBusy &&
+                            !doIpCertificateError && doIpTester.length == 4 &&
+                            inventoryAddresses != null && doIpTester.toIntOrNull(16) !in inventoryAddresses,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_inventory))
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester,
+                        "%04X".format(requireNotNull(inventoryAddresses).first()), doIpInventoryAddresses, doIpTls,
+                        DoIpDirectRead.Operation.OBD_INVENTORY, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = idle && vinReady && doIpOptions != null && !doIpCertificateBusy &&
+                            !doIpCertificateError && doIpTester.length == 4 &&
+                            inventoryAddresses != null && doIpTester.toIntOrNull(16) !in inventoryAddresses,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_obd_inventory))
+                    }
+                    Button(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.VIN, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_read_vin))
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.DID, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpDid.length == 4, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_read_uds_did))
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid,
+                        doIpTls, DoIpDirectRead.Operation.SCALING_DID, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpDid.length == 4, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_scaling_read))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "F810", doIpTls,
+                            DoIpDirectRead.Operation.OBD_IDENTIFY, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_obd_identify))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls,
+                            DoIpDirectRead.Operation.OBD_DID, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && doIpDid.length == 4 &&
+                                doIpDid.toIntOrNull(16)?.let(DoIpDirectRead::isObdDid) == true, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_obd_read))
+                        }
+                    }
+                    OutlinedTextField(doIpMultiLayout, { doIpMultiLayout = it.uppercase().filter { c -> c in "0123456789ABCDEF:, " }.take(383) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_multi_layout)) })
+                    val multiLayout = remember(doIpMultiLayout) {
+                        runCatching { com.camarodiag.gen5.data.obd.DoIpMultiDid.parse(doIpMultiLayout) }.getOrNull()
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpMultiLayout,
+                            doIpTls, DoIpDirectRead.Operation.MULTI_DID, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && multiLayout != null, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_multi_read))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpMultiLayout,
+                            doIpTls, DoIpDirectRead.Operation.OBD_MULTI_DID, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && multiLayout?.all { DoIpDirectRead.isObdDid(it.did) } == true,
+                            modifier = Modifier.weight(1f)) { Text(stringResource(R.string.cal_doip_multi_obd_read)) }
+                    }
+                    OutlinedTextField(doIpDtcMask, { doIpDtcMask = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_dtc_mask)) })
+                    OutlinedTextField(doIpSeverityMask, { doIpSeverityMask = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_severity_mask)) })
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for ((operation, label) in listOf(DoIpDirectRead.Operation.SEVERITY_COUNT to R.string.cal_doip_severity_count,
+                            DoIpDirectRead.Operation.SEVERITY_LIST to R.string.cal_doip_severity_list)) {
+                            OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                                doIpSeverityMask + doIpDtcMask, doIpTls, operation, doIpCertificate, requireNotNull(doIpOptions)) },
+                                enabled = targetReady && vinReady && doIpSeverityMask.length == 2 && doIpDtcMask.length == 2,
+                                modifier = Modifier.weight(1f)) { Text(stringResource(label)) }
+                        }
+                    }
+                    OutlinedTextField(doIpWwhSeverity, { doIpWwhSeverity = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_wwh_severity)) })
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpWwhSeverity + doIpDtcMask,
+                        doIpTls, DoIpDirectRead.Operation.OBD_WWH_MASK, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpWwhSeverity.length == 2 && doIpDtcMask.length == 2,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_wwh_mask)) }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "", doIpTls,
+                        DoIpDirectRead.Operation.OBD_WWH_PERMANENT, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_wwh_permanent))
+                    }
+                    OutlinedTextField(doIpWwhReadiness, { doIpWwhReadiness = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_wwh_readiness_group)) })
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpWwhReadiness, doIpTls,
+                        DoIpDirectRead.Operation.OBD_WWH_READINESS, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpWwhReadiness.length == 2, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_wwh_readiness))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls, DoIpDirectRead.Operation.DTC, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && doIpDtcMask.length == 2, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_read_uds_dtcs))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls, DoIpDirectRead.Operation.DTC_COUNT, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && doIpDtcMask.length == 2, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_count_button))
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls,
+                            DoIpDirectRead.Operation.OBD_DTC, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && doIpDtcMask.length == 2, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_obd_dtcs))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls,
+                            DoIpDirectRead.Operation.OBD_DTC_COUNT, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && doIpDtcMask.length == 2, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_obd_count))
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(doIpSampleCount, { doIpSampleCount = it.filter(Char::isDigit).take(2) },
+                            enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            label = { Text(stringResource(R.string.cal_doip_samples)) })
+                        OutlinedTextField(doIpInterval, { doIpInterval = it.filter(Char::isDigit).take(4) },
+                            enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            label = { Text(stringResource(R.string.cal_doip_interval)) })
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(doIpDetailDtc, { doIpDetailDtc = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(6) },
+                            enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
+                            label = { Text(stringResource(R.string.cal_doip_detail_dtc)) })
+                        OutlinedTextField(doIpDetailRecord, { doIpDetailRecord = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                            enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
+                            label = { Text(stringResource(R.string.cal_doip_detail_record)) })
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDetailDtc,
+                        doIpTls, DoIpDirectRead.Operation.SEVERITY_INFO, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpDetailDtc.length == 6,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_severity_info)) }
+                    val detailReady = targetReady && vinReady && doIpDetailDtc.length == 6 &&
+                        doIpDetailRecord.length == 2 && doIpDetailRecord != "00"
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.DTC_SNAPSHOT, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = detailReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_snapshot))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.DTC_EXTENDED, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = detailReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_extended))
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.OBD_DTC_SNAPSHOT, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = detailReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_obd_snapshot))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.OBD_DTC_EXTENDED, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = detailReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_obd_extended))
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "", doIpTls,
+                            DoIpDirectRead.Operation.SUPPORTED_DTCS, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_supported_dtcs))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "", doIpTls,
+                            DoIpDirectRead.Operation.SNAPSHOT_INDEX, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_snapshot_index))
+                        }
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "", doIpTls,
+                        DoIpDirectRead.Operation.PERMANENT_DTCS, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_permanent_dtcs))
+                    }
+                    for ((operation, label) in listOf(
+                        DoIpDirectRead.Operation.MIRROR_DTCS to R.string.cal_doip_legacy_mirror_dtcs,
+                        DoIpDirectRead.Operation.MIRROR_COUNT to R.string.cal_doip_legacy_mirror_count,
+                        DoIpDirectRead.Operation.LEGACY_EMISSIONS_DTCS to R.string.cal_doip_legacy_emissions_dtcs,
+                        DoIpDirectRead.Operation.LEGACY_EMISSIONS_COUNT to R.string.cal_doip_legacy_emissions_count)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask,
+                            doIpTls, operation, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && doIpDtcMask.length == 2,
+                            modifier = Modifier.fillMaxWidth()) { Text(stringResource(label)) }
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.MIRROR_EXTENDED,
+                        doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = detailReady && (doIpDetailRecord.toIntOrNull(16) ?: 0) !in 0xF0..0xFD,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_legacy_mirror_extended)) }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.STORED_RECORD, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpDetailRecord.length == 2 &&
+                            (doIpDetailRecord.toIntOrNull(16) ?: 255) in 0..254,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_stored_record)) }
+                    OutlinedTextField(doIpStoredCatalog, { doIpStoredCatalog = it.uppercase().filter { c -> c in "0123456789ABCDEF:," }.take(2549) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        label = { Text(stringResource(R.string.cal_doip_stored_catalog)) })
+                    val storedCatalogReady = remember(doIpStoredCatalog) {
+                        runCatching { com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseStoredDidLengths(doIpStoredCatalog) }.isSuccess
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpStoredCatalog, doIpTls, DoIpDirectRead.Operation.ALL_STORED_RECORDS, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && storedCatalogReady,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_all_stored_records)) }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpDetailRecord + "|" + doIpStoredCatalog, doIpTls, DoIpDirectRead.Operation.DECODED_STORED_RECORD,
+                        doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && storedCatalogReady && doIpDetailRecord.length == 2 &&
+                            (doIpDetailRecord.toIntOrNull(16) ?: 255) in 0..254,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_decoded_stored_record)) }
+                    for ((op, label) in listOf(
+                        DoIpDirectRead.Operation.DECODED_SNAPSHOT to R.string.cal_doip_decoded_snapshot,
+                        DoIpDirectRead.Operation.OBD_DECODED_SNAPSHOT to R.string.cal_doip_obd_decoded_snapshot)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord + "|" + doIpStoredCatalog, doIpTls, op,
+                            doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && storedCatalogReady &&
+                                doIpDetailDtc.length == 6 && doIpDetailRecord.length == 2,
+                            modifier = Modifier.fillMaxWidth()) { Text(stringResource(label)) }
+                    }
+                    OutlinedTextField(doIpExtendedCatalog, { doIpExtendedCatalog = it.uppercase().filter { c -> c in "0123456789ABCDEF:," }.take(1911) },
+                        enabled = idle, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        label = { Text(stringResource(R.string.cal_doip_extended_catalog)) })
+                    val extendedCatalogReady = remember(doIpExtendedCatalog, doIpDetailRecord) {
+                        runCatching {
+                            val catalog = com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseExtendedRecordLengths(doIpExtendedCatalog)
+                            com.camarodiag.gen5.data.obd.UdsDtcDecoder.extendedRecordsRequest(0, doIpDetailRecord.toInt(16), catalog)
+                        }.isSuccess
+                    }
+                    for ((op, label) in listOf(
+                        DoIpDirectRead.Operation.DECODED_EXTENDED to R.string.cal_doip_decoded_extended,
+                        DoIpDirectRead.Operation.OBD_DECODED_EXTENDED to R.string.cal_doip_obd_decoded_extended)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord + "|" + doIpExtendedCatalog, doIpTls, op,
+                            doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && extendedCatalogReady &&
+                                doIpDetailDtc.length == 6 && doIpDetailRecord.length == 2,
+                            modifier = Modifier.fillMaxWidth()) { Text(stringResource(label)) }
+                    }
+                    val extendedRecordReady = targetReady && vinReady && doIpDetailRecord.length == 2 &&
+                        (doIpDetailRecord.toIntOrNull(16) ?: 0) in 1..0xEF
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.EXTENDED_RECORD_SUPPORT, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = extendedRecordReady, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_extended_record_support))
+                    }
+                    OutlinedTextField(doIpExtendedRecordSize, { doIpExtendedRecordSize = it.filter { c -> c in '0'..'9' }.take(4) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_extended_record_size)) })
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpDetailRecord + ":" + doIpExtendedRecordSize, doIpTls, DoIpDirectRead.Operation.EXTENDED_RECORD_DATA,
+                        doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = extendedRecordReady && (doIpExtendedRecordSize.toIntOrNull() ?: 0) in 1..4090,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_extended_record_data)) }
+                    OutlinedTextField(doIpDtcMemory, { doIpDtcMemory = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_memory_selection)) })
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpDtcMask + doIpDtcMemory, doIpTls, DoIpDirectRead.Operation.MEMORY_DTCS, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpDtcMemory.length == 2 && doIpDtcMask.length == 2,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_memory_dtcs)) }
+                    for ((op, label, catalog) in listOf(
+                        Triple(DoIpDirectRead.Operation.MEMORY_DECODED_SNAPSHOT, R.string.cal_doip_memory_decoded_snapshot, doIpStoredCatalog),
+                        Triple(DoIpDirectRead.Operation.MEMORY_DECODED_EXTENDED, R.string.cal_doip_memory_decoded_extended, doIpExtendedCatalog))) {
+                        val catalogReady = if (op == DoIpDirectRead.Operation.MEMORY_DECODED_SNAPSHOT) storedCatalogReady else extendedCatalogReady
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord + doIpDtcMemory + "|" + catalog, doIpTls, op,
+                            doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = detailReady && doIpDtcMemory.length == 2 && catalogReady,
+                            modifier = Modifier.fillMaxWidth()) { Text(stringResource(label)) }
+                    }
+                    for ((op, label) in listOf(DoIpDirectRead.Operation.MEMORY_SNAPSHOT to R.string.cal_doip_memory_snapshot,
+                        DoIpDirectRead.Operation.MEMORY_EXTENDED to R.string.cal_doip_memory_extended)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord + doIpDtcMemory, doIpTls, op, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = detailReady && doIpDtcMemory.length == 2 &&
+                                (op != DoIpDirectRead.Operation.MEMORY_EXTENDED || (doIpDetailRecord.toIntOrNull(16) ?: 0) !in 0xF0..0xFD),
+                            modifier = Modifier.fillMaxWidth()) { Text(stringResource(label)) }
+                    }
+                    for (pair in listOf(
+                        listOf(DoIpDirectRead.Operation.FIRST_FAILED_DTC to R.string.cal_doip_first_failed,
+                            DoIpDirectRead.Operation.FIRST_CONFIRMED_DTC to R.string.cal_doip_first_confirmed),
+                        listOf(DoIpDirectRead.Operation.RECENT_FAILED_DTC to R.string.cal_doip_recent_failed,
+                            DoIpDirectRead.Operation.RECENT_CONFIRMED_DTC to R.string.cal_doip_recent_confirmed))) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            for ((operation, label) in pair) {
+                                OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "", doIpTls,
+                                    operation, doIpCertificate, requireNotNull(doIpOptions)) },
+                                    enabled = targetReady && vinReady, modifier = Modifier.weight(1f)) {
+                                    Text(stringResource(label))
+                                }
+                            }
+                        }
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "", doIpTls,
+                        DoIpDirectRead.Operation.FAULT_COUNTERS, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_fault_counters))
+                    }
+                    OutlinedTextField(doIpCommand, { doIpCommand = it.take(12288) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_command_payload)) })
+                    OutlinedButton(onClick = {
+                        doIpConsentStep = EcuWriteConsentFlow.Step.WARNING
+                        pendingDoIpCommand = DoIpConsoleCommand(doIpHost, doIpTester, doIpEcu,
+                            doIpTls, doIpCommand, vehicle, doIpContextGeneration, doIpCertificate, requireNotNull(doIpOptions))
+                    }, enabled = targetReady && vinReady && runCatching { DoIpDirectRead.parseCommands(doIpCommand) }.isSuccess,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_command_send))
+                    }
+                    pendingDoIpCommand?.let { pending ->
+                        val sameContext = pending.vehicle == vehicle && pending.generation == doIpContextGeneration &&
+                            pending.host == doIpHost && pending.tester == doIpTester && pending.ecu == doIpEcu &&
+                            pending.tls == doIpTls && pending.certificate == doIpCertificate &&
+                            pending.options == doIpOptions && pending.payload == doIpCommand && targetReady
+                        AlertDialog(onDismissRequest = { pendingDoIpCommand = null },
+                            title = { Text(stringResource(if (doIpConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                                R.string.ecu_write_warning_title else R.string.ecu_write_confirm_title)) },
+                            text = {
+                                Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(stringResource(R.string.cal_doip_command_target, pending.vehicle.vin,
+                                        pending.host.ifBlank { stringResource(R.string.cal_doip_discover_by_vin) },
+                                        pending.tester, pending.ecu, if (pending.tls) "TLS" else "TCP"))
+                                    pending.certificate?.let { selected ->
+                                        Text(stringResource(R.string.cal_doip_cert_selected, selected.alias, selected.fingerprint))
+                                    }
+                                    Text(stringResource(R.string.cal_doip_session_summary,
+                                        pending.options.timeoutMs, pending.options.p2Ms, pending.options.p2StarMs,
+                                        "%02X".format(pending.options.routingType), pending.options.routingOemHex.ifEmpty { "—" }))
+                                    Text(pending.payload, fontFamily = FontFamily.Monospace)
+                                    Text(stringResource(if (doIpConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                                        R.string.ecu_write_warning_message else R.string.ecu_write_confirm_message))
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(enabled = sameContext, onClick = {
+                                    if (doIpConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                                        doIpConsentStep = EcuWriteConsentFlow.afterWarningOk(doIpConsentStep)
+                                    else {
+                                        EcuWriteConsentFlow.approval(doIpConsentStep, true, sameContext)?.let {
+                                            onConfirmDoIpCommand(pending, it)
+                                        }
+                                        pendingDoIpCommand = null
+                                    }
+                                }) { Text(stringResource(if (doIpConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                                    R.string.ecu_write_ok else R.string.ecu_write_yes)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { pendingDoIpCommand = null }) {
+                                    Text(stringResource(if (doIpConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                                        R.string.ecu_write_cancel else R.string.ecu_write_no))
+                                }
+                            })
+                    }
+                    val samples = doIpSampleCount.toIntOrNull()
+                    val interval = doIpInterval.toIntOrNull()
+                    OutlinedButton(onClick = {
+                        if (samples != null && interval != null)
+                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, samples, interval, DoIpDirectRead.Operation.MONITOR, doIpCertificate, requireNotNull(doIpOptions))
+                    }, enabled = targetReady && vinReady && doIpDid.length == 4 &&
+                        samples != null && samples in 1..30 && interval != null && interval in 250..5000,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_monitor))
+                    }
+                    OutlinedButton(onClick = {
+                        if (samples != null && interval != null)
+                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, samples, interval, DoIpDirectRead.Operation.OBD_MONITOR, doIpCertificate, requireNotNull(doIpOptions))
+                    }, enabled = targetReady && vinReady && doIpDid.length == 4 &&
+                        doIpDid.toIntOrNull(16)?.let(DoIpDirectRead::isObdDid) == true &&
+                        samples != null && samples in 1..30 && interval != null && interval in 250..5000,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_obd_monitor))
+                    }
+                    val multiMonitorReady = multiLayout?.let {
+                        runCatching { com.camarodiag.gen5.data.obd.DoIpMultiDid.validateMonitor(it) }.isSuccess
+                    } == true
+                    OutlinedButton(onClick = {
+                        if (samples != null && interval != null)
+                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpMultiLayout, doIpTls,
+                                samples, interval, DoIpDirectRead.Operation.MULTI_MONITOR, doIpCertificate, requireNotNull(doIpOptions))
+                    }, enabled = targetReady && vinReady && multiMonitorReady &&
+                        samples != null && samples in 1..30 && interval != null && interval in 250..5000,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_multi_monitor))
+                    }
+                    OutlinedButton(onClick = {
+                        if (samples != null && interval != null)
+                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpMultiLayout, doIpTls,
+                                samples, interval, DoIpDirectRead.Operation.OBD_MULTI_MONITOR, doIpCertificate, requireNotNull(doIpOptions))
+                    }, enabled = targetReady && vinReady && multiMonitorReady &&
+                        multiLayout?.all { DoIpDirectRead.isObdDid(it.did) } == true &&
+                        samples != null && samples in 1..30 && interval != null && interval in 250..5000,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_obd_multi_monitor))
+                    }
+                    HorizontalDivider()
+                    OutlinedButton(onClick = onImportDoIpBackupProfile, enabled = idle && vinReady,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_backup_profile))
+                    }
+                    state.doIpBackupScope?.let { scope ->
+                        Text(stringResource(R.string.cal_doip_backup_scope,
+                            scope.vin, "%04X".format(scope.ecu), "%08X".format(scope.start), scope.length),
+                            color = TextPrimary, fontSize = 12.sp)
+                        OutlinedButton(onClick = { onVerifyDoIpBackup(scope) },
+                            enabled = idle && scope.vin == vehicle.vin.uppercase(),
+                            modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.cal_doip_verify_backup))
+                        }
+                        val matches = scope.vin == vehicle.vin.uppercase() &&
+                            doIpTester.toIntOrNull(16) == scope.tester && doIpEcu.toIntOrNull(16) == scope.ecu
+                        if (!scope.canCapture()) {
+                            Text(stringResource(R.string.cal_doip_backup_limit),
+                                color = TextPrimary, fontSize = 12.sp)
+                        }
+                        OutlinedButton(onClick = { pendingDoIpBackup = scope },
+                            enabled = targetReady && matches && scope.canCapture(),
+                            modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.cal_doip_backup))
+                        }
+                    }
+                    pendingDoIpBackup?.let { scope ->
+                        if (scope == state.doIpBackupScope && targetReady && scope.canCapture()) {
+                            AlertDialog(onDismissRequest = { pendingDoIpBackup = null },
+                                title = { Text(stringResource(R.string.cal_doip_backup)) },
+                                text = { Text(stringResource(R.string.cal_doip_backup_confirm,
+                                    scope.vin, "%04X".format(scope.ecu), "%08X".format(scope.start), scope.length)) },
+                                confirmButton = { TextButton(onClick = {
+                                    pendingDoIpBackup = null
+                                    onCaptureDoIpBackup(doIpHost, doIpTester, doIpEcu, doIpTls, scope, doIpCertificate, requireNotNull(doIpOptions))
+                                }) { Text(stringResource(R.string.cal_doip_backup)) } },
+                                dismissButton = { TextButton(onClick = { pendingDoIpBackup = null }) {
+                                    Text(stringResource(R.string.cal_doip_cancel))
+                                } })
+                        }
+                    }
+                    if (state.doIpReading) {
+                        if (state.doIpBackupBytes > 0 && state.doIpBackupScope != null) {
+                            val total = state.doIpBackupScope.length * 2
+                            LinearProgressIndicator(progress = { (state.doIpBackupBytes.toFloat() / total).coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth())
+                            Text("${state.doIpBackupBytes} / $total")
+                        } else LinearProgressIndicator(Modifier.fillMaxWidth())
+                        OutlinedButton(onClick = onCancelDirectDoIp, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.cal_doip_cancel))
+                        }
+                    }
+                    if (state.doIpResult.isNotBlank())
+                        Text(state.doIpResult, color = TextPrimary, fontFamily = FontFamily.Monospace)
+                    if (state.doIpLiveSamples.isNotEmpty()) {
+                        Text(stringResource(R.string.cal_doip_monitor_samples_received, state.doIpLiveSamples.size),
+                            color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        state.doIpLiveSamples.forEach { sample ->
+                            val data = if (sample.values.isEmpty()) sample.payloadHex else sample.values.joinToString("  ") {
+                                "%04X=%s".format(it.did, it.payloadHex)
+                            }
+                            Text("#${sample.index}  ${sample.elapsedMs} ms  $data",
+                                color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                        }
+                        if (idle && state.doIpMonitorReport == null)
+                            Text(stringResource(R.string.cal_doip_monitor_partial), color = CamaroAmber, fontSize = 11.sp)
+                        state.doIpMonitorReport?.takeIf { idle && !it.complete }?.let { report ->
+                            Text(stringResource(R.string.cal_doip_monitor_partial_verified,
+                                report.samples.size, report.requestedSamples), color = CamaroAmber, fontSize = 11.sp)
+                        }
+                    }
+                    state.doIpMonitorReport?.let { report ->
+                        OutlinedButton(onClick = { onExportDoIpMonitoring(report) },
+                            enabled = idle, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.cal_doip_monitor_export))
+                        }
+                    }
+                    if (state.doIpTrace.isNotEmpty() && state.doIpBackupBytes > 0)
+                        Text(stringResource(R.string.cal_doip_recent_trace), color = TextMuted, fontSize = 10.sp)
+                    state.doIpTrace.forEach { line ->
+                        Text(line, color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                    }
+                }
+            }
+        }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(stringResource(R.string.cal_workspace_title),
-                    color = CamaroAmber, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
-                Text(vehicleLabel, color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.cal_section_vehicle),
+                    color = CamaroAmber, fontWeight = FontWeight.ExtraBold)
+                Text(stringResource(R.string.cal_selected_profile_label, vehicleLabel), color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                if (state.vinComparison?.matches == false) {
+                    Text(stringResource(R.string.cal_vin_mismatch_title), color = WarnRed, fontWeight = FontWeight.Bold)
+                }
                 Text(stringResource(R.string.cal_ecm_family, ecmType),
                     color = TextMuted, fontSize = 12.sp)
                 Text(
@@ -628,11 +1499,11 @@ fun CalibrationWorkspaceScreen(
                         )
                         Text(stringResource(R.string.flexfuel_lfx2012_audit_post_not_performed),
                             color = WarnRed, fontSize = 11.sp)
-                        Text(
-                            stringResource(R.string.flexfuel_lfx2012_readonly_testing_notice),
-                            color = TextMuted,
-                            fontSize = 11.sp
-                        )
+                        // Text(
+                            // stringResource(R.string.flexfuel_lfx2012_readonly_testing_notice),
+                            // color = TextMuted,
+                            // fontSize = 11.sp
+                        // )
                         OutlinedButton(
                             onClick = onReadIdentification,
                             enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isReading,
@@ -705,10 +1576,10 @@ fun CalibrationWorkspaceScreen(
                         Text(stringResource(R.string.cal_ecu_identification),
                             color = TextPrimary, fontWeight = FontWeight.Bold)
                     }
-                    Text(
-                        stringResource(R.string.cal_obd_mode09_explanation),
-                        color = TextMuted, fontSize = 12.sp
-                    )
+                    // Text(
+                        // stringResource(R.string.cal_obd_mode09_explanation),
+                        // color = TextMuted, fontSize = 12.sp
+                    // )
                     Button(
                         onClick = onReadIdentification,
                         enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isReading,
@@ -744,14 +1615,30 @@ fun CalibrationWorkspaceScreen(
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
                     )
-                    OutlinedTextField(
-                        value = udsCanProtocol,
-                        onValueChange = { udsCanProtocol = it.filter(Char::isDigit).take(2) },
-                        label = { Text(stringResource(R.string.cal_can_profile)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
+                    // Keep the old free-form profile field for reference:
+                    // OutlinedTextField(value = udsCanProtocol, onValueChange = { udsCanProtocol = it.filter(Char::isDigit).take(2) })
+                    val allCanProfiles = setOf(33, 34, 35, 36, 63, 64)
+                    val displayedProfiles = if (canReadEnhancedUds) compatibleUdsProfiles else allCanProfiles
+                    val profileLabels = mapOf(33 to "CAN 11-bit / 500 kbit/s",
+                        34 to "CAN 29-bit / 500 kbit/s", 35 to "CAN 11-bit / 250 kbit/s",
+                        36 to "CAN 29-bit / 250 kbit/s", 63 to "SW-CAN 11-bit / 33.3 kbit/s",
+                        64 to "SW-CAN 29-bit / 33.3 kbit/s")
+                    Box {
+                        OutlinedButton(onClick = { udsProfileMenuExpanded = true },
+                            enabled = !state.isUdsReading && !state.isObdbSignalReading && displayedProfiles.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth()) {
+                            Text(if (canReadEnhancedUds && !profileAvailable)
+                                stringResource(R.string.cal_choose_compatible_profile)
+                            else profileLabels[udsCanProtocol.toIntOrNull()] ?: stringResource(R.string.cal_can_profile))
+                        }
+                        DropdownMenu(expanded = udsProfileMenuExpanded,
+                            onDismissRequest = { udsProfileMenuExpanded = false }) {
+                            displayedProfiles.sorted().forEach { profile ->
+                                DropdownMenuItem(text = { Text(profileLabels.getValue(profile)) },
+                                    onClick = { udsCanProtocol = profile.toString(); udsProfileMenuExpanded = false })
+                            }
+                        }
+                    }
                     OutlinedTextField(
                         value = udsDid,
                         onValueChange = { udsDid = it.uppercase().filter { ch -> ch.isDigit() || ch in 'A'..'F' }.take(4) },
@@ -1005,8 +1892,8 @@ fun CalibrationWorkspaceScreen(
                     }
                     Button(
                         onClick = { onReadUdsDid(udsRequestCanId, udsResponseCanId, udsDid, udsCanProtocol) },
-                        enabled = canReadEnhancedUds && !state.isUdsReading &&
-                            canIdsMatchProfile && udsDid.length == 4 &&
+                        enabled = canReadEnhancedUds && profileAvailable && !state.isUdsReading &&
+                            !state.doIpReading && !state.isObdbSignalReading && canIdsMatchProfile && udsDid.length == 4 &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -1020,8 +1907,8 @@ fun CalibrationWorkspaceScreen(
                     }
                     OutlinedButton(
                         onClick = { onReadUdsDtcs(udsRequestCanId, udsResponseCanId, udsCanProtocol) },
-                        enabled = canReadEnhancedUds && !state.isUdsReading &&
-                            canIdsMatchProfile &&
+                        enabled = canReadEnhancedUds && profileAvailable && !state.isUdsReading &&
+                            !state.doIpReading && !state.isObdbSignalReading && canIdsMatchProfile &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -1088,10 +1975,10 @@ fun CalibrationWorkspaceScreen(
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.cal_native_catalog_title),
                         color = CamaroAmber, fontWeight = FontWeight.Bold)
-                    Text(
-                        stringResource(R.string.cal_native_catalog_explanation),
-                        color = TextMuted, fontSize = 11.sp
-                    )
+                    // Text(
+                        // stringResource(R.string.cal_native_catalog_explanation),
+                        // color = TextMuted, fontSize = 11.sp
+                    // )
                     Text(state.nativeSignalMessage.ifBlank {
                         stringResource(R.string.cal_native_catalog_loading)
                     }, color = TextMuted, fontSize = 10.sp)
@@ -1167,7 +2054,7 @@ fun CalibrationWorkspaceScreen(
                                         udsRequestCanId = signal.requestCanId?.toString(16)?.uppercase() ?: signal.requestHeaderHex
                                         udsResponseCanId = signal.responseCanId?.toString(16)?.uppercase() ?: signal.responseHeaderHex.orEmpty()
                                         udsDid = signal.identifierHex
-                                        udsCanProtocol = "33"
+                                        if (signalProfiles.size == 1) udsCanProtocol = signalProfiles.single().toString()
                                     }
                                 )
                             }
@@ -1200,12 +2087,12 @@ fun CalibrationWorkspaceScreen(
                             )
                         }
                         Button(
-                            onClick = { onReadObdbSignal(signal.id, udsCanProtocol) },
+                            onClick = { signalProfile?.let { onReadObdbSignal(signal.id, it.toString()) } },
                             enabled = canReadEnhancedUds &&
                                 signal.hasSupportedPhysicalCanAddressing &&
-                                !profileUses29BitIds &&
+                                signalProfile != null &&
                                 signal.service == 0x22 &&
-                                !state.isObdbSignalReading,
+                                !state.doIpReading && !state.isUdsReading && !state.isObdbSignalReading,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             if (state.isObdbSignalReading) CircularProgressIndicator()
@@ -1225,10 +2112,10 @@ fun CalibrationWorkspaceScreen(
                         stringResource(R.string.cal_trace_title),
                         color = TextPrimary, fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        stringResource(R.string.cal_trace_description),
-                        color = TextMuted, fontSize = 12.sp
-                    )
+                    // Text(
+                        // stringResource(R.string.cal_trace_description),
+                        // color = TextMuted, fontSize = 12.sp
+                    // )
                     OutlinedButton(
                         onClick = onImportTrace,
                         enabled = !state.isTraceAnalyzing,
@@ -1312,10 +2199,10 @@ fun CalibrationWorkspaceScreen(
                         Text(stringResource(R.string.calibration_files),
                             color = TextPrimary, fontWeight = FontWeight.Bold)
                     }
-                    Text(
-                        stringResource(R.string.cal_file_inspection_hint),
-                        color = TextMuted, fontSize = 12.sp
-                    )
+                    // Text(
+                        // stringResource(R.string.cal_file_inspection_hint),
+                        // color = TextMuted, fontSize = 12.sp
+                    // )
                     OutlinedButton(onClick = onImportFile, modifier = Modifier.fillMaxWidth()) {
                         androidx.compose.material3.Icon(Icons.Default.CloudDownload, contentDescription = null)
                         Text(stringResource(R.string.cal_import_file))
@@ -1603,6 +2490,9 @@ fun CalibrationWorkspaceScreen(
                         stringResource(R.string.cal_no_calibration_write),
                         color = CamaroAmber, fontSize = 12.sp
                     )
+                    HorizontalDivider()
+                    PhysicalRecoveryPanel(state, vehicle.vin, doIpAccountUid, onInspectPhysicalRecovery, onExportPhysicalRecovery,
+                        onInspectPhysicalRecoveryHistory, onExportPhysicalRecoveryHistory)
                 }
             }
         }
@@ -1850,6 +2740,7 @@ fun CalibrationWorkspaceScreen(
             item { Text(state.message, color = CamaroAmber, fontSize = 12.sp) }
         }
     }
+    }
     if (showVinMismatchDialog) {
         val comparison = state.vinComparison
         if (comparison?.matches == false) {
@@ -1920,4 +2811,85 @@ fun CalibrationWorkspaceScreen(
             )
         }
     }
+}
+
+@Composable
+private fun PhysicalRecoveryPanel(state: CalibrationWorkspaceState, defaultVin: String,
+                                  accountUid: String?, onInspect: (PhysicalRecoveryIdentity) -> Unit,
+                                  onExport: (PhysicalRecoveryIdentity, com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report) -> Unit,
+                                  onInspectHistory: (PhysicalRecoveryIdentity, List<android.net.Uri>) -> Unit,
+                                  onExportHistory: (PhysicalRecoveryHistory.Report) -> Unit) {
+    var vin by remember(accountUid, defaultVin) { mutableStateOf(defaultVin.uppercase().take(17)) }
+    var family by remember(accountUid) { mutableStateOf("") }
+    var controller by remember(accountUid) { mutableStateOf("") }
+    var firmware by remember(accountUid) { mutableStateOf("") }
+    val identity = PhysicalRecoveryIdentity(vin, family.trim(), controller.trim(), firmware.trim())
+    val editable = !state.physicalRecoveryReading && !state.physicalRecoveryExporting
+    Text(stringResource(R.string.cal_recovery_title), fontWeight = FontWeight.Bold, color = TextPrimary)
+    Text(stringResource(R.string.cal_recovery_folder_hint), color = TextMuted, fontSize = 12.sp)
+    OutlinedTextField(vin, { vin = it.uppercase().filter { ch -> ch in "ABCDEFGHJKLMNPRSTUVWXYZ0123456789" }.take(17) },
+        label = { Text(stringResource(R.string.cal_recovery_vin)) }, enabled = editable,
+        singleLine = true, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(family, { family = it.take(128) }, label = { Text(stringResource(R.string.cal_recovery_family)) },
+        enabled = editable, singleLine = true, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(controller, { controller = it.take(128) }, label = { Text(stringResource(R.string.cal_recovery_controller)) },
+        enabled = editable, singleLine = true, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(firmware, { firmware = it.take(128) }, label = { Text(stringResource(R.string.cal_recovery_firmware)) },
+        enabled = editable, singleLine = true, modifier = Modifier.fillMaxWidth())
+    Button(onClick = { onInspect(identity) }, enabled = editable && identity.valid && accountUid != null,
+        modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.cal_recovery_choose_folder))
+    }
+    if (state.physicalRecoveryReading || state.physicalRecoveryExporting) CircularProgressIndicator()
+    if (state.physicalRecoveryIdentity == identity) {
+        if (state.physicalRecoveryFailed) Text(stringResource(R.string.cal_recovery_folder_failed), color = WarnRed)
+        state.physicalRecoveryResult?.let { report ->
+            Text(stringResource(if (report.verified) R.string.cal_recovery_verified else R.string.cal_recovery_failed),
+                color = if (report.verified) OkGreen else WarnRed)
+            Text(stringResource(R.string.cal_recovery_counts, report.sectors.size, report.expectedSectors, report.verifiedBytes))
+            report.journalAudit?.let { audit ->
+                Text(stringResource(R.string.recovery_journal_counts,audit.records,audit.baselineSectors,
+                    audit.verifiedSectors,audit.finalReadbackSectors),fontSize=12.sp)
+            }
+            report.journalSha256?.let { hash ->
+                Text(stringResource(R.string.recovery_journal_sha256),fontSize=12.sp)
+                Text(hash,fontFamily=FontFamily.Monospace,fontSize=10.sp)
+            }
+            report.snapshotSha256?.let {
+                Text(stringResource(R.string.cal_recovery_snapshot_sha256), fontSize = 12.sp)
+                Text(it, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+            }
+            val disposition = when (report.journalDisposition) {
+                com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.NO_ERASE_RECORDED -> R.string.cal_recovery_no_erase
+                com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.ERASE_OR_WRITE_MAY_BE_INCOMPLETE -> R.string.cal_recovery_incomplete
+                com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.ADDITIONAL_BASELINES_NOT_WRITTEN -> R.string.cal_recovery_partial
+                com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.ALL_RECORDED_SECTORS_VERIFIED -> R.string.cal_recovery_sectors_verified
+                com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.FINAL_READBACK_INCOMPLETE -> R.string.cal_recovery_final_incomplete
+                com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.TRANSACTION_COMPLETION_RECORDED -> R.string.cal_recovery_completed
+                else -> R.string.cal_recovery_unknown
+            }
+            Text(stringResource(disposition), color = CamaroAmber)
+            report.uncertainAddress?.let { Text(stringResource(R.string.cal_recovery_address, it), color = WarnRed) }
+            report.uncertainRegion?.let { Text(stringResource(R.string.cal_recovery_uncertain_region, it.name), color = WarnRed) }
+            report.problemAddress?.let { Text(stringResource(R.string.cal_recovery_problem_address, it), color = WarnRed) }
+            // Keep very large reports readable without composing thousands of rows.
+            report.sectors.take(20).forEach { sector ->
+                Text(stringResource(R.string.cal_recovery_sector, sector.region.name, sector.address, sector.length),
+                    fontSize = 12.sp)
+                Text(sector.sha256, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                sector.envelopeSha256?.let {
+                    Text(stringResource(R.string.recovery_envelope_sha256),fontSize=11.sp)
+                    Text(it,fontFamily=FontFamily.Monospace,fontSize=10.sp)
+                }
+            }
+            if (report.sectors.size > 20) Text(stringResource(R.string.cal_recovery_more, report.sectors.size - 20))
+            Text(stringResource(R.string.cal_recovery_no_restore), color = CamaroAmber, fontSize = 12.sp)
+            OutlinedButton(onClick = { onExport(identity, report) }, enabled = editable && accountUid != null &&
+                report.verified && report.snapshotSha256 != null && report.journalSha256 != null &&
+                state.physicalRecoveryFolderUri != null,
+                modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_recovery_export)) }
+            state.physicalRecoveryExportMessage?.let { Text(it, fontSize = 12.sp) }
+        }
+    }
+    PhysicalRecoveryHistoryPanel(identity, accountUid, state, onInspectHistory, onExportHistory)
 }

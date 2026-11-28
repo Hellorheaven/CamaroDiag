@@ -7,6 +7,7 @@ internal static class NativeE39WriteSequenceSelfTests
     {
         internal readonly List<NativeE39WriteSequence.Event> Events = [];
         internal readonly Dictionary<uint, byte[]> SavedBlocks = [];
+        internal Action<NativeE39WriteSequence.Event>? OnAppend;
         public Task PreserveOriginalBlockAsync(uint address, byte[] liveBytes,
             string sha256, CancellationToken token)
         {
@@ -18,10 +19,22 @@ internal static class NativeE39WriteSequenceSelfTests
                 throw new InvalidDataException("Cannot save fresh physical sector.");
             return Task.CompletedTask;
         }
+        public Task RequireOriginalBlocksIntactAsync(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            var expected = Events.Where(e => e.Phase == NativeE39WriteSequence.Phase.Prepared).ToArray();
+            if (expected.Length == 0 || SavedBlocks.Count != expected.Length ||
+                expected.Any(e => !SavedBlocks.TryGetValue(e.Address, out var bytes) ||
+                    !string.Equals(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)),
+                        e.Detail, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidDataException("Saved original sector changed.");
+            return Task.CompletedTask;
+        }
         public Task AppendAsync(NativeE39WriteSequence.Event evidence, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
             Events.Add(evidence);
+            OnAppend?.Invoke(evidence);
             return Task.CompletedTask;
         }
     }
@@ -38,6 +51,7 @@ internal static class NativeE39WriteSequenceSelfTests
         internal uint? SupplyMillivolts = 13500;
         internal bool LoseSupplyAfterErase;
         internal int VoltageReads;
+        internal Action? OnSupplyRead;
         internal int ByteReads;
         internal bool CorruptEarlierSectorOnSecondErase;
         internal bool CorruptNextSectorOnFirstErase;
@@ -49,6 +63,7 @@ internal static class NativeE39WriteSequenceSelfTests
         {
             token.ThrowIfCancellationRequested();
             VoltageReads++;
+            OnSupplyRead?.Invoke();
             return Task.FromResult(LoseSupplyAfterErase && Erases > 0
                 ? (uint?)null : SupplyMillivolts);
         }
@@ -112,6 +127,25 @@ internal static class NativeE39WriteSequenceSelfTests
             }
             return Task.FromResult(new byte[] { 0x76 });
         }
+    }
+
+    private sealed class SuspendedJournal : NativeE39WriteSequence.IDurableJournal
+    {
+        internal readonly TaskCompletionSource<bool> Entered = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> Continue = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task AppendAsync(NativeE39WriteSequence.Event evidence,
+            CancellationToken token)
+        {
+            Entered.TrySetResult(true);
+            await Continue.Task.WaitAsync(token);
+        }
+
+        public Task PreserveOriginalBlockAsync(uint address, byte[] liveBytes,
+            string sha256, CancellationToken token) =>
+            throw new InvalidOperationException("Suspended journal must not reach ECU erase.");
     }
 
     internal static int Run()
@@ -199,6 +233,18 @@ internal static class NativeE39WriteSequenceSelfTests
                journal.Events.FindIndex(e => e.Phase == NativeE39WriteSequence.Phase.EraseAcknowledged),
             "Erase-start event written before physical erase");
 
+        var diskChanged = new TestEcu(origin);
+        var diskJournal = new TestJournal();
+        diskJournal.OnAppend = step =>
+        {
+            if (step.Phase == NativeE39WriteSequence.Phase.EraseStarted)
+                diskJournal.SavedBlocks[plan.Sectors[0].Address][0] ^= 1;
+        };
+        Expect<InvalidDataException>(() =>
+            NativeE39WriteSequence.RunBenchSequenceAsync(diskChanged, diskJournal,
+                plan, opts, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(diskChanged.Erases == 0,
+            "Altered durable original after preflight prevents the first erase");
         var invalid = plan with { VerifiedMemoryMap = false };
         var noTraffic = new TestEcu(origin);
         Expect<UnauthorizedAccessException>(() =>
@@ -231,6 +277,79 @@ internal static class NativeE39WriteSequenceSelfTests
                lostSupplyJournal.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired &&
                !lostSupply.Requests.Any(x => x[0] == 0x36 && x[1] == 0),
             "Voltage loss after erase prevents programming and requires recovery");
+
+        // A vendor driver that ignores cancellation until AFTER returning
+        // voltage must not permit an erase or physical write to follow.
+        using (var stoppedBeforeErase = new CancellationTokenSource())
+        {
+            var physical = new TestEcu(origin);
+            var evidence = new TestJournal();
+            var armSupplyCancellation = false;
+            evidence.OnAppend = step =>
+            {
+                if (step.Phase == NativeE39WriteSequence.Phase.EraseStarted)
+                    armSupplyCancellation = true;
+            };
+            physical.OnSupplyRead = () =>
+            {
+                if (armSupplyCancellation)
+                {
+                    armSupplyCancellation = false;
+                    stoppedBeforeErase.Cancel();
+                }
+            };
+            Expect<OperationCanceledException>(() =>
+                NativeE39WriteSequence.RunBenchSequenceAsync(physical, evidence,
+                    plan, opts, stoppedBeforeErase.Token).GetAwaiter().GetResult());
+            Assert(physical.Erases == 0 &&
+                   !physical.Requests.Any(x => x[0] == 0x36 && x[1] == 0) &&
+                   evidence.Events[^1].Phase == NativeE39WriteSequence.Phase.EraseStarted,
+                "Cancellation during a noncooperative supply read never erases or writes");
+        }
+
+        using (var stoppedAfterErase = new CancellationTokenSource())
+        {
+            var physical = new TestEcu(origin);
+            var evidence = new TestJournal();
+            var armSupplyCancellation = false;
+            evidence.OnAppend = step =>
+            {
+                if (step.Phase == NativeE39WriteSequence.Phase.WriteStarted)
+                    armSupplyCancellation = true;
+            };
+            physical.OnSupplyRead = () =>
+            {
+                if (armSupplyCancellation)
+                {
+                    armSupplyCancellation = false;
+                    stoppedAfterErase.Cancel();
+                }
+            };
+            Expect<OperationCanceledException>(() =>
+                NativeE39WriteSequence.RunBenchSequenceAsync(physical, evidence,
+                    plan, opts, stoppedAfterErase.Token).GetAwaiter().GetResult());
+            Assert(physical.Erases == 1 &&
+                   !physical.Requests.Any(x => x[0] == 0x36 && x[1] == 0) &&
+                   evidence.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired,
+                "Cancellation after erase does not write or silently retry and records recovery");
+        }
+
+        using (var stoppedAtCompletion = new CancellationTokenSource())
+        {
+            var physical = new TestEcu(origin);
+            var evidence = new TestJournal();
+            evidence.OnAppend = step =>
+            {
+                if (step.Phase == NativeE39WriteSequence.Phase.Completed)
+                    stoppedAtCompletion.Cancel();
+            };
+            Expect<OperationCanceledException>(() =>
+                NativeE39WriteSequence.RunBenchSequenceAsync(physical, evidence,
+                    plan, opts, stoppedAtCompletion.Token).GetAwaiter().GetResult());
+            Assert(physical.Erases == 2 &&
+                   evidence.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired,
+                "Completion callback cancellation never returns a false successful transaction");
+        }
 
         var wrongBaseline = origin.ToArray();
         wrongBaseline[1] ^= 0x05;
@@ -333,6 +452,34 @@ internal static class NativeE39WriteSequenceSelfTests
             NativeE39WriteSequence.RunBenchSequenceAsync(tamperEcu, new TestJournal(),
                 damagedPlan, opts, CancellationToken.None).GetAwaiter().GetResult());
         Assert(tamperEcu.Requests.Count == 0, "Mutated sector rejected before any ECU request");
+
+        // Concurrent programming on the *same* live kernel transport must
+        // fail before traffic or durable journal mutation by a second owner.
+        // An interrupted first owner releases the link for a new, separately
+        // preflighted operation; it must not retry or continue automatically.
+        using (var stopFirst = new CancellationTokenSource())
+        {
+            var sharedLink = new TestEcu(origin);
+            var holdingJournal = new SuspendedJournal();
+            var first = NativeE39WriteSequence.RunBenchSequenceAsync(
+                sharedLink, holdingJournal, plan, opts, stopFirst.Token);
+            holdingJournal.Entered.Task.GetAwaiter().GetResult();
+            var competingJournal = new TestJournal();
+            Expect<InvalidOperationException>(() =>
+                NativeE39WriteSequence.RunBenchSequenceAsync(
+                    sharedLink, competingJournal, plan, opts, CancellationToken.None)
+                    .GetAwaiter().GetResult());
+            Assert(competingJournal.Events.Count == 0 && sharedLink.Requests.Count == 0,
+                "Second owner cannot write or journal on a link held by first sequence");
+            stopFirst.Cancel();
+            Expect<OperationCanceledException>(() => first.GetAwaiter().GetResult());
+            var afterCancellation = NativeE39WriteSequence.RunBenchSequenceAsync(
+                sharedLink, new TestJournal(), plan, opts, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            Assert(afterCancellation.SectorsWritten == 2 &&
+                   sharedLink.Memory.SequenceEqual(updated),
+                "Canceled preflight releases link and later fresh transaction succeeds");
+        }
 
         Console.WriteLine($"PASS: {count} native E39 offline write transaction self-tests.");
         return count;

@@ -8,6 +8,13 @@ namespace CamaroDiag.J2534Bridge;
 /// access; caller supplies the OEM-defined data, authenticated session and
 /// operator's fresh OK -> Oui/Non consent for a mutating transaction.
 /// </summary>
+internal sealed class UdsServiceRefusal(byte service, byte code) :
+    IOException($"UDS negative response 0x{code:X2}.")
+{
+    internal byte Service { get; } = service;
+    internal byte Code { get; } = code;
+}
+
 internal static class UdsStandardServices
 {
     internal static byte[] Session(byte sessionType) => [0x10, sessionType];
@@ -364,7 +371,7 @@ internal static class UdsStandardServices
         if (response[0] == 0x7F)
         {
             if (response.Length == 3 && response[1] == request[0])
-                throw new IOException($"UDS negative response 0x{response[2]:X2}.");
+                throw new UdsServiceRefusal(response[1], response[2]);
             throw new InvalidDataException("UDS negative response does not correspond to request.");
         }
         if (response[0] != unchecked((byte)(request[0] + 0x40)))
@@ -394,6 +401,51 @@ internal static class UdsStandardServices
             _ = DecodeTransferParameters(request[0], response);
         if (request[0] == 0x19)
         {
+            var subfunction = request[1] & 0x7F;
+            if (subfunction is 0x03 or 0x14 && (request.Length != 2 || (response.Length - 2) % 4 != 0))
+                throw new InvalidDataException("Malformed DTC index or fault counter report.");
+            if ((subfunction is 0x0A or 0x15) && (request.Length != 2 || response.Length < 3 || (response.Length - 3) % 4 != 0))
+                throw new InvalidDataException("Malformed supported DTC inventory.");
+            if ((subfunction is 0x0F or 0x13) && (request.Length != 3 || response.Length < 3 ||
+                (response.Length - 3) % 4 != 0))
+                throw new InvalidDataException("Malformed legacy DTC list.");
+            if ((subfunction is 0x11 or 0x12) && (request.Length != 3 || response.Length != 6))
+                throw new InvalidDataException("Malformed legacy DTC count.");
+            if (subfunction == 0x10 && (request.Length != 6 || response.Length < 6 ||
+                !response.Slice(2, 3).SequenceEqual(request.Slice(2, 3)) ||
+                (response.Length >= 7 && request[5] is not (0xFE or 0xFF) && response[6] != request[5])))
+                throw new InvalidDataException("Wrong legacy mirror-memory DTC detail.");
+            if (subfunction == 5)
+            {
+                if (request.Length != 3 || response.Length < 3 ||
+                    (request[2] != 255 && response[2] != request[2]) ||
+                    (request[2] == 255 && ((response.Length == 3) != (response[2] == 255))))
+                    throw new InvalidDataException("Wrong stored DTC record response.");
+                if (response.Length != 3 && (response.Length < 8 ||
+                    response.Length - 8 < response[7] * 2 ||
+                    (request[2] != 255 && response[7] == 0 && response.Length != 8)))
+                    throw new InvalidDataException("Truncated or inconsistent stored DTC record.");
+            }
+            if (subfunction == 0x16 && (request.Length != 3 || response.Length < 3 || response[2] != request[2]))
+                throw new InvalidDataException("Wrong extended record response.");
+            if (subfunction == 0x1A && (request.Length != 3 || response.Length < 4 ||
+                response[3] != request[2] || (response.Length - 4) % 4 != 0))
+                throw new InvalidDataException("Wrong supported extended record response.");
+            if (subfunction == 0x17 && (request.Length != 4 || response.Length < 4 ||
+                response[2] != request[3] || (response.Length - 4) % 4 != 0))
+                throw new InvalidDataException("Malformed or misdirected user-memory DTC list.");
+            if (subfunction is 0x18 or 0x19)
+            {
+                if (request.Length != 7 || response.Length < 7 || response[2] != request[6] ||
+                    !response.Slice(3, 3).SequenceEqual(request.Slice(2, 3)))
+                    throw new InvalidDataException("Misdirected user-memory DTC detail.");
+                if (response.Length >= 8 && request[5] != 0xFF &&
+                    (subfunction != 0x19 || request[5] != 0xFE) && response[7] != request[5])
+                    throw new InvalidDataException("Wrong user-memory DTC record.");
+            }
+            if (subfunction == 9 && (request.Length != 5 || response.Length is not (3 or 9) ||
+                (response.Length == 9 && !response.Slice(5, 3).SequenceEqual(request.Slice(2, 3)))))
+                throw new InvalidDataException("DTC severity response belongs to another fault.");
             // ISO 14229 WWH-OBD subfunctions echo the functional group
             // immediately after the subfunction. Ignoring it can attribute
             // a safety/legislated group DTC to an emissions request.

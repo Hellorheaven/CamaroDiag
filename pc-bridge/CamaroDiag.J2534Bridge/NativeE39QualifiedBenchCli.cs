@@ -84,9 +84,16 @@ internal static class NativeE39QualifiedBenchCli
                 });
                 metadata.Flush(true);
             }
-            await using var journal = new NativeE39FileWriteJournal(journalPath);
-            var result = await J2534Device.RunQualifiedNativeE39BenchAsync(adapter, qualified.Scope,
-                qualified.Channel, qualified.Policy, original, target, kernel, journal, cancel.Token);
+            NativeE39WriteSequence.Result result;
+            await using (var journal = new NativeE39FileWriteJournal(journalPath))
+            {
+                result = await J2534Device.RunQualifiedNativeE39BenchAsync(
+                    adapter, qualified.Scope, qualified.Channel, qualified.Policy,
+                    original, target, kernel, journal, cancel.Token);
+            }
+            // Durable journal disposal/flush is a separate failure boundary.
+            // Never display success or exit with code zero before that succeeds.
+            cancel.Token.ThrowIfCancellationRequested();
             Console.WriteLine(result);
             Console.WriteLine("Preserve backup and journal. Independent functional bench evaluation remains necessary.");
             return 0;

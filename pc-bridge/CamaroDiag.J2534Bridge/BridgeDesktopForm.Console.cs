@@ -10,6 +10,9 @@ internal sealed partial class BridgeDesktopForm
     private J2534Device? consoleDevice;
     private CancellationTokenSource? doIpConsoleDiscoveryCancellation;
     private readonly TextBox doIpConsoleHost = new() { Dock = DockStyle.Fill };
+    private readonly TextBox doIpExpectedVin = new()
+        { Dock = DockStyle.Fill, MaxLength = 17, CharacterCasing = CharacterCasing.Upper };
+    private bool doIpPublishingHost;
     private readonly Button doIpConsoleDiscover = Button(DoIpConsolePresentation.Text("Discover"));
     private readonly Button doIpConsoleCancel = Button(DoIpConsolePresentation.Text("Cancel"));
     private readonly Button doIpConsoleStatus = Button(DoIpConsolePresentation.Text("Status"));
@@ -17,10 +20,90 @@ internal sealed partial class BridgeDesktopForm
     private DoIpVehicleDiscovery.Identity? doIpObservedGateway;
     private readonly TextBox doIpTesterAddress = new() { Dock = DockStyle.Fill };
     private readonly TextBox doIpEcuAddress = new() { Dock = DockStyle.Fill };
+    private readonly TextBox doIpInventoryAddresses = new() { Dock = DockStyle.Fill, MaxLength = 79,
+        CharacterCasing = CharacterCasing.Upper };
+    private readonly Button doIpInventory = Button(DoIpConsolePresentation.Text("Inventory"));
+    private readonly Button doIpObdInventory = Button(DoIpConsolePresentation.Text("ObdInventory"));
     private readonly CheckBox doIpUseTls = new()
         { Text = DoIpConsolePresentation.Text("UseTls"), Checked = true, AutoSize = true };
     private readonly TextBox doIpClientCertificate = new() { Dock = DockStyle.Fill };
+    private readonly TextBox doIpP2 = new() { Dock = DockStyle.Fill, MaxLength = 5 };
+    private readonly TextBox doIpP2Star = new() { Dock = DockStyle.Fill, MaxLength = 5 };
+    private readonly TextBox doIpRoutingType = new() { Dock = DockStyle.Fill, MaxLength = 2, Text = "00", CharacterCasing = CharacterCasing.Upper };
+    private readonly TextBox doIpRoutingOem = new() { Dock = DockStyle.Fill, MaxLength = 8, CharacterCasing = CharacterCasing.Upper };
+    private enum DoIpReadOperation { Vin, Dtcs, DtcCount, DtcSnapshot, DtcExtended, Did, MonitorDid, Backup, Exchange, ObdIdentify, ObdDid, ObdMonitor, WwhMask, WwhPermanent, WwhReadiness, MultiDid, ObdMultiDid, ScalingDid, SupportedDtcs, PermanentDtcs, SnapshotIndex, MultiMonitor, ObdMultiMonitor, FirstFailed, FirstConfirmed, RecentFailed, RecentConfirmed, FaultCounters, SeverityCount, SeverityList, SeverityInfo, Inventory, ObdInventory, MemoryDtcs, MemorySnapshot, MemoryExtended, ExtendedRecordSupport, ExtendedRecordData, MirrorDtcs, MirrorCount, MirrorExtended, LegacyEmissionsDtcs, LegacyEmissionsCount, StoredRecord, AllStoredRecords, DecodedSnapshot, DecodedExtended, MemoryDecodedSnapshot, MemoryDecodedExtended, DecodedStoredRecord }
+    private readonly Button doIpCountDtcs = Button(DoIpConsolePresentation.Text("CountDtcs"));
+    private readonly Button doIpSupportedDtcs = Button(DoIpConsolePresentation.Text("SupportedDtcs"));
+    private readonly Button doIpPermanentDtcs = Button(DoIpConsolePresentation.Text("PermanentDtcs"));
+    private readonly TextBox doIpDtcMemory = new() { Dock = DockStyle.Fill, MaxLength = 2, CharacterCasing = CharacterCasing.Upper };
+    private readonly Button doIpMemoryDtcs = Button(DoIpConsolePresentation.Text("MemoryDtcs"));
+    private readonly Button doIpMemorySnapshot = Button(DoIpConsolePresentation.Text("MemorySnapshot"));
+    private readonly Button doIpMemoryExtended = Button(DoIpConsolePresentation.Text("MemoryExtended"));
+    private readonly Button doIpMemoryDecodedSnapshot = Button(DoIpConsolePresentation.Text("MemoryDecodedSnapshot"));
+    private readonly Button doIpMemoryDecodedExtended = Button(DoIpConsolePresentation.Text("MemoryDecodedExtended"));
+    private readonly TextBox doIpExtendedRecordSize = new() { Dock = DockStyle.Fill, MaxLength = 4 };
+    private readonly Button doIpStoredRecord = Button(DoIpConsolePresentation.Text("StoredRecord"));
+    private readonly TextBox doIpStoredCatalog = new() { Dock = DockStyle.Fill, MaxLength = 2549, CharacterCasing = CharacterCasing.Upper };
+    private readonly Button doIpAllStoredRecords = Button(DoIpConsolePresentation.Text("AllStoredRecords"));
+    private readonly Button doIpDecodedStoredRecord = Button(DoIpConsolePresentation.Text("DecodedStoredRecord"));
+    private readonly Button doIpDecodedSnapshot = Button(DoIpConsolePresentation.Text("DecodedSnapshot"));
+    private readonly Button doIpObdDecodedSnapshot = Button(DoIpConsolePresentation.Text("ObdDecodedSnapshot"));
+    private readonly TextBox doIpExtendedCatalog = new() { Dock = DockStyle.Fill, MaxLength = 1911, CharacterCasing = CharacterCasing.Upper };
+    private readonly Button doIpDecodedExtended = Button(DoIpConsolePresentation.Text("DecodedExtended"));
+    private readonly Button doIpObdDecodedExtended = Button(DoIpConsolePresentation.Text("ObdDecodedExtended"));
+    private readonly Button doIpExtendedRecordSupport = Button(DoIpConsolePresentation.Text("ExtendedRecordSupport"));
+    private readonly Button doIpExtendedRecordData = Button(DoIpConsolePresentation.Text("ExtendedRecordData"));
+    private readonly Button doIpMirrorDtcs = Button(DoIpConsolePresentation.Text("LegacyMirrorDtcs"));
+    private readonly Button doIpMirrorCount = Button(DoIpConsolePresentation.Text("LegacyMirrorCount"));
+    private readonly Button doIpMirrorExtended = Button(DoIpConsolePresentation.Text("LegacyMirrorExtended"));
+    private readonly Button doIpLegacyEmissionsDtcs = Button(DoIpConsolePresentation.Text("LegacyEmissionsDtcs"));
+    private readonly Button doIpLegacyEmissionsCount = Button(DoIpConsolePresentation.Text("LegacyEmissionsCount"));
+    private readonly Button doIpFaultCounters = Button(DoIpConsolePresentation.Text("FaultCounters"));
+    private readonly TextBox doIpSeverityMask = new() { Dock = DockStyle.Fill, Text = "FF", MaxLength = 2 };
+    private readonly Button doIpSeverityCount = Button(DoIpConsolePresentation.Text("SeverityCount"));
+    private readonly Button doIpSeverityList = Button(DoIpConsolePresentation.Text("SeverityList"));
+    private readonly Button doIpSeverityInfo = Button(DoIpConsolePresentation.Text("SeverityInfo"));
+    private readonly Button doIpFirstFailed = Button(DoIpConsolePresentation.Text("FirstFailed"));
+    private readonly Button doIpFirstConfirmed = Button(DoIpConsolePresentation.Text("FirstConfirmed"));
+    private readonly Button doIpRecentFailed = Button(DoIpConsolePresentation.Text("RecentFailed"));
+    private readonly Button doIpRecentConfirmed = Button(DoIpConsolePresentation.Text("RecentConfirmed"));
+    private readonly Button doIpSnapshotIndex = Button(DoIpConsolePresentation.Text("SnapshotIndex"));
+    private readonly Button doIpObdDtcs = Button(DoIpConsolePresentation.Text("ObdDtcs"));
+    private readonly Button doIpObdCount = Button(DoIpConsolePresentation.Text("ObdCount"));
+    private readonly Button doIpObdSnapshot = Button(DoIpConsolePresentation.Text("ObdSnapshot"));
+    private readonly Button doIpObdExtended = Button(DoIpConsolePresentation.Text("ObdExtended"));
+    private readonly Button doIpSnapshot = Button(DoIpConsolePresentation.Text("Snapshot"));
+    private readonly Button doIpExtended = Button(DoIpConsolePresentation.Text("Extended"));
+    private readonly TextBox doIpDetailDtc = new() { Dock = DockStyle.Fill, MaxLength = 6 };
+    private readonly TextBox doIpDetailRecord = new() { Dock = DockStyle.Fill, MaxLength = 2, Text = "01" };
+    private readonly TextBox doIpPayload = new() { Dock = DockStyle.Fill, MaxLength = 12288 };
+    private readonly Button doIpExchange = Button(DoIpConsolePresentation.Text("Exchange"));
+    private readonly Button doIpBackup = Button(DoIpConsolePresentation.Text("Backup"));
+    private readonly Button doIpVerifyBackup = Button(DoIpConsolePresentation.Text("BackupVerify"));
+    private readonly Button doIpMonitorDid = Button(DoIpConsolePresentation.Text("MonitorDid"));
+    private readonly Button doIpObdMonitor = Button(DoIpConsolePresentation.Text("ObdMonitor"));
+    private readonly Button doIpMultiMonitor = Button(DoIpConsolePresentation.Text("MultiMonitor"));
+    private readonly Button doIpObdMultiMonitor = Button(DoIpConsolePresentation.Text("ObdMultiMonitor"));
+    private readonly NumericUpDown doIpMonitorInterval = new()
+        { Minimum = 250, Maximum = 60000, Increment = 250, Value = 1000, Dock = DockStyle.Fill };
+    private readonly NumericUpDown doIpMonitorCount = new()
+        { Minimum = 1, Maximum = 3600, Value = 60, Dock = DockStyle.Fill };
+    private readonly Button doIpReadDid = Button(DoIpConsolePresentation.Text("ReadDid"));
+    private readonly Button doIpScalingDid = Button(DoIpConsolePresentation.Text("ScalingDid"));
+    private readonly Button doIpObdIdentify = Button(DoIpConsolePresentation.Text("ObdIdentify"));
+    private readonly Button doIpObdDid = Button(DoIpConsolePresentation.Text("ObdRead"));
+    private readonly Button doIpMultiRead = Button(DoIpConsolePresentation.Text("MultiRead"));
+    private readonly Button doIpObdMultiRead = Button(DoIpConsolePresentation.Text("ObdMultiRead"));
+    private readonly TextBox doIpMultiLayout = new() { Dock = DockStyle.Fill, MaxLength = 256 };
+    private readonly Button doIpWwhMask = Button(DoIpConsolePresentation.Text("WwhMask"));
+    private readonly Button doIpWwhPermanent = Button(DoIpConsolePresentation.Text("WwhPermanent"));
+    private readonly Button doIpWwhReadiness = Button(DoIpConsolePresentation.Text("WwhReadiness"));
+    private readonly TextBox doIpWwhSeverity = new() { Dock = DockStyle.Fill, Text = "FF", MaxLength = 2 };
+    private readonly TextBox doIpWwhGroup = new() { Dock = DockStyle.Fill, MaxLength = 2 };
+    private readonly TextBox doIpDid = new() { Dock = DockStyle.Fill };
     private readonly Button doIpReadVin = Button(DoIpConsolePresentation.Text("ReadVin"));
+    private readonly Button doIpReadDtcs = Button(DoIpConsolePresentation.Text("ReadDtcs"));
+    private readonly TextBox doIpDtcMask = new() { Dock = DockStyle.Fill, Text = "FF" };
     private readonly TextBox consoleRequestId = new()
         { Text = "7E0", Dock = DockStyle.Fill };
     private readonly TextBox consoleResponseId = new()
@@ -79,6 +162,7 @@ internal sealed partial class BridgeDesktopForm
         consoleBattery.Click += async (_, _) => await ConsoleBatteryAsync();
         consoleSave.Click += (_, _) => SaveConsoleHistory();
         WideRow(fields, identityButtons, 48);
+        Row(fields, DoIpConsolePresentation.Text("ExpectedVin"), doIpExpectedVin);
         Row(fields, DoIpConsolePresentation.Text("Host"), doIpConsoleHost, doIpConsoleDiscover);
         doIpConsoleCancel.Enabled = false;
         doIpConsoleDiscover.Click += async (_, _) => await DiscoverDoIpFromConsoleAsync();
@@ -87,48 +171,212 @@ internal sealed partial class BridgeDesktopForm
         doIpOperations.Controls.Add(doIpConsoleStatus);
         doIpOperations.Controls.Add(doIpConsolePower);
         doIpOperations.Controls.Add(doIpConsoleCancel);
-        doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
+        SetDoIpOperationButtons(false);
         doIpConsoleStatus.Click += async (_, _) => await RunDoIpConsoleOperationAsync(false);
         doIpConsolePower.Click += async (_, _) => await RunDoIpConsoleOperationAsync(true);
         doIpConsoleHost.TextChanged += (_, _) =>
         {
+            if (doIpPublishingHost) return;
             doIpObservedGateway = null;
-            doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
+            SetDoIpOperationButtons(false);
             doIpConsoleDiscoveryCancellation?.Cancel();
         };
         WideRow(fields, doIpOperations, 48);
         Row(fields, DoIpConsolePresentation.Text("TesterAddress"), doIpTesterAddress);
         Row(fields, DoIpConsolePresentation.Text("EcuAddress"), doIpEcuAddress, doIpReadVin);
+        Row(fields, DoIpConsolePresentation.Text("InventoryAddresses"), doIpInventoryAddresses, doIpInventory);
+        doIpInventory.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.Inventory);
+        WideRow(fields, doIpObdInventory, 38);
+        doIpObdInventory.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.ObdInventory);
         WideRow(fields, doIpUseTls, 38);
         Row(fields, DoIpConsolePresentation.Text("CertThumbprint"), doIpClientCertificate);
-        doIpReadVin.Enabled = false;
-        doIpReadVin.Click += async (_, _) => await ReadDoIpVinFromConsoleAsync();
+        Row(fields, DoIpConsolePresentation.Text("SessionP2"), doIpP2);
+        Row(fields, DoIpConsolePresentation.Text("SessionP2Star"), doIpP2Star);
+        Row(fields, DoIpConsolePresentation.Text("RoutingType"), doIpRoutingType);
+        Row(fields, DoIpConsolePresentation.Text("RoutingOem"), doIpRoutingOem);
+        SetDoIpOperationButtons(false);
+        doIpReadVin.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.Vin);
+        Row(fields, DoIpConsolePresentation.Text("DtcMask"), doIpDtcMask, doIpReadDtcs);
+        doIpReadDtcs.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.Dtcs);
+        WideRow(fields, doIpCountDtcs, 38);
+        Row(fields, DoIpConsolePresentation.Text("SeverityMask"), doIpSeverityMask, doIpSeverityList);
+        WideRow(fields, doIpSeverityCount, 38);
+        WideRow(fields, doIpSeverityInfo, 38);
+        doIpSeverityCount.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.SeverityCount);
+        doIpSeverityList.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.SeverityList);
+        doIpSeverityInfo.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.SeverityInfo);
+        Row(fields, DoIpConsolePresentation.Text("DetailDtc"), doIpDetailDtc, doIpSnapshot);
+        Row(fields, DoIpConsolePresentation.Text("DetailRecord"), doIpDetailRecord, doIpExtended);
+        doIpSnapshot.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.DtcSnapshot);
+        doIpExtended.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.DtcExtended);
+        doIpCountDtcs.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.DtcCount);
+        WideRow(fields, doIpSupportedDtcs, 38);
+        foreach (var (button, op) in new[] {
+            (doIpMirrorDtcs, DoIpReadOperation.MirrorDtcs), (doIpMirrorCount, DoIpReadOperation.MirrorCount),
+            (doIpMirrorExtended, DoIpReadOperation.MirrorExtended), (doIpLegacyEmissionsDtcs, DoIpReadOperation.LegacyEmissionsDtcs),
+            (doIpLegacyEmissionsCount, DoIpReadOperation.LegacyEmissionsCount) })
+        {
+            WideRow(fields, button, 38);
+            button.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(op);
+        }
+        WideRow(fields, doIpStoredRecord, 38);
+        doIpStoredRecord.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.StoredRecord);
+        Row(fields, DoIpConsolePresentation.Text("StoredCatalog"), doIpStoredCatalog, doIpAllStoredRecords);
+        doIpAllStoredRecords.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.AllStoredRecords);
+        WideRow(fields, doIpDecodedStoredRecord, 38);
+        doIpDecodedStoredRecord.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.DecodedStoredRecord);
+        WideRow(fields, doIpDecodedSnapshot, 38);
+        WideRow(fields, doIpObdDecodedSnapshot, 38);
+        doIpDecodedSnapshot.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.DecodedSnapshot);
+        doIpObdDecodedSnapshot.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.DecodedSnapshot, true);
+        Row(fields, DoIpConsolePresentation.Text("ExtendedCatalog"), doIpExtendedCatalog, doIpDecodedExtended);
+        WideRow(fields, doIpObdDecodedExtended, 38);
+        doIpDecodedExtended.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.DecodedExtended);
+        doIpObdDecodedExtended.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.DecodedExtended, true);
+        WideRow(fields, doIpExtendedRecordSupport, 38);
+        Row(fields, DoIpConsolePresentation.Text("ExtendedRecordSize"), doIpExtendedRecordSize, doIpExtendedRecordData);
+        doIpExtendedRecordSupport.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.ExtendedRecordSupport);
+        doIpExtendedRecordData.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.ExtendedRecordData);
+        Row(fields, DoIpConsolePresentation.Text("MemorySelection"), doIpDtcMemory, doIpMemoryDtcs);
+        WideRow(fields, doIpMemorySnapshot, 38);
+        WideRow(fields, doIpMemoryExtended, 38);
+        doIpMemoryDtcs.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.MemoryDtcs);
+        doIpMemorySnapshot.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.MemorySnapshot);
+        doIpMemoryExtended.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.MemoryExtended);
+        WideRow(fields, doIpMemoryDecodedSnapshot, 38);
+        WideRow(fields, doIpMemoryDecodedExtended, 38);
+        doIpMemoryDecodedSnapshot.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.MemoryDecodedSnapshot);
+        doIpMemoryDecodedExtended.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.MemoryDecodedExtended);
+        WideRow(fields, doIpPermanentDtcs, 38);
+        doIpPermanentDtcs.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.PermanentDtcs);
+        WideRow(fields, doIpFaultCounters, 38);
+        doIpFaultCounters.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.FaultCounters);
+        WideRow(fields, doIpFirstFailed, 38);
+        doIpFirstFailed.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.FirstFailed);
+        WideRow(fields, doIpFirstConfirmed, 38);
+        doIpFirstConfirmed.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.FirstConfirmed);
+        WideRow(fields, doIpRecentFailed, 38);
+        doIpRecentFailed.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.RecentFailed);
+        WideRow(fields, doIpRecentConfirmed, 38);
+        doIpRecentConfirmed.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.RecentConfirmed);
+        WideRow(fields, doIpSnapshotIndex, 38);
+        doIpSupportedDtcs.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.SupportedDtcs);
+        doIpSnapshotIndex.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.SnapshotIndex);
+        WideRow(fields, doIpObdDtcs, 38);
+        WideRow(fields, doIpObdCount, 38);
+        WideRow(fields, doIpObdSnapshot, 38);
+        WideRow(fields, doIpObdExtended, 38);
+        doIpObdDtcs.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.Dtcs, true);
+        doIpObdCount.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.DtcCount, true);
+        doIpObdSnapshot.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.DtcSnapshot, true);
+        doIpObdExtended.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.DtcExtended, true);
+        Row(fields, DoIpConsolePresentation.Text("Payload"), doIpPayload, doIpExchange);
+        doIpExchange.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.Exchange);
+        Row(fields, DoIpConsolePresentation.Text("DidLabel"), doIpDid, doIpReadDid);
+        doIpReadDid.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.Did);
+        WideRow(fields, doIpScalingDid, 38);
+        doIpScalingDid.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.ScalingDid);
+        WideRow(fields, doIpObdIdentify, 38);
+        WideRow(fields, doIpObdDid, 38);
+        doIpObdIdentify.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.ObdIdentify);
+        doIpObdDid.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.ObdDid);
+        Row(fields, DoIpConsolePresentation.Text("MultiLayout"), doIpMultiLayout, doIpMultiRead);
+        WideRow(fields, doIpObdMultiRead, 38);
+        doIpMultiRead.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.MultiDid);
+        doIpObdMultiRead.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.ObdMultiDid);
+        Row(fields, DoIpConsolePresentation.Text("WwhSeverity"), doIpWwhSeverity, doIpWwhMask);
+        WideRow(fields, doIpWwhPermanent, 38);
+        Row(fields, DoIpConsolePresentation.Text("WwhGroup"), doIpWwhGroup, doIpWwhReadiness);
+        doIpWwhMask.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.WwhMask);
+        doIpWwhPermanent.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.WwhPermanent);
+        doIpWwhReadiness.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.WwhReadiness);
+        Row(fields, DoIpConsolePresentation.Text("MonitorInterval"), doIpMonitorInterval, doIpMonitorDid);
+        Row(fields, DoIpConsolePresentation.Text("MonitorCount"), doIpMonitorCount);
+        doIpMonitorDid.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.MonitorDid);
+        WideRow(fields, doIpObdMonitor, 38);
+        doIpObdMonitor.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.ObdMonitor);
+        WideRow(fields, doIpMultiMonitor, 38);
+        WideRow(fields, doIpObdMultiMonitor, 38);
+        doIpMultiMonitor.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.MultiMonitor);
+        doIpObdMultiMonitor.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.ObdMultiMonitor);
+        var backupButtons = new FlowLayoutPanel { Dock = DockStyle.Fill };
+        backupButtons.Controls.Add(doIpBackup);
+        backupButtons.Controls.Add(doIpVerifyBackup);
+        WideRow(fields, backupButtons, 48);
+        doIpVerifyBackup.Click += async (_, _) => await VerifyDoIpBackupFromConsoleAsync();
+        doIpBackup.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.Backup);
         // A logical endpoint or security-mode change invalidates the
         // previously selected diagnostic context, even with the same IP.
         // Require new discovery rather than retaining stale gateway evidence.
         void InvalidateDoIpContext(object? sender, EventArgs args)
         {
             doIpObservedGateway = null;
-            doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
+            SetDoIpOperationButtons(false);
             doIpConsoleDiscoveryCancellation?.Cancel();
         }
+        doIpExpectedVin.TextChanged += InvalidateDoIpContext;
         doIpTesterAddress.TextChanged += InvalidateDoIpContext;
         doIpEcuAddress.TextChanged += InvalidateDoIpContext;
         doIpUseTls.CheckedChanged += InvalidateDoIpContext;
         doIpClientCertificate.TextChanged += InvalidateDoIpContext;
-        WideRow(fields, new Label
+        doIpRoutingType.TextChanged += InvalidateDoIpContext;
+        doIpRoutingOem.TextChanged += InvalidateDoIpContext;
+        doIpInventoryAddresses.TextChanged += (_, _) =>
         {
-            Text = "Console J2534 locale : TX et RX séparés ; commandes ECU transmises selon " +
-                "le protocole et le pilote réellement sélectionnés, sans liste blanche CamaroDiag. " +
-                "Les écritures et déverrouillages restent soumis aux réponses du calculateur. " +
-                "Fermez ce canal avant de démarrer le pont Android.",
-            Dock = DockStyle.Fill, AutoSize = true, ForeColor = Color.DarkSlateGray
-        }, 78);
+            if (doIpConsoleDiscoveryCancellation is null) SetDoIpOperationButtons(true);
+        };
+        // WideRow(fields, new Label
+        // {
+        // Text = "Console J2534 locale : TX et RX séparés ; commandes ECU transmises selon " +
+        // "le protocole et le pilote réellement sélectionnés, sans liste blanche CamaroDiag. " +
+        // "Les écritures et déverrouillages restent soumis aux réponses du calculateur. " +
+        // "Fermez ce canal avant de démarrer le pont Android.",
+        // Dock = DockStyle.Fill, AutoSize = true, ForeColor = Color.DarkSlateGray
+        // }, 78);
         outer.Controls.Add(fields, 0, 0);
         outer.Controls.Add(consoleHistory, 0, 1);
         tab.Controls.Add(outer);
         ConsoleLine("SYSTEM", "Console prête. Sélectionnez l'interface dans Connexion Android et ouvrez un canal.", Color.DarkSlateGray);
         return tab;
+    }
+
+    // A discovered gateway is not proof of every ECU's diagnostic capabilities.
+    // Keep the operation controls aligned with the address and identity
+    // prerequisites; actual service support remains determined by ECU replies.
+    private void SetDoIpOperationButtons(bool allow)
+    {
+        var ready = DoIpConsolePresentation.EvaluateTarget(allow ? doIpObservedGateway : null,
+            doIpConsoleHost.Text.Trim(), doIpExpectedVin.Text.Trim(), doIpTesterAddress.Text.Trim(),
+            doIpEcuAddress.Text.Trim(), doIpInventoryAddresses.Text.Trim());
+        doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = ready.Gateway;
+        doIpInventory.Enabled = doIpObdInventory.Enabled = ready.Inventory;
+        foreach (var button in new[]
+        {
+            doIpSeverityCount, doIpSeverityList, doIpSeverityInfo, doIpFaultCounters,
+            doIpFirstFailed, doIpFirstConfirmed, doIpRecentFailed, doIpRecentConfirmed,
+            doIpSupportedDtcs, doIpPermanentDtcs, doIpSnapshotIndex, doIpReadDtcs,
+            doIpCountDtcs, doIpSnapshot, doIpExtended, doIpBackup,
+            doIpMonitorDid, doIpScalingDid, doIpReadDid, doIpReadVin
+        }) button.Enabled = ready.SingleEcu;
+        foreach (var button in new[]
+        {
+            doIpObdDtcs, doIpObdCount, doIpObdSnapshot, doIpObdExtended,
+            doIpObdIdentify, doIpObdDid, doIpObdMonitor, doIpObdMultiRead,
+            doIpObdMultiMonitor, doIpWwhMask, doIpWwhPermanent, doIpWwhReadiness,
+            doIpMultiRead, doIpMultiMonitor, doIpExchange, doIpMirrorDtcs,
+            doIpMirrorCount, doIpMirrorExtended, doIpLegacyEmissionsDtcs, doIpLegacyEmissionsCount,
+            doIpStoredRecord, doIpAllStoredRecords, doIpDecodedStoredRecord, doIpDecodedSnapshot,
+            doIpObdDecodedSnapshot, doIpDecodedExtended, doIpObdDecodedExtended, doIpExtendedRecordSupport,
+            doIpExtendedRecordData, doIpMemoryDtcs, doIpMemorySnapshot, doIpMemoryExtended,
+            doIpMemoryDecodedSnapshot, doIpMemoryDecodedExtended
+        }) button.Enabled = ready.ExplicitVinEcu;
+    }
+
+    private void JournalDoIpUdp(string direction, System.Net.IPEndPoint endpoint, byte[] pdu)
+    {
+        if (IsDisposed || Disposing) return;
+        ConsoleLine(direction, "DoIP UDP " + endpoint + " PDU " + Convert.ToHexString(pdu),
+            direction == "TX" ? Color.DarkOrange : Color.DarkGreen);
     }
 
     private Task DiscoverDoIpFromConsoleAsync() => RunDoIpConsoleOperationAsync(null);
@@ -143,11 +391,16 @@ internal sealed partial class BridgeDesktopForm
             return;
         }
         var host = doIpConsoleHost.Text.Trim();
-        if (!System.Net.IPAddress.TryParse(host, out var address) ||
-            address.Equals(System.Net.IPAddress.Any) ||
-            address.Equals(System.Net.IPAddress.IPv6Any) ||
-            address.Equals(System.Net.IPAddress.Broadcast) ||
-            address.IsIPv6Multicast)
+        var vin = doIpExpectedVin.Text.Trim();
+        var auto = !powerMode.HasValue && host.Length == 0;
+        if ((auto || vin.Length != 0) && !DoIpVehicleDiscovery.IsVehicleVin(vin))
+        {
+            ShowError(DoIpConsolePresentation.Text("InvalidExpectedVin"));
+            return;
+        }
+        System.Net.IPAddress? address = null;
+        if (!auto && (!System.Net.IPAddress.TryParse(host, out address) ||
+            !DoIpVehicleDiscovery.IsExplicitUnicast(address)))
         {
             ShowError(DoIpConsolePresentation.Text("InvalidHost"));
             return;
@@ -163,8 +416,9 @@ internal sealed partial class BridgeDesktopForm
         var timeout = TimeSpan.FromMilliseconds((int)consoleTimeout.Value);
         using var stop = new CancellationTokenSource();
         doIpConsoleDiscoveryCancellation = stop;
-        doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
-        doIpConsoleHost.Enabled = false;
+        doIpConsoleDiscover.Enabled = false;
+        SetDoIpOperationButtons(false);
+        doIpConsoleHost.Enabled = doIpExpectedVin.Enabled = false;
         doIpConsoleCancel.Enabled = true;
         try
         {
@@ -175,44 +429,57 @@ internal sealed partial class BridgeDesktopForm
                     if (powerMode.HasValue)
                     {
                         var version = observed!.ProtocolVersion;
+                        var selectedAddress = observed.Source;
                         ConsoleLine("SYSTEM", string.Format(
-                            DoIpConsolePresentation.Text("StatusStarted"), address, version),
+                            DoIpConsolePresentation.Text("StatusStarted"), selectedAddress, version),
                             Color.DarkSlateGray);
+                        await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(observed, timeout,
+                            stop.Token, JournalDoIpUdp);
                         var response = await DoIpVehicleDiscovery.QueryStatusAsync(
-                            address.ToString(), powerMode.Value, timeout, stop.Token,
-                            protocolVersion: version);
+                            selectedAddress.ToString(), powerMode.Value, timeout, stop.Token,
+                            protocolVersion: version, trace: JournalDoIpUdp);
                         stop.Token.ThrowIfCancellationRequested();
                         if (IsDisposed || Disposing) return;
                         ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatStatus(
                             response, powerMode.Value), Color.DarkGreen);
-                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("StatusNotice"),
-                            Color.DarkSlateGray);
+                        // ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("StatusNotice"),
+                            // Color.DarkSlateGray);
                     }
                     else
                     {
-                        ConsoleLine("SYSTEM", string.Format(
-                            DoIpConsolePresentation.Text("Started"), address), Color.DarkSlateGray);
-                        var identity = await DoIpVehicleDiscovery.DiscoverAsync(
-                            address.ToString(), timeout, stop.Token);
+                        ConsoleLine("SYSTEM", auto
+                            ? string.Format(DoIpConsolePresentation.Text("VinDiscoveryStarted"), vin)
+                            : string.Format(DoIpConsolePresentation.Text("Started"), address), Color.DarkSlateGray);
+                        var identity = auto
+                            ? await DoIpVehicleDiscovery.DiscoverUniqueVinAsync(vin, timeout, stop.Token,
+                                trace: JournalDoIpUdp)
+                            : await DoIpVehicleDiscovery.DiscoverAsync(address!.ToString(), timeout, stop.Token,
+                                vin: vin.Length == 0 ? null : vin, trace: JournalDoIpUdp);
                         stop.Token.ThrowIfCancellationRequested();
                         if (IsDisposed || Disposing) return;
+                        if (auto)
+                        {
+                            doIpPublishingHost = true;
+                            try { doIpConsoleHost.Text = identity.Source.ToString(); }
+                            finally { doIpPublishingHost = false; }
+                        }
                         doIpObservedGateway = identity;
                         ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatIdentity(identity),
                             Color.DarkGreen);
-                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Notice"),
-                            Color.DarkSlateGray);
+                        // ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Notice"),
+                            // Color.DarkSlateGray);
                     }
                 }
                 catch (OperationCanceledException) when (stop.IsCancellationRequested)
                 {
-                    doIpObservedGateway = null;
+                    if (!powerMode.HasValue) doIpObservedGateway = null;
                     if (!IsDisposed && !Disposing)
                         ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Canceled"),
                             Color.DarkSlateGray);
                 }
                 catch
                 {
-                    doIpObservedGateway = null;
+                    if (!powerMode.HasValue) doIpObservedGateway = null;
                     throw;
                 }
             });
@@ -222,15 +489,15 @@ internal sealed partial class BridgeDesktopForm
             doIpConsoleDiscoveryCancellation = null;
             if (!IsDisposed && !Disposing)
             {
-                doIpConsoleHost.Enabled = true;
+                doIpConsoleHost.Enabled = doIpExpectedVin.Enabled = true;
                 doIpConsoleDiscover.Enabled = true;
-                doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = doIpObservedGateway is not null;
+                SetDoIpOperationButtons(true);
                 doIpConsoleCancel.Enabled = false;
             }
         }
     }
 
-    private async Task ReadDoIpVinFromConsoleAsync()
+    private async Task ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation operation, bool obdDtc = false)
     {
         if (busy || doIpConsoleDiscoveryCancellation is not null) return;
         if (consoleDevice is not null || bridgeTask is { IsCompleted: false })
@@ -248,17 +515,156 @@ internal sealed partial class BridgeDesktopForm
         }
         ushort tester;
         ushort ecu;
+        ushort[]? inventoryTargets = null;
         try
         {
             tester = DoIpVinReader.ParseLogicalAddress(doIpTesterAddress.Text.Trim());
-            ecu = DoIpVinReader.ParseLogicalAddress(doIpEcuAddress.Text.Trim());
-            if (tester == ecu) throw new ArgumentException();
+            if (operation is DoIpReadOperation.Inventory or DoIpReadOperation.ObdInventory)
+            {
+                inventoryTargets = DoIpVinReader.ParseInventoryAddresses(doIpInventoryAddresses.Text.Trim());
+                if (inventoryTargets.Contains(tester)) throw new ArgumentException();
+                ecu = inventoryTargets[0]; // Only for common context; inventory uses each explicit address.
+            }
+            else ecu = DoIpVinReader.ParseLogicalAddress(doIpEcuAddress.Text.Trim());
+            if (tester == ecu || tester == observed.LogicalAddress) throw new ArgumentException();
         }
         catch (ArgumentException)
         {
             ShowError(DoIpConsolePresentation.Text("InvalidLogical"));
             return;
         }
+        byte legacySub = operation switch
+        {
+            DoIpReadOperation.MirrorDtcs => 0x0F, DoIpReadOperation.MirrorExtended => 0x10,
+            DoIpReadOperation.MirrorCount => 0x11, DoIpReadOperation.LegacyEmissionsCount => 0x12,
+            DoIpReadOperation.LegacyEmissionsDtcs => 0x13, _ => 0
+        };
+        byte storedRecord = 0;
+        if (operation is DoIpReadOperation.StoredRecord or DoIpReadOperation.DecodedStoredRecord)
+        {
+            try
+            {
+                storedRecord = DoIpConsolePresentation.ParseDtcMask(doIpDetailRecord.Text.Trim());
+                _ = ObdOnUdsServices.ReadStoredRecord(storedRecord);
+            }
+            catch (ArgumentException)
+            {
+                ShowError(DoIpConsolePresentation.Text("InvalidStoredRecord"));
+                return;
+            }
+        }
+        Dictionary<byte, int>? extendedCatalog = null;
+        if (operation is DoIpReadOperation.DecodedExtended or DoIpReadOperation.MemoryDecodedExtended)
+        {
+            try { extendedCatalog = ObdOnUdsServices.ParseExtendedRecordLengths(doIpExtendedCatalog.Text.Trim()); }
+            catch (ArgumentException) { ShowError(DoIpConsolePresentation.Text("InvalidExtendedCatalog")); return; }
+        }
+        Dictionary<ushort, int>? storedCatalog = null;
+        if (operation is DoIpReadOperation.AllStoredRecords or DoIpReadOperation.DecodedSnapshot or DoIpReadOperation.MemoryDecodedSnapshot or DoIpReadOperation.DecodedStoredRecord)
+        {
+            try { storedCatalog = ObdOnUdsServices.ParseStoredDidLengths(doIpStoredCatalog.Text.Trim()); }
+            catch (ArgumentException) { ShowError(DoIpConsolePresentation.Text("InvalidStoredCatalog")); return; }
+        }
+        bool extendedRecordRead = operation is DoIpReadOperation.ExtendedRecordSupport or DoIpReadOperation.ExtendedRecordData;
+        byte extendedRecord = 0;
+        int? extendedRecordSize = null;
+        if (extendedRecordRead)
+        {
+            try
+            {
+                extendedRecord = DoIpConsolePresentation.ParseDtcMask(doIpDetailRecord.Text.Trim());
+                if (operation == DoIpReadOperation.ExtendedRecordData)
+                {
+                    if (!int.TryParse(doIpExtendedRecordSize.Text.Trim(), System.Globalization.NumberStyles.None,
+                        System.Globalization.CultureInfo.InvariantCulture, out var size)) throw new ArgumentException();
+                    extendedRecordSize = size;
+                }
+                _ = ObdOnUdsServices.ReadExtendedRecord(extendedRecord, extendedRecordSize);
+            }
+            catch (ArgumentException) { ShowError(DoIpConsolePresentation.Text("InvalidExtendedRecord")); return; }
+        }
+        byte memory = 0;
+        bool memoryRead = operation is DoIpReadOperation.MemoryDtcs or DoIpReadOperation.MemorySnapshot or DoIpReadOperation.MemoryExtended or DoIpReadOperation.MemoryDecodedSnapshot or DoIpReadOperation.MemoryDecodedExtended;
+        if (memoryRead)
+        {
+            try { memory = DoIpConsolePresentation.ParseDtcMask(doIpDtcMemory.Text.Trim()); }
+            catch (ArgumentException) { ShowError(DoIpConsolePresentation.Text("InvalidMemorySelection")); return; }
+        }
+        byte dtcMask = 0;
+        bool severityFilter = operation is DoIpReadOperation.SeverityCount or DoIpReadOperation.SeverityList;
+        if ((legacySub != 0 && legacySub != 0x10) || severityFilter || operation is DoIpReadOperation.Dtcs or DoIpReadOperation.DtcCount or DoIpReadOperation.WwhMask or DoIpReadOperation.MemoryDtcs)
+        {
+            try { dtcMask = DoIpConsolePresentation.ParseDtcMask(doIpDtcMask.Text.Trim()); }
+            catch (ArgumentException)
+            {
+                ShowError(DoIpConsolePresentation.Text("InvalidDtcMask"));
+                return;
+            }
+        }
+        byte severityMask = 255;
+        if (severityFilter)
+        {
+            try { severityMask = DoIpConsolePresentation.ParseDtcMask(doIpSeverityMask.Text.Trim()); }
+            catch (ArgumentException) { ShowError(DoIpConsolePresentation.Text("InvalidDtcMask")); return; }
+        }
+        byte wwhSeverity = 255, wwhGroup = 0;
+        bool wwh = operation is DoIpReadOperation.WwhMask or DoIpReadOperation.WwhPermanent or DoIpReadOperation.WwhReadiness;
+        try
+        {
+            if (operation == DoIpReadOperation.WwhMask)
+                wwhSeverity = DoIpConsolePresentation.ParseDtcMask(doIpWwhSeverity.Text.Trim());
+            if (operation == DoIpReadOperation.WwhReadiness)
+                wwhGroup = DoIpConsolePresentation.ParseDtcMask(doIpWwhGroup.Text.Trim());
+        }
+        catch (ArgumentException)
+        {
+            ShowError(DoIpConsolePresentation.Text("InvalidDtcMask"));
+            return;
+        }
+        ushort did = 0;
+        if (operation is DoIpReadOperation.Did or DoIpReadOperation.ScalingDid or DoIpReadOperation.MonitorDid or DoIpReadOperation.ObdDid or DoIpReadOperation.ObdMonitor)
+        {
+            try { did = DoIpVinReader.ParseLogicalAddress(doIpDid.Text.Trim()); }
+            catch (ArgumentException)
+            {
+                ShowError(DoIpConsolePresentation.Text("InvalidDid"));
+                return;
+            }
+        }
+        if ((operation is DoIpReadOperation.ObdDid or DoIpReadOperation.ObdMonitor) &&
+            ObdOnUdsServices.ClassifyDid(did) == ObdOnUdsServices.DataGroup.NotLegislated)
+        {
+            ShowError(DoIpConsolePresentation.Text("ObdInvalidDid"));
+            return;
+        }
+        IReadOnlyList<UdsMultiDidCli.Entry>? multiLayout = null;
+        if (operation is DoIpReadOperation.MultiDid or DoIpReadOperation.ObdMultiDid or
+            DoIpReadOperation.MultiMonitor or DoIpReadOperation.ObdMultiMonitor)
+        {
+            try
+            {
+                multiLayout = UdsMultiDidCli.Parse(doIpMultiLayout.Text.Trim());
+                if (operation is DoIpReadOperation.MultiMonitor or DoIpReadOperation.ObdMultiMonitor)
+                    multiLayout = UdsMultiDidCli.ValidateMonitor(multiLayout);
+                if ((operation is DoIpReadOperation.ObdMultiDid or DoIpReadOperation.ObdMultiMonitor) && multiLayout.Any(e =>
+                    ObdOnUdsServices.ClassifyDid(e.Did) == ObdOnUdsServices.DataGroup.NotLegislated))
+                    throw new ArgumentException("Expected legislated DIDs.");
+            }
+            catch (ArgumentException)
+            {
+                ShowError(DoIpConsolePresentation.Text("InvalidMultiLayout"));
+                return;
+            }
+        }
+        var expectedObdVin = doIpExpectedVin.Text.Trim();
+        if ((operation == DoIpReadOperation.StoredRecord || storedCatalog is not null || extendedCatalog is not null || legacySub != 0 || extendedRecordRead || memoryRead || inventoryTargets is not null || multiLayout is not null || wwh || obdDtc || operation is DoIpReadOperation.ObdIdentify or DoIpReadOperation.ObdDid or DoIpReadOperation.ObdMonitor) &&
+            (!DoIpVehicleDiscovery.IsVehicleVin(expectedObdVin) || observed.Vin != expectedObdVin))
+        {
+            ShowError(DoIpConsolePresentation.Text("ExpectedVinRequired"));
+            return;
+        }
+        var interval = TimeSpan.FromMilliseconds((int)doIpMonitorInterval.Value);
+        var sampleCount = (int)doIpMonitorCount.Value;
         var useTls = doIpUseTls.Checked;
         var thumbprint = string.Concat(doIpClientCertificate.Text.Where(c => !char.IsWhiteSpace(c)));
         if (thumbprint.Length != 0 &&
@@ -267,13 +673,756 @@ internal sealed partial class BridgeDesktopForm
             ShowError(DoIpConsolePresentation.Text("InvalidCertificate"));
             return;
         }
+        uint detailDtc = 0;
+        byte detailRecord = 1;
+        if (operation is DoIpReadOperation.DtcSnapshot or DoIpReadOperation.DtcExtended or DoIpReadOperation.MemorySnapshot or DoIpReadOperation.MemoryExtended or DoIpReadOperation.MirrorExtended)
+        {
+            try
+            {
+                (detailDtc, detailRecord) = DoIpConsolePresentation.ParseDetail(doIpDetailDtc.Text.Trim(),
+                    doIpDetailRecord.Text.Trim());
+            }
+            catch (ArgumentException)
+            {
+                ShowError(DoIpConsolePresentation.Text("InvalidDetail"));
+                return;
+            }
+        }
+        if ((operation is DoIpReadOperation.MemoryExtended or DoIpReadOperation.MirrorExtended) && detailRecord is >= 0xF0 and <= 0xFD)
+        {
+            ShowError(DoIpConsolePresentation.Text("InvalidDetail"));
+            return;
+        }
+        if (operation is DoIpReadOperation.DecodedExtended or DoIpReadOperation.MemoryDecodedExtended)
+        {
+            try
+            {
+                (detailDtc, _) = DoIpConsolePresentation.ParseDetail(doIpDetailDtc.Text.Trim(), "01");
+                detailRecord = DoIpConsolePresentation.ParseDtcMask(doIpDetailRecord.Text.Trim());
+                _ = ObdOnUdsServices.ReadDecodedExtended(detailDtc, detailRecord, extendedCatalog!);
+            }
+            catch (ArgumentException) { ShowError(DoIpConsolePresentation.Text("InvalidExtendedCatalog")); return; }
+        }
+        if (operation is DoIpReadOperation.DecodedSnapshot or DoIpReadOperation.MemoryDecodedSnapshot)
+        {
+            try
+            {
+                (detailDtc, _) = DoIpConsolePresentation.ParseDetail(doIpDetailDtc.Text.Trim(), "01");
+                detailRecord = DoIpConsolePresentation.ParseDtcMask(doIpDetailRecord.Text.Trim());
+                _ = ObdOnUdsServices.ReadDecodedSnapshot(detailDtc, detailRecord);
+                if (operation == DoIpReadOperation.MemoryDecodedSnapshot) _ = ObdOnUdsServices.ReadUserMemory(0x18, memory, 0, detailDtc, detailRecord);
+            }
+            catch (ArgumentException) { ShowError(DoIpConsolePresentation.Text("InvalidDetail")); return; }
+        }
+        if (operation == DoIpReadOperation.SeverityInfo)
+        {
+            try { (detailDtc, _) = DoIpConsolePresentation.ParseDetail(doIpDetailDtc.Text.Trim(), "01"); }
+            catch (ArgumentException) { ShowError(DoIpConsolePresentation.Text("InvalidDetail")); return; }
+        }
         var timeout = TimeSpan.FromMilliseconds((int)consoleTimeout.Value);
+        DoIpDiagnosticTransport.SessionOptions CurrentOptions() => DoIpDiagnosticTransport.SessionOptions.Parse(
+            (int)consoleTimeout.Value, doIpP2.Text.Trim(), doIpP2Star.Text.Trim(),
+            doIpRoutingType.Text.Trim(), doIpRoutingOem.Text.Trim());
+        DoIpDiagnosticTransport.SessionOptions options;
+        try { options = CurrentOptions(); }
+        catch (ArgumentException)
+        {
+            ShowError(DoIpConsolePresentation.Text("InvalidSessionOptions"));
+            return;
+        }
+        byte[][]? commands = null;
+        if (operation == DoIpReadOperation.Exchange)
+        {
+            try { commands = DoIpConsolePresentation.ParseCommands(doIpPayload.Text); }
+            catch (ArgumentException)
+            {
+                ShowError(DoIpConsolePresentation.Text("InvalidPayload"));
+                return;
+            }
+            if (!DoIpVehicleDiscovery.IsVehicleVin(doIpExpectedVin.Text.Trim()) ||
+                observed.Vin != doIpExpectedVin.Text.Trim())
+            {
+                ShowError(DoIpConsolePresentation.Text("ExpectedVinRequired"));
+                return;
+            }
+            var details = string.Format(DoIpConsolePresentation.Text("ExchangeTarget"),
+                observed.Vin, address, ecu, tester, useTls ? "TLS" : "TCP",
+                string.Join("; ", commands.Select(x => Convert.ToHexString(x)))) + "\n" +
+                string.Format(DoIpConsolePresentation.Text("SessionSummary"), timeout.TotalMilliseconds,
+                    options.P2Ms, options.P2StarMs, options.RoutingType,
+                    options.OemHex.Length == 0 ? "—" : options.OemHex);
+            bool SameOptions()
+            {
+                try { return CurrentOptions() == options && consoleTimeout.Value == (decimal)timeout.TotalMilliseconds; }
+                catch (ArgumentException) { return false; }
+            }
+            bool SameContext() => SameOptions() && !busy && doIpConsoleDiscoveryCancellation is null &&
+                ReferenceEquals(observed, doIpObservedGateway) && consoleDevice is null &&
+                bridgeTask is not { IsCompleted: false };
+            if (MessageBox.Show(this, DoIpConsolePresentation.Text("ExchangeWarning") + "\n\n" + details,
+                    DoIpConsolePresentation.Text("ExchangeWarningTitle"), MessageBoxButtons.OKCancel,
+                    MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.OK || !SameContext())
+                return;
+            if (MessageBox.Show(this, DoIpConsolePresentation.Text("ExchangeConfirm") + "\n\n" + details,
+                    DoIpConsolePresentation.Text("ExchangeWarningTitle"), MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes || !SameContext())
+                return;
+        }
+        DoIpBackupScope? backupScope = null;
+        string? backupProfilePath = null;
+        string? backupPath = null;
+        if (operation == DoIpReadOperation.Backup)
+        {
+            using var profile = new OpenFileDialog
+            {
+                Title = DoIpConsolePresentation.Text("BackupProfile"), Filter = "JSON (*.json)|*.json"
+            };
+            if (profile.ShowDialog(this) != DialogResult.OK) return;
+            try
+            {
+                backupScope = DoIpBackupScope.Load(profile.FileName);
+                DoIpScopedBackup.ValidateCaptureBudget(backupScope);
+                backupProfilePath = profile.FileName;
+                if (backupScope.Gateway != observed.LogicalAddress || backupScope.Tester != tester ||
+                    backupScope.Ecu != ecu || (observed.Vin is not null && observed.Vin != backupScope.Vin))
+                    throw new InvalidDataException(DoIpConsolePresentation.Text("BackupMismatch"));
+            }
+            catch (Exception error) when (error is ArgumentException or IOException or JsonException or
+                UnauthorizedAccessException or FormatException or OverflowException or InvalidOperationException)
+            {
+                ShowError(error.Message);
+                return;
+            }
+            using var destination = new SaveFileDialog
+            {
+                Title = DoIpConsolePresentation.Text("Backup"),
+                Filter = "ZIP (*.zip)|*.zip", DefaultExt = "zip",
+                AddExtension = true, FileName = "CamaroDiag_DoIP_" + backupScope.Vin + ".zip"
+            };
+            if (destination.ShowDialog(this) != DialogResult.OK) return;
+            if (File.Exists(destination.FileName))
+            {
+                ShowError(DoIpConsolePresentation.Text("BackupExists"));
+                return;
+            }
+            backupPath = destination.FileName;
+            if (MessageBox.Show(this, string.Format(DoIpConsolePresentation.Text("BackupConfirm"),
+                backupScope.Vin, backupScope.Ecu, backupScope.Start, backupScope.Length),
+                DoIpConsolePresentation.Text("Backup"), MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+            if (!ReferenceEquals(observed, doIpObservedGateway) || busy ||
+                doIpConsoleDiscoveryCancellation is not null || consoleDevice is not null ||
+                bridgeTask is { IsCompleted: false }) return;
+            try
+            {
+                if (CurrentOptions() != options || consoleTimeout.Value != (decimal)timeout.TotalMilliseconds)
+                    return;
+            }
+            catch (ArgumentException) { return; }
+        }
         using var stop = new CancellationTokenSource();
         doIpConsoleDiscoveryCancellation = stop;
-        doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled =
-            doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
-        doIpConsoleHost.Enabled = doIpTesterAddress.Enabled =
-            doIpEcuAddress.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled = false;
+        doIpConsoleDiscover.Enabled = false;
+        SetDoIpOperationButtons(false);
+        doIpConsoleHost.Enabled = doIpExpectedVin.Enabled = doIpTesterAddress.Enabled =
+            doIpInventoryAddresses.Enabled = doIpEcuAddress.Enabled = doIpPayload.Enabled = doIpDetailDtc.Enabled = doIpExtendedRecordSize.Enabled = doIpDtcMemory.Enabled = doIpDetailRecord.Enabled = doIpDtcMask.Enabled = doIpWwhSeverity.Enabled = doIpWwhGroup.Enabled = doIpMultiLayout.Enabled = doIpStoredCatalog.Enabled = doIpExtendedCatalog.Enabled = doIpDid.Enabled = doIpMonitorInterval.Enabled = doIpMonitorCount.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled =
+            doIpP2.Enabled = doIpP2Star.Enabled = doIpRoutingType.Enabled = doIpRoutingOem.Enabled = false;
+        doIpConsoleCancel.Enabled = true;
+        // The receive pump runs on a worker thread. Queue physical PDUs
+        // without touching WinForms controls, and drain only on the UI thread.
+        var pendingTrace = new System.Collections.Concurrent.ConcurrentQueue<(ushort Ecu, DoIpDiagnosticTransport.PduTrace Entry)>();
+        long pendingBytes = 0;
+        int traceOverflow = 0;
+        void Trace(DoIpDiagnosticTransport.PduTrace entry) => TraceForEcu(ecu, entry);
+        void TraceForEcu(ushort targetEcu, DoIpDiagnosticTransport.PduTrace entry)
+        {
+            if (Interlocked.Add(ref pendingBytes, entry.Bytes.Length) > 16L * 1024 * 1024)
+            {
+                Interlocked.Add(ref pendingBytes, -entry.Bytes.Length);
+                Interlocked.Exchange(ref traceOverflow, 1);
+                throw new IOException("DoIP console trace backlog exceeded; capture incomplete.");
+            }
+            pendingTrace.Enqueue((targetEcu, entry));
+        }
+        void DrainTrace()
+        {
+            while (pendingTrace.TryDequeue(out var item))
+            {
+                var entry = item.Entry;
+                Interlocked.Add(ref pendingBytes, -entry.Bytes.Length);
+                if (!IsDisposed && !Disposing)
+                    ConsoleLine(entry.Direction, "DoIP " + (useTls ? "TLS" : "TCP") + " " +
+                        address + $" ECU 0x{item.Ecu:X4} PDU " + Convert.ToHexString(entry.Bytes),
+                        entry.Direction == "TX" ? Color.DarkOrange : Color.DarkGreen,
+                        entry.ObservedAtUtc);
+            }
+        }
+        void RequireCompleteTrace()
+        {
+            DrainTrace();
+            if (Volatile.Read(ref traceOverflow) != 0)
+                throw new IOException(DoIpConsolePresentation.Text("TraceIncomplete"));
+        }
+        var monitoring = operation is DoIpReadOperation.MonitorDid or DoIpReadOperation.ObdMonitor
+            or DoIpReadOperation.MultiMonitor or DoIpReadOperation.ObdMultiMonitor;
+        var capture = monitoring ? new DoIpMonitoringProgress(sampleCount) : null;
+        void RecordVerifiedSample(int index)
+        {
+            RequireCompleteTrace();
+            stop.Token.ThrowIfCancellationRequested();
+            capture!.RecordVerified(index);
+        }
+        using var traceTimer = new System.Windows.Forms.Timer { Interval = 100 };
+        traceTimer.Tick += (_, _) => DrainTrace();
+        traceTimer.Start();
+        try
+        {
+            await RunBusyAsync(async () =>
+            {
+                try
+                {
+                    if (inventoryTargets is not null)
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("InventoryStarted"),
+                            string.Join(", ", inventoryTargets.Select(x => $"0x{x:X4}"))), Color.DarkSlateGray);
+                    else ConsoleLine("SYSTEM", string.Format(
+                        DoIpConsolePresentation.Text(operation switch { DoIpReadOperation.Exchange => "ExchangeStarted", DoIpReadOperation.Backup => "BackupStarted", DoIpReadOperation.Dtcs or DoIpReadOperation.DtcCount or DoIpReadOperation.DtcSnapshot or DoIpReadOperation.DtcExtended => "DtcStarted", DoIpReadOperation.Did or DoIpReadOperation.MonitorDid or DoIpReadOperation.ObdMonitor => "DidStarted", _ => "VinStarted" }),
+                        useTls ? "TLS" : "TCP", address, ecu, tester, observed.ProtocolVersion),
+                        Color.DarkSlateGray);
+                    await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(observed, timeout,
+                        stop.Token, JournalDoIpUdp);
+                    if (!ReferenceEquals(observed, doIpObservedGateway))
+                        throw new InvalidOperationException("DoIP target changed.");
+                    var certificate = thumbprint.Length == 0 ? null : thumbprint;
+                    if (inventoryTargets is not null)
+                    {
+                        var displayed = 0;
+                        var rows = await DoIpVinReader.InventoryObservedAsync(observed, expectedObdVin, tester,
+                            inventoryTargets, useTls, timeout, stop.Token, certificate, options, JournalDoIpUdp, TraceForEcu,
+                            operation == DoIpReadOperation.ObdInventory, (partial, total) =>
+                            {
+                                RequireCompleteTrace();
+                                stop.Token.ThrowIfCancellationRequested();
+                                if (IsDisposed || Disposing || !ReferenceEquals(observed, doIpObservedGateway))
+                                    throw new InvalidOperationException("DoIP target changed.");
+                                foreach (var row in partial.Skip(displayed))
+                                {
+                                    ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text(row.Vin is null ?
+                                        "InventoryUnverified" : "InventoryVerified"), row.Ecu, row.Vin ?? ""),
+                                        row.Vin is null ? Color.DarkOrange : Color.DarkGreen);
+                                    if (row.Vin is null)
+                                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text(row.Reason switch
+                                        {
+                                            "timeout" => "InventoryReasonTimeout",
+                                            "identity_or_response_invalid" => "InventoryReasonIdentity",
+                                            "uds_negative_response" => "InventoryReasonNrc",
+                                            "header_nack" => "InventoryReasonHeader",
+                                            "routing_denied" => "InventoryReasonRouting",
+                                            "diagnostic_nack" => "InventoryReasonAck",
+                                            _ => "InventoryReasonCommunication"
+                                        }) + (row.FailureCode is byte code ? $" (0x{code:X2})" : ""), Color.DarkOrange);
+                                    if (row.ProtocolValue is byte protocol)
+                                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text(protocol == 1 ?
+                                            "InventoryObdSupported" : "InventoryObdUnrecognized"), row.Ecu, protocol),
+                                            protocol == 1 ? Color.DarkGreen : Color.DarkOrange);
+                                }
+                                displayed = partial.Count;
+                                ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("InventoryProgress"),
+                                    partial.Count, total), Color.DarkSlateGray);
+                            });
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing || !ReferenceEquals(observed, doIpObservedGateway)) return;
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("InventoryComplete"),
+                            rows.Count(row => row.Vin is not null), rows.Count), Color.DarkGreen);
+                    }
+                    else if (operation == DoIpReadOperation.Backup)
+                    {
+                        var scope = backupScope ?? throw new InvalidOperationException();
+                        var destination = backupPath ?? throw new InvalidOperationException();
+                        var profilePath = backupProfilePath ?? throw new InvalidOperationException();
+                        var backupCapture = await DoIpScopedBackup.ReadObservedAsync(observed, address,
+                            scope, useTls, timeout, stop.Token, (pass, count) =>
+                            {
+                                RequireCompleteTrace();
+                                stop.Token.ThrowIfCancellationRequested();
+                                if (!IsDisposed && !Disposing)
+                                    ConsoleLine("SYSTEM", string.Format(
+                                        DoIpConsolePresentation.Text("BackupProgress"), pass, count, scope.Length),
+                                        Color.DarkSlateGray);
+                            }, certificate, trace: Trace, options: options);
+                        await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(observed, timeout,
+                            stop.Token, JournalDoIpUdp);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing || !ReferenceEquals(observed, doIpObservedGateway))
+                            throw new InvalidOperationException(DoIpConsolePresentation.Text("BackupMismatch"));
+                        await Task.Run(() =>
+                        {
+                            stop.Token.ThrowIfCancellationRequested();
+                            if (DoIpBackupScope.Load(profilePath) != scope)
+                                throw new InvalidDataException(DoIpConsolePresentation.Text("BackupMismatch"));
+                            DoIpScopedBackup.SaveNew(destination, backupCapture, stop.Token);
+                        }, stop.Token);
+                        if (!IsDisposed && !Disposing)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("BackupSaved"),
+                                scope.Length, backupCapture.Sha256, destination), Color.DarkGreen);
+                    }
+                    else if (operation == DoIpReadOperation.Exchange)
+                    {
+                        var count = await DoIpVinReader.ExchangeSequenceObservedAsync(observed,
+                            address, tester, ecu, useTls, commands ?? throw new InvalidOperationException(),
+                            timeout, stop.Token, (index, reply) =>
+                            {
+                                RequireCompleteTrace();
+                                if (!IsDisposed && !Disposing)
+                                    ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("SequenceReply"),
+                                        index, Convert.ToHexString(reply)), Color.DarkGreen);
+                            }, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (!IsDisposed && !Disposing)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("SequenceComplete"),
+                                count), Color.DarkGreen);
+                    }
+                    else if (operation is DoIpReadOperation.DtcSnapshot or DoIpReadOperation.DtcExtended)
+                    {
+                        var detail = await DoIpVinReader.ReadObservedGatewayDtcDetailAsync(observed,
+                            address, tester, ecu, useTls, detailDtc, detailRecord,
+                            operation == DoIpReadOperation.DtcExtended, timeout, stop.Token, certificate, Trace, options,
+                            expectedObdVin: obdDtc ? expectedObdVin : null);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (!IsDisposed && !Disposing)
+                            ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatDetail(detail.Dtc, detail.Status, detail.Records), Color.DarkGreen);
+                    }
+                    else if (operation == DoIpReadOperation.DtcCount)
+                    {
+                        var report = await DoIpVinReader.CountObservedGatewayDtcsAsync(observed,
+                            address, tester, ecu, useTls, dtcMask, timeout, stop.Token, certificate, Trace, options,
+                            expectedObdVin: obdDtc ? expectedObdVin : null);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (!IsDisposed && !Disposing)
+                            ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatDtcCount(report, dtcMask), Color.DarkGreen);
+                    }
+                    else if (operation == DoIpReadOperation.Dtcs)
+                    {
+                        var report = await DoIpVinReader.ReadObservedGatewayDtcsAsync(
+                            observed, address, tester, ecu, useTls, dtcMask, timeout, stop.Token,
+                            clientCertificateThumbprint: certificate, trace: Trace, options: options,
+                            expectedObdVin: obdDtc ? expectedObdVin : null);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        foreach (var line in DoIpConsolePresentation.FormatDtcs(report, dtcMask))
+                            ConsoleLine("SYSTEM", line, Color.DarkSlateGray);
+                    }
+                    else if (severityFilter || operation == DoIpReadOperation.SeverityInfo)
+                    {
+                        byte sub = operation == DoIpReadOperation.SeverityCount ? (byte)7 :
+                            operation == DoIpReadOperation.SeverityList ? (byte)8 : (byte)9;
+                        var request = ObdOnUdsServices.ReadSeverity(sub, severityMask, dtcMask, detailDtc);
+                        var report = await DoIpVinReader.ReadObservedSeverityAsync(observed,
+                            address, tester, ecu, useTls, request, timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        if (report.Count.HasValue)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("SeverityCountResult"),
+                                report.Count.Value, report.AvailabilityMask, report.FormatIdentifier), Color.DarkGreen);
+                        else
+                        {
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("SeverityListResult"),
+                                report.Records.Count, report.AvailabilityMask), Color.DarkGreen);
+                            foreach (var row in report.Records)
+                                ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("SeverityRecord"),
+                                    row.Dtc, row.Severity, row.FunctionalUnit, row.Status), Color.DarkSlateGray);
+                        }
+                    }
+                    else if (operation == DoIpReadOperation.FaultCounters)
+                    {
+                        var rows = await DoIpVinReader.ReadObservedFaultCountersAsync(observed,
+                            address, tester, ecu, useTls, timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("FaultCountersResult"), rows.Count), Color.DarkGreen);
+                        foreach (var row in rows)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("FaultCounterEntry"),
+                                row.Dtc, row.Counter), Color.DarkSlateGray);
+                    }
+                    else if (operation is DoIpReadOperation.FirstFailed or DoIpReadOperation.FirstConfirmed or DoIpReadOperation.RecentFailed or DoIpReadOperation.RecentConfirmed)
+                    {
+                        byte subfunction = operation switch
+                        {
+                            DoIpReadOperation.FirstFailed => 0x0B,
+                            DoIpReadOperation.FirstConfirmed => 0x0C,
+                            DoIpReadOperation.RecentFailed => 0x0D,
+                            _ => 0x0E
+                        };
+                        var report = await DoIpVinReader.ReadObservedHistoricalDtcAsync(observed,
+                            address, tester, ecu, useTls, subfunction, timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        var label = DoIpConsolePresentation.Text(operation.ToString());
+                        var value = report.Codes.Count == 0 ? DoIpConsolePresentation.Text("NoHistoricalDtc") :
+                            string.Format(DoIpConsolePresentation.Text("DtcEntry"), report.Codes[0].Code, report.Codes[0].Status);
+                        ConsoleLine("SYSTEM", label + ": " + value, Color.DarkGreen);
+                    }
+                    else if (operation == DoIpReadOperation.SupportedDtcs)
+                    {
+                        var report = await DoIpVinReader.ReadObservedSupportedDtcsAsync(observed,
+                            address, tester, ecu, useTls, timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("SupportedResult"),
+                            report.Codes.Count, report.AvailabilityMask), Color.DarkGreen);
+                        foreach (var code in report.Codes)
+                            ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatDtcEntry(
+                                code.Code, code.Status, report.AvailabilityMask), Color.DarkSlateGray);
+                    }
+                    else if (legacySub != 0)
+                    {
+                        var report = await DoIpVinReader.ReadObservedLegacyDtcAsync(observed, address, tester, ecu, useTls,
+                            legacySub, dtcMask, detailDtc, detailRecord, timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text(legacySub <= 0x11 ? "LegacyMirrorResult" : "LegacyEmissionsResult"), Color.DarkGreen);
+                        if (report.List is not null)
+                            foreach (var line in DoIpConsolePresentation.FormatDtcs(report.List, dtcMask))
+                                ConsoleLine("SYSTEM", line, Color.DarkSlateGray);
+                        else if (report.Count is not null)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("DtcCountResult"),
+                                report.Count.Count, dtcMask, report.Count.StatusAvailabilityMask, report.Count.DtcFormatIdentifier), Color.DarkSlateGray);
+                        else if (report.Detail is not null)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MemoryDetailResult"), report.Detail.Dtc,
+                                report.Detail.Status, Convert.ToHexString(report.Detail.RawExtendedDataRecords)), Color.DarkSlateGray);
+                    }
+                    else if ((operation is DoIpReadOperation.DecodedExtended or DoIpReadOperation.MemoryDecodedExtended) && extendedCatalog is not null)
+                    {
+                        var report = operation == DoIpReadOperation.MemoryDecodedExtended
+                            ? await DoIpVinReader.ReadObservedDecodedMemoryExtendedAsync(observed, address, tester, ecu,
+                                useTls, memory, detailDtc, detailRecord, extendedCatalog, timeout, stop.Token, certificate, Trace, options)
+                            : await DoIpVinReader.ReadObservedDecodedExtendedAsync(observed, address, tester, ecu,
+                                useTls, detailDtc, detailRecord, extendedCatalog, timeout, stop.Token, certificate, Trace, options,
+                                expectedObdVin: obdDtc ? expectedObdVin : null);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        if (memoryRead) ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MemoryResult"), memory), Color.DarkGreen);
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("DecodedExtendedResult"),
+                            report.Dtc, report.Status, report.Records.Count), Color.DarkGreen);
+                        foreach (var row in report.Records)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("DecodedExtendedEntry"),
+                                row.Number, Convert.ToHexString(row.Data)), Color.DarkSlateGray);
+                    }
+                    else if ((operation is DoIpReadOperation.DecodedSnapshot or DoIpReadOperation.MemoryDecodedSnapshot) && storedCatalog is not null)
+                    {
+                        var report = operation == DoIpReadOperation.MemoryDecodedSnapshot
+                            ? await DoIpVinReader.ReadObservedDecodedMemorySnapshotAsync(observed, address, tester, ecu,
+                                useTls, memory, detailDtc, detailRecord, storedCatalog, timeout, stop.Token, certificate, Trace, options)
+                            : await DoIpVinReader.ReadObservedDecodedSnapshotAsync(observed, address, tester, ecu,
+                                useTls, detailDtc, detailRecord, storedCatalog, timeout, stop.Token, certificate, Trace, options,
+                                expectedObdVin: obdDtc ? expectedObdVin : null);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        if (memoryRead) ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MemoryResult"), memory), Color.DarkGreen);
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("DecodedSnapshotResult"),
+                            report.Dtc, report.Status, report.Records.Count), Color.DarkGreen);
+                        foreach (var row in report.Records)
+                        {
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("SnapshotRecordResult"), row.Record), Color.DarkSlateGray);
+                            foreach (var item in row.Dids)
+                                ConsoleLine("SYSTEM", $"{item.Did:X4}: {Convert.ToHexString(item.Data)}", Color.DarkSlateGray);
+                        }
+                    }
+                    else if (storedCatalog is not null)
+                    {
+                        var requestedStoredRecord = operation == DoIpReadOperation.DecodedStoredRecord ? storedRecord : (byte)255;
+                        var report = await DoIpVinReader.ReadObservedDecodedStoredRecordsAsync(observed, address, tester, ecu,
+                            useTls, requestedStoredRecord, storedCatalog, timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        if (requestedStoredRecord != 255) ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("StoredRecordResult"), requestedStoredRecord), Color.DarkGreen);
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("AllStoredResult"), report.Records.Count), Color.DarkGreen);
+                        foreach (var row in report.Records)
+                        {
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("StoredRecordResult"), row.Record), Color.DarkSlateGray);
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MemoryDetailResult"), row.Dtc,
+                                row.Status, Convert.ToHexString(row.RawRecord)), Color.DarkSlateGray);
+                            foreach (var item in row.Dids)
+                                ConsoleLine("SYSTEM", $"{item.Did:X4}: {Convert.ToHexString(item.Data)}", Color.DarkSlateGray);
+                        }
+                    }
+                    else if (operation == DoIpReadOperation.StoredRecord)
+                    {
+                        var report = await DoIpVinReader.ReadObservedStoredRecordAsync(observed, address, tester, ecu,
+                            useTls, storedRecord, timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("StoredRecordResult"), report.Record), Color.DarkGreen);
+                        if (report.Dtc.HasValue)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("StoredRecordCount"),
+                                report.RawData[0]), Color.DarkSlateGray);
+                        ConsoleLine("SYSTEM", report.Dtc.HasValue
+                            ? string.Format(DoIpConsolePresentation.Text("MemoryDetailResult"), report.Dtc.Value,
+                                report.Status!.Value, Convert.ToHexString(report.RawData))
+                            : DoIpConsolePresentation.Text("StoredRecordEmpty"), Color.DarkSlateGray);
+                    }
+                    else if (extendedRecordRead)
+                    {
+                        var report = await DoIpVinReader.ReadObservedExtendedRecordAsync(observed, address, tester, ecu,
+                            useTls, extendedRecord, extendedRecordSize, timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("ExtendedRecordResult"), report.Record, report.Entries.Count), Color.DarkGreen);
+                        if (report.Availability.HasValue)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("ExtendedRecordMask"), report.Availability.Value), Color.DarkSlateGray);
+                        foreach (var entry in report.Entries)
+                            ConsoleLine("SYSTEM", extendedRecordSize.HasValue
+                                ? string.Format(DoIpConsolePresentation.Text("MemoryDetailResult"), entry.Dtc, entry.Status, Convert.ToHexString(entry.Data))
+                                : string.Format(DoIpConsolePresentation.Text("DtcEntry"), entry.Dtc, entry.Status), Color.DarkSlateGray);
+                    }
+                    else if (memoryRead)
+                    {
+                        byte sub = operation == DoIpReadOperation.MemoryDtcs ? (byte)0x17 :
+                            operation == DoIpReadOperation.MemorySnapshot ? (byte)0x18 : (byte)0x19;
+                        var report = await DoIpVinReader.ReadObservedUserMemoryAsync(observed, address,
+                            tester, ecu, useTls, sub, memory, dtcMask, detailDtc, detailRecord,
+                            timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MemoryResult"), report.Memory), Color.DarkGreen);
+                        if (report.List is not null)
+                            foreach (var line in DoIpConsolePresentation.FormatDtcs(report.List, dtcMask))
+                                ConsoleLine("SYSTEM", line, Color.DarkSlateGray);
+                        else
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MemoryDetailResult"),
+                                report.Dtc, report.Status, Convert.ToHexString(report.RawRecords!)), Color.DarkSlateGray);
+                    }
+                    else if (operation == DoIpReadOperation.PermanentDtcs)
+                    {
+                        var report = await DoIpVinReader.ReadObservedPermanentDtcsAsync(observed,
+                            address, tester, ecu, useTls, timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("PermanentResult"),
+                            report.Codes.Count, report.AvailabilityMask), Color.DarkGreen);
+                        foreach (var code in report.Codes)
+                            ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatDtcEntry(
+                                code.Code, code.Status, report.AvailabilityMask), Color.DarkSlateGray);
+                    }
+                    else if (operation == DoIpReadOperation.SnapshotIndex)
+                    {
+                        var rows = await DoIpVinReader.ReadObservedSnapshotIndexAsync(observed,
+                            address, tester, ecu, useTls, timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("SnapshotIndexResult"), rows.Count), Color.DarkGreen);
+                        foreach (var row in rows)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("SnapshotIndexEntry"),
+                                row.Dtc, row.Record), Color.DarkSlateGray);
+                    }
+                    else if (operation == DoIpReadOperation.ObdMonitor)
+                    {
+                        await DoIpVinReader.MonitorObservedObdAsync(observed, address, tester,
+                            ecu, useTls, expectedObdVin, did, sampleCount, interval, timeout, stop.Token,
+                            (index, data) =>
+                            {
+                                RecordVerifiedSample(index);
+                                if (!IsDisposed && !Disposing)
+                                    ConsoleLine("SYSTEM", string.Format(
+                                        DoIpConsolePresentation.Text("ObdMonitorSample"), index,
+                                        did, Convert.ToHexString(data)), Color.DarkGreen);
+                            }, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        capture!.MarkComplete();
+                        if (!IsDisposed && !Disposing)
+                            ConsoleLine("SYSTEM", string.Format(
+                                DoIpConsolePresentation.Text("ObdMonitorComplete"), sampleCount),
+                                Color.DarkGreen);
+                    }
+                    else if (operation == DoIpReadOperation.MonitorDid)
+                    {
+                        await DoIpVinReader.MonitorObservedGatewayDidAsync(
+                            observed, address, tester, ecu, useTls, did, sampleCount, interval,
+                            timeout, stop.Token, (index, data) =>
+                            {
+                                RecordVerifiedSample(index);
+                                if (!IsDisposed && !Disposing)
+                                    ConsoleLine("SYSTEM", string.Format(
+                                        DoIpConsolePresentation.Text("MonitorSample"), index,
+                                        did, Convert.ToHexString(data)), Color.DarkGreen);
+                            }, clientCertificateThumbprint: certificate, trace: Trace, options: options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        capture!.MarkComplete();
+                        if (!IsDisposed && !Disposing)
+                            ConsoleLine("SYSTEM", string.Format(
+                                DoIpConsolePresentation.Text("MonitorComplete"), sampleCount),
+                                Color.DarkGreen);
+                    }
+                    else if (operation is DoIpReadOperation.MultiMonitor or DoIpReadOperation.ObdMultiMonitor)
+                    {
+                        await DoIpVinReader.MonitorObservedMultiDidAsync(observed, address, tester,
+                            ecu, useTls, expectedObdVin, multiLayout!, operation == DoIpReadOperation.ObdMultiMonitor,
+                            sampleCount, interval, timeout, stop.Token, (index, values) =>
+                            {
+                                RecordVerifiedSample(index);
+                                if (!IsDisposed && !Disposing)
+                                    ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MultiMonitorSample"),
+                                        index, string.Join("  ", values.Select(v => $"{v.Did:X4}={Convert.ToHexString(v.Data)}"))),
+                                        Color.DarkSlateGray);
+                            }, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        capture!.MarkComplete();
+                        if (!IsDisposed && !Disposing)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MultiMonitorComplete"),
+                                sampleCount), Color.DarkGreen);
+                    }
+                    else if (multiLayout is not null)
+                    {
+                        var values = await DoIpVinReader.ReadObservedMultiDidAsync(observed, address, tester, ecu,
+                            useTls, expectedObdVin, multiLayout, operation == DoIpReadOperation.ObdMultiDid,
+                            timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        foreach (var item in values)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MultiResult"),
+                                item.Did, item.Data.Length, Convert.ToHexString(item.Data)), Color.DarkGreen);
+                    }
+                    else if (wwh)
+                    {
+                        byte subfunction = operation switch { DoIpReadOperation.WwhMask => 0x42,
+                            DoIpReadOperation.WwhPermanent => 0x55, _ => 0x56 };
+                        var report = await DoIpVinReader.ReadObservedWwhAsync(observed, address, tester, ecu,
+                            useTls, expectedObdVin, subfunction, dtcMask, wwhSeverity, wwhGroup,
+                            timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        foreach (var line in DoIpConsolePresentation.FormatWwh(report, subfunction,
+                            subfunction == 0x56 ? wwhGroup : null,
+                            requestedStatusMask: subfunction == 0x42 ? dtcMask : null,
+                            requestedSeverityMask: subfunction == 0x42 ? wwhSeverity : null))
+                            ConsoleLine("SYSTEM", line, Color.DarkGreen);
+                    }
+                    else if (operation is DoIpReadOperation.ObdIdentify or DoIpReadOperation.ObdDid)
+                    {
+                        var obd = await DoIpVinReader.ReadObservedObdAsync(observed, address, tester, ecu,
+                            useTls, expectedObdVin, operation == DoIpReadOperation.ObdDid ? did : null,
+                            timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text(
+                            obd.ProtocolValue == 1 ? "ObdVerified" : "ObdUnknown"),
+                            obd.ProtocolValue, obd.Vin), obd.ProtocolValue == 1 ? Color.DarkGreen : Color.DarkOrange);
+                        if (obd.Data is not null)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("DidResult"),
+                                did, Convert.ToHexString(obd.Data)), Color.DarkGreen);
+                    }
+                    else if (operation == DoIpReadOperation.ScalingDid)
+                    {
+                        var data = await DoIpVinReader.ReadObservedScalingDidAsync(observed, address, tester,
+                            ecu, useTls, did, timeout, stop.Token, certificate, Trace, options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("ScalingResult"),
+                            did, Convert.ToHexString(data)), Color.DarkGreen);
+                    }
+                    else if (operation == DoIpReadOperation.Did)
+                    {
+                        var data = await DoIpVinReader.ReadObservedGatewayDidAsync(
+                            observed, address, tester, ecu, useTls, did, timeout, stop.Token,
+                            clientCertificateThumbprint: certificate, trace: Trace, options: options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", string.Format(
+                            DoIpConsolePresentation.Text("DidResult"), did, Convert.ToHexString(data)),
+                            Color.DarkGreen);
+                    }
+                    else
+                    {
+                        var vin = await DoIpVinReader.ReadObservedGatewayAsync(
+                            observed, address, tester, ecu, useTls, timeout, stop.Token,
+                            clientCertificateThumbprint: certificate, trace: Trace, options: options);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", string.Format(
+                            DoIpConsolePresentation.Text("VinResult"), vin), Color.DarkGreen);
+                        // ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("VinNotice"), Color.DarkSlateGray);
+                    }
+                }
+                catch (OperationCanceledException) when (stop.IsCancellationRequested)
+                {
+                    DrainTrace();
+                    doIpObservedGateway = null;
+                    if (!IsDisposed && !Disposing)
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Canceled"), Color.DarkSlateGray);
+                }
+                catch
+                {
+                    DrainTrace();
+                    doIpObservedGateway = null;
+                    throw;
+                }
+            });
+        }
+        finally
+        {
+            traceTimer.Stop();
+            DrainTrace();
+            if (capture is { Complete: false } && !IsDisposed && !Disposing)
+                ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MonitorPartial"),
+                    capture.VerifiedSamples, capture.RequestedSamples), Color.DarkOrange);
+            if (Volatile.Read(ref traceOverflow) != 0 && !IsDisposed && !Disposing)
+                ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("TraceIncomplete"), Color.DarkRed);
+            doIpConsoleDiscoveryCancellation = null;
+            if (!IsDisposed && !Disposing)
+            {
+                doIpConsoleHost.Enabled = doIpExpectedVin.Enabled = doIpTesterAddress.Enabled =
+                    doIpInventoryAddresses.Enabled = doIpEcuAddress.Enabled = doIpPayload.Enabled = doIpDetailDtc.Enabled = doIpExtendedRecordSize.Enabled = doIpDtcMemory.Enabled = doIpDetailRecord.Enabled = doIpDtcMask.Enabled = doIpWwhSeverity.Enabled = doIpWwhGroup.Enabled = doIpMultiLayout.Enabled = doIpStoredCatalog.Enabled = doIpExtendedCatalog.Enabled = doIpDid.Enabled = doIpMonitorInterval.Enabled = doIpMonitorCount.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled =
+                    doIpP2.Enabled = doIpP2Star.Enabled = doIpRoutingType.Enabled = doIpRoutingOem.Enabled = true;
+                doIpConsoleDiscover.Enabled = true;
+                SetDoIpOperationButtons(true);
+                doIpConsoleCancel.Enabled = false;
+            }
+        }
+    }
+
+    private async Task VerifyDoIpBackupFromConsoleAsync()
+    {
+        if (busy || doIpConsoleDiscoveryCancellation is not null) return;
+        using var profile = new OpenFileDialog
+        {
+            Title = DoIpConsolePresentation.Text("BackupProfile"), Filter = "JSON (*.json)|*.json"
+        };
+        if (profile.ShowDialog(this) != DialogResult.OK) return;
+        using var archive = new OpenFileDialog
+        {
+            Title = DoIpConsolePresentation.Text("BackupVerify"), Filter = "ZIP (*.zip)|*.zip"
+        };
+        if (archive.ShowDialog(this) != DialogResult.OK) return;
+        using var stop = new CancellationTokenSource();
+        doIpConsoleDiscoveryCancellation = stop;
+        doIpVerifyBackup.Enabled = false;
         doIpConsoleCancel.Enabled = true;
         try
         {
@@ -281,44 +1430,19 @@ internal sealed partial class BridgeDesktopForm
             {
                 try
                 {
-                    ConsoleLine("SYSTEM", string.Format(
-                        DoIpConsolePresentation.Text("VinStarted"), useTls ? "TLS" : "TCP",
-                        address, ecu, tester, observed.ProtocolVersion), Color.DarkSlateGray);
-                    var vin = await DoIpVinReader.ReadObservedGatewayAsync(
-                        observed, address, tester, ecu, useTls, timeout, stop.Token,
-                        requested: data =>
-                        {
-                            if (!IsDisposed && !Disposing)
-                                ConsoleLine("TX", Convert.ToHexString(data) + " [" +
-                                    BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.Requested) + "]",
-                                    Color.DarkOrange);
-                        },
-                        received: data =>
-                        {
-                            if (!IsDisposed && !Disposing)
-                                {
-                                ConsoleLine("SYSTEM", BridgeConsoleTxEvidence.Label(
-                                    BridgeConsoleTxState.EcuReplied), Color.DarkSlateGray);
-                                ConsoleLine("RX", Convert.ToHexString(data), Color.DarkGreen);
-                            }
-                        },
-                        clientCertificateThumbprint: thumbprint.Length == 0 ? null : thumbprint);
-                    stop.Token.ThrowIfCancellationRequested();
-                    if (IsDisposed || Disposing) return;
-                    ConsoleLine("SYSTEM", string.Format(
-                        DoIpConsolePresentation.Text("VinResult"), vin), Color.DarkGreen);
-                    ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("VinNotice"), Color.DarkSlateGray);
+                    var result = await Task.Run(() =>
+                    {
+                        var scope = DoIpBackupScope.Load(profile.FileName);
+                        return DoIpScopedBackup.VerifyZip(archive.FileName, scope, stop.Token);
+                    }, stop.Token);
+                    if (!IsDisposed && !Disposing)
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("BackupVerified"),
+                            result.Scope.Length, result.Sha256), Color.DarkGreen);
                 }
                 catch (OperationCanceledException) when (stop.IsCancellationRequested)
                 {
-                    doIpObservedGateway = null;
                     if (!IsDisposed && !Disposing)
                         ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Canceled"), Color.DarkSlateGray);
-                }
-                catch
-                {
-                    doIpObservedGateway = null;
-                    throw;
                 }
             });
         }
@@ -327,11 +1451,7 @@ internal sealed partial class BridgeDesktopForm
             doIpConsoleDiscoveryCancellation = null;
             if (!IsDisposed && !Disposing)
             {
-                doIpConsoleHost.Enabled = doIpTesterAddress.Enabled =
-                    doIpEcuAddress.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled = true;
-                doIpConsoleDiscover.Enabled = true;
-                doIpConsoleStatus.Enabled = doIpConsolePower.Enabled =
-                    doIpReadVin.Enabled = doIpObservedGateway is not null;
+                doIpVerifyBackup.Enabled = true;
                 doIpConsoleCancel.Enabled = false;
             }
         }
@@ -536,6 +1656,11 @@ internal sealed partial class BridgeDesktopForm
 
     private void SaveConsoleHistory()
     {
+        if (doIpConsoleDiscoveryCancellation is not null)
+        {
+            ShowError(DoIpConsolePresentation.Text("Busy"));
+            return;
+        }
         using var picker = new SaveFileDialog
         {
             Title = "Exporter la console CAN/OBD",
@@ -560,12 +1685,13 @@ internal sealed partial class BridgeDesktopForm
         catch (UnauthorizedAccessException ex) { ShowError(ex.Message); }
     }
 
-    private void ConsoleLine(string direction, string message, Color color)
+    private void ConsoleLine(string direction, string message, Color color,
+        DateTimeOffset? observedAtUtc = null)
     {
         consoleHistory.SelectionStart = consoleHistory.TextLength;
         consoleHistory.SelectionLength = 0;
         consoleHistory.SelectionColor = color;
-        consoleHistory.AppendText($"{DateTime.Now:HH:mm:ss} [{BridgeConsoleDirection.Normalize(direction)}] {message}{Environment.NewLine}");
+        consoleHistory.AppendText($"{(observedAtUtc?.ToLocalTime() ?? DateTimeOffset.Now):HH:mm:ss.fff} [{BridgeConsoleDirection.Normalize(direction)}] {message}{Environment.NewLine}");
         consoleHistory.SelectionColor = consoleHistory.ForeColor;
         consoleHistory.ScrollToCaret();
     }

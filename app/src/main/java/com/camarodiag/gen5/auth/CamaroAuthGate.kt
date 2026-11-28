@@ -10,6 +10,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -90,10 +92,12 @@ fun CamaroAuthGate(
         validationError = null
         if (user != null) {
             val targetUid = user.uid
+            var validationFinished = false
             user.getIdToken(true).addOnCompleteListener { task ->
                 if (auth.currentUser?.uid != targetUid || validationGeneration != attempt) {
                     return@addOnCompleteListener
                 }
+                validationFinished = true
                 if (task.isSuccessful) {
                     val verifiedClaims = task.result?.claims.orEmpty()
                     val providerIds = user.providerData.map { it.providerId }
@@ -197,6 +201,21 @@ fun CamaroAuthGate(
                     }
                 }
             }
+            // Bound startup validation if the network route changes. A timeout
+            // never proves authentication or grants offline access.
+            delay(15_000L)
+            if (!validationFinished && validationGeneration == attempt &&
+                auth.currentUser?.uid == targetUid) {
+                validationGeneration++
+                accountAdminAllowed = false
+                licenseChecked = false
+                licenseSource = null
+                accessLevel = LicenseLevel.FREE
+                validatedAccountUid = null
+                validatedUser = null
+                latestOnAccountChanged(null)
+                validationError = "timeout"
+            }
         }
     }
     if (user == null) {
@@ -218,7 +237,9 @@ fun CamaroAuthGate(
                 CircularProgressIndicator()
             } else {
                 Text(
-                    if (validationError == "offline") {
+                    if (validationError == "timeout") {
+                        stringResource(R.string.auth_startup_validation_timeout)
+                    } else if (validationError == "offline") {
                         if (french) "Connexion requise : la validation hors ligne a expiré."
                         else "Connect to the internet: offline validation has expired."
                     } else {

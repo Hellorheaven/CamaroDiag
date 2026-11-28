@@ -83,6 +83,25 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun parsesPaddedPhysicalCanAndExplicitDlcWithoutTreatingPaddingAsData() {
+        val expected = intArrayOf(0x1A, 0xF8)
+        for (valid in listOf("7E8 04 41 0C 1A F8 AA AA AA",
+            "18DAF110 04 41 0C 1A F8 00 00 00",
+            "7E8 8 04 41 0C 1A F8 CC CC CC",
+            "7E8 04 41 0C 1A F8",
+            "7E804410C1AF8AAAAAA")) {
+            assertArrayEquals(valid, expected, CamaroUdsProtocol.parsePidBytes(valid, "0C"))
+        }
+        for (invalid in listOf("7E8 03 41 0C 1A F8 AA AA AA",
+            "7E8 05 41 0C 1A F8 AA AA AA",
+            "7E8 7 04 41 0C 1A F8 CC CC CC",
+            "04 41 0C 1A F8 00 00 00",
+            "7E8 41 0C 1A F8 00")) {
+            assertNull(invalid, CamaroUdsProtocol.parsePidBytes(invalid, "0C"))
+        }
+    }
+
+    @Test
     fun odometerNeverCombinesChatterOrIncompleteAndOverlongPidReplies() {
         for (invalid in listOf(
             "A641A60012D687",
@@ -167,6 +186,7 @@ class CamaroUdsProtocolTest {
     fun echoedAtCommandsWithSeparateOkAcknowledgementsRemainSupported() {
         val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "OBDLink MX+",
+            hardwareResp = "OBDLink MX+",
             macAddress = "00:00:00:00:00:01",
             atzResp = "OBDLink",
             stiResp = "STN2120 v5.6.5",
@@ -271,6 +291,22 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun automaticSelectionDoesNotInventCanCapabilityOrProtocolSix() {
+        fun probe(protocol: Int?, reply: String) = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "ELM", macAddress = "test", atzResp = "ELM327",
+            stiResp = "?", atalResp = "OK", stp61Resp = "?",
+            selectedElmProtocol = 0, reportedElmProtocol = protocol,
+            elmProtocolProbe = mapOf(7 to "OK"), transmitProbeResp = reply)
+        val can = probe(7, "18DAF110 06 41 00 BE 3E B8 13")
+        assertEquals(setOf(7), can.acceptedElmProtocols)
+        assertEquals(7, can.reportedElmProtocol)
+        assertTrue(can.supportsCanTransmit)
+        assertFalse(probe(3, "4100BE3EB813").supportsCanTransmit)
+        assertFalse(probe(null, "4100BE3EB813").supportsCanTransmit)
+        assertFalse(probe(7, "NO DATA").supportsCanTransmit)
+    }
+
+    @Test
     fun genericElmCloneCanUseStandardCanWithoutClaimingUdsCapabilities() {
         val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "ELM327 Bluetooth",
@@ -333,6 +369,7 @@ class CamaroUdsProtocolTest {
     fun enablesSwCanOnlyForDocumentedMxHardwareWithAcceptedProtocol() {
         val mxPlus = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "OBDLink MX+",
+            hardwareResp = "OBDLink MX+",
             macAddress = "00:00:00:00:00:00",
             atzResp = "OBDLink",
             stiResp = "STN2120 v5.6.5",
@@ -365,6 +402,29 @@ class CamaroUdsProtocolTest {
         )
 
         assertFalse(capabilities.supportsSwCan)
+    }
+
+    @Test
+    fun configurationAcceptanceAndDisplayNameAreNotPhysicalVehicleEvidence() {
+        val capability = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "OBDLink MX+", macAddress = "test", atzResp = "ELM327",
+            stiResp = "STN2255 v5.6.5", atalResp = "OK", stp61Resp = "OK",
+            elmProtocolProbe = mapOf(1 to "OK", 3 to "?", 8 to "OK", 10 to "ERROR")
+        )
+        assertEquals(setOf(1, 6, 8), capability.acceptedElmProtocols)
+        assertFalse(capability.supportsSwCan)
+        assertFalse(capability.supportsCanTransmit)
+    }
+
+    @Test
+    fun singleWireRawProfilesRequireHardwareAndIndividualAcknowledgements() {
+        fun probe(hardware: String, second: String) = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "OBDLink MX+", macAddress = "test", atzResp = "OBDLink",
+            stiResp = "STN2255 v5.6.5", atalResp = "OK", stp61Resp = "OK",
+            hardwareResp = hardware, stnProtocolProbe = mapOf(61 to "OK", 62 to second))
+        assertEquals(setOf(61), probe("OBDLink MX+ r3.2.1", "?").acceptedStnProtocols)
+        assertEquals(setOf(61, 62), probe("OBDLink MX+ r3.2.1", "OK").acceptedStnProtocols)
+        assertTrue(probe("OBDLink LX", "OK").acceptedStnProtocols.isEmpty())
     }
 
     @Test

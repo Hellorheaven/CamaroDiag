@@ -41,13 +41,13 @@ object CanConsoleAdapterReplyPolicy {
             if ((payload[0].toInt() and 0xFF) == 0x7F)
                 negativeSeen = true
         }
-        if (!request.isExtended && request.canId == 0x7DFL) {
+        if (CanConsoleEcuRouting.isFunctional(request)) {
             val responders = mutableMapOf<Long, CanConsoleDiagnosticCorrelation>()
             for (frame in frames) {
-                if (frame.isExtended || frame.canId !in 0x7E8L..0x7EFL) continue
-                val matcher = responders.getOrPut(frame.canId) {
-                    CanConsoleDiagnosticCorrelation(request.copy(canId = frame.canId - 8L))
-                }
+                val physical = CanConsoleEcuRouting.physicalRequestForResponse(request, frame) ?: continue
+                val matcher = responders[frame.canId] ?: runCatching {
+                    CanConsoleDiagnosticCorrelation(physical)
+                }.getOrNull()?.also { responders[frame.canId] = it } ?: continue
                 val payload = matcher.accept(frame, 0L) ?: continue
                 if ((payload[0].toInt() and 0xFF) != 0x7F)
                     return CanConsoleDiagnosticStatus.POSITIVE
@@ -90,10 +90,26 @@ object CanConsoleEcuRouting {
 
     /** SAE J1979 functional request is a broadcast, not one selected ECU.
      * The console retains each responder's CAN ID and never coalesces payloads. */
+    fun isFunctional(request: RawCanFrame): Boolean =
+        (!request.isExtended && request.canId == 0x7DFL) ||
+            (request.isExtended && request.canId == 0x18DB33F1L)
+
+    /** Correlate functional replies per responder, never by mixing CAN IDs.
+     * The derived physical address is used ONLY for RX correlation, not TX. */
+    fun physicalRequestForResponse(request: RawCanFrame, response: RawCanFrame): RawCanFrame? {
+        if (!isFunctional(request) || request.isExtended != response.isExtended) return null
+        val physicalId = when {
+            !request.isExtended && response.canId in 0x7E8L..0x7EFL -> response.canId - 8L
+            request.isExtended && response.canId in 0x18DAF100L..0x18DAF1FFL ->
+                0x18DA00F1L or ((response.canId and 0xFFL) shl 8)
+            else -> return null
+        }
+        return request.copy(canId = physicalId)
+    }
+
     fun isExpectedResponse(request: RawCanFrame, response: RawCanFrame): Boolean =
-        if (!request.isExtended && request.canId == 0x7DFL) {
-            !response.isExtended && response.canId in 0x7E8L..0x7EFL
-        } else isSelectedResponder(request, response)
+        if (isFunctional(request)) physicalRequestForResponse(request, response) != null
+        else isSelectedResponder(request, response)
 }
 
 /** Presentation has no diagnostic ownership: every valid bus frame is RX.
@@ -199,21 +215,27 @@ class CanMonitorErrorTracker {
 }
 
 object CanMonitorProtocolPolicy {
-    fun protocolCommand(can29Bit: Boolean): String = if (can29Bit) "ATSP7" else "ATSP6"
+    fun protocolCommand(can29Bit: Boolean, bitrate: Int = 500_000): String =
+        if (bitrate == DiagnosticRouteSelector.SW_CAN_BITRATE)
+            "STP " + DiagnosticRouteSelector.rawCanProfile(can29Bit, bitrate)
+        else "ATSP" + DiagnosticRouteSelector.elmCanProtocol(can29Bit, bitrate)
     fun clearFilter(can29Bit: Boolean): String = if (can29Bit) "00000000" else "000"
 
-    fun setupCommands(can29Bit: Boolean, stn: Boolean): List<String> = buildList {
-        add(protocolCommand(can29Bit))
+    fun setupCommands(can29Bit: Boolean, stn: Boolean, bitrate: Int = 500_000): List<String> = buildList {
+        require(bitrate != DiagnosticRouteSelector.SW_CAN_BITRATE || stn)
+        add(protocolCommand(can29Bit, bitrate))
         addAll(listOf("ATE0", "ATL0", "ATS1", "ATH1", "ATCAF0"))
         if (stn) {
+            if (bitrate == DiagnosticRouteSelector.SW_CAN_BITRATE)
+                addAll(listOf("STCMM 0", "STCSEGR 0", "STCSEGT 0"))
             val filter = clearFilter(can29Bit)
             addAll(listOf("ATCF $filter", "ATCM $filter", "STFAC"))
         }
     }
 
-    fun restoreCommands(stn: Boolean): List<String> = buildList {
+    fun restoreCommands(stn: Boolean, protocol: Int = 6): List<String> = buildList {
         if (stn) add("ATAR")
-        addAll(listOf("ATSP6", "ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"))
+        addAll(ElmObdSessionProfile(protocol).restoreCommands())
     }
 }
 

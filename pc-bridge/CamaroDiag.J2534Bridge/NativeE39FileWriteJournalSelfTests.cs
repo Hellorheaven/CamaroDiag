@@ -67,6 +67,43 @@ internal static class NativeE39FileWriteJournalSelfTests
                 "Only the accepted event is persisted; disposing twice cannot append completion");
 
             File.Delete(path);
+            // Windows normally prevents external writers while the descriptor
+            // is open. On a platform permitting rename, verify path replacement.
+            var active=new NativeE39FileWriteJournal(path);
+            string moved=path+".moved";
+            try
+            {
+                active.AppendAsync(new(NativeE39WriteSequence.Phase.Prepared,0x20000,"baseline"),
+                    CancellationToken.None).GetAwaiter().GetResult();
+                bool renamed=false;
+                try { File.Move(path,moved);renamed=true; }
+                catch(IOException) { }
+                catch(UnauthorizedAccessException) { }
+                if(renamed)
+                {
+                    File.WriteAllText(path,"replacement");
+                    AssertThrows<IOException>(()=>active.AppendAsync(new(NativeE39WriteSequence.Phase.OriginalCrcVerified,
+                        0x20000,"must not append"),CancellationToken.None).GetAwaiter().GetResult());
+                    tests++;
+                    Assert(File.ReadAllText(path)=="replacement","Replacement journal is untouched");
+                    File.Delete(path);File.Move(moved,path);
+                    AssertThrows<IOException>(()=>active.AppendAsync(new(NativeE39WriteSequence.Phase.OriginalCrcVerified,
+                        0x20000,"must remain blocked"),CancellationToken.None).GetAwaiter().GetResult());
+                    tests++;
+                }
+                else
+                {
+                    Assert(File.Exists(path)&&!File.Exists(moved),"Active journal cannot be renamed");
+                    active.AppendAsync(new(NativeE39WriteSequence.Phase.OriginalCrcVerified,0x20000,"next"),
+                        CancellationToken.None).GetAwaiter().GetResult();
+                }
+            }
+            finally
+            {
+                active.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                if(File.Exists(moved))File.Delete(moved);
+            }
+            File.Delete(path);
             WriteScenario(path, true, false);
             Assert(NativeE39FileWriteJournal.Inspect(path) ==
                 NativeE39FileWriteJournal.CompletionState.Completed,
@@ -195,6 +232,14 @@ internal static class NativeE39FileWriteJournalSelfTests
                 0x20000u, physicalBytes, originalSha, CancellationToken.None)
                 .GetAwaiter().GetResult();
             var physicalFile = Path.Combine(path + ".blocks", "00020000-16.ecu-block");
+            AssertThrows<InvalidDataException>(()=>
+                NativeE39FileWriteJournal.ReadCreatedEnvelope(physicalFile,1));
+            tests++;
+            AssertThrows<InvalidDataException>(()=>
+                NativeE39FileWriteJournal.ReadCreatedEnvelope(physicalFile,2*1024*1024));
+            tests++;
+            Assert(NativeE39FileWriteJournal.ReadCreatedEnvelope(physicalFile,(int)new FileInfo(physicalFile).Length)
+                .AsSpan()[^16..].SequenceEqual(physicalBytes),"Bounded exact envelope readback");
             Assert(File.Exists(physicalFile) &&
                 File.ReadAllBytes(physicalFile).AsSpan()[^16..].SequenceEqual(physicalBytes),
                 "Physical ECU sector backup is durably persisted with exact bytes");
@@ -207,6 +252,24 @@ internal static class NativeE39FileWriteJournalSelfTests
                     originalSha, CancellationToken.None).GetAwaiter().GetResult());
             tests++;
             liveBackup.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            File.Delete(path);
+            Directory.Delete(path + ".blocks", recursive:true);
+            var invalidated = new NativeE39FileWriteJournal(path);
+            try {
+                physicalBytes[0] ^= 0xFF;
+                invalidated.PreserveOriginalBlockAsync(0x20000u,physicalBytes,originalSha,CancellationToken.None).GetAwaiter().GetResult();
+                invalidated.RequireOriginalBlocksIntactAsync(CancellationToken.None).GetAwaiter().GetResult();
+                var intact = File.ReadAllBytes(physicalFile);
+                var changed = intact.ToArray();changed[^1] ^= 1;File.WriteAllBytes(physicalFile,changed);
+                AssertThrows<InvalidDataException>(()=>invalidated.RequireOriginalBlocksIntactAsync(CancellationToken.None).GetAwaiter().GetResult());
+                File.WriteAllBytes(physicalFile,intact);
+                AssertThrows<InvalidDataException>(()=>invalidated.RequireOriginalBlocksIntactAsync(CancellationToken.None).GetAwaiter().GetResult());
+                AssertThrows<InvalidDataException>(()=>invalidated.AppendAsync(new(NativeE39WriteSequence.Phase.Completed,0,"not allowed"),CancellationToken.None).GetAwaiter().GetResult());
+                invalidated.AppendAsync(new(NativeE39WriteSequence.Phase.RecoveryRequired,0x20000,"backup changed"),CancellationToken.None).GetAwaiter().GetResult();
+                tests+=3;
+            }finally{invalidated.DisposeAsync().AsTask().GetAwaiter().GetResult();}
+            Assert(NativeE39FileWriteJournal.Inspect(path)==NativeE39FileWriteJournal.CompletionState.RecoveryRequired,
+                "Detected backup change permanently invalidates session while allowing recovery evidence");
         }
         finally
         {

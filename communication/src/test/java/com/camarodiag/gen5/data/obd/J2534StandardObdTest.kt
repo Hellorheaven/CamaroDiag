@@ -5,6 +5,22 @@ import org.junit.Test
 
 class J2534StandardObdTest {
     private fun bytes(vararg v: Int) = v.map { it.toByte() }.toByteArray()
+    @Test fun odometerVinRequiresTwoMatchingPhysicalMode09Records() {
+        val vin = "WF0TK3SS7PMA00001"
+        val reply = bytes(0x49, 2, 1) + vin.toByteArray(Charsets.US_ASCII)
+        assertEquals(vin, J2534StandardObd.vinData(reply))
+        assertNull(J2534StandardObd.vinData(reply.copyOf(19)))
+        assertNull(J2534StandardObd.vinData(reply + byteArrayOf(0)))
+        assertNull(J2534StandardObd.vinData(bytes(0x7F, 9, 0x12)))
+        assertNull(J2534StandardObd.vinData(bytes(0x49, 4, 1) + vin.toByteArray()))
+        assertEquals(vin, J2534StandardObd.stableOdometerVin(vin, vin))
+        assertNull(J2534StandardObd.stableOdometerVin(vin, null))
+        assertNull(J2534StandardObd.stableOdometerVin(null, vin))
+        assertThrows(IllegalStateException::class.java) {
+            J2534StandardObd.stableOdometerVin(vin, vin.dropLast(1) + "2")
+        }
+    }
+
     @Test fun identityMustBelongToNegotiatedPhysicalResponder() {
         val vin = "1G1FA1RXXR0123456"
         fun identity(response: String = "7E8", expected: String = "7E8",
@@ -48,6 +64,28 @@ class J2534StandardObdTest {
             J2534StandardObd.pidData(0x0C,bytes(0x41,0x0D,0))
         }
     }
+    @Test fun knownMeasurementWidthsAndFinalPageAreStrict() {
+        val one = listOf(0x13, 0x1D, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x33, 0x5A, 0x5C, 0x61, 0x62)
+        val two = listOf(0x21, 0x22, 0x23, 0x31, 0x32, 0x3C, 0x3D, 0x3E, 0x3F,
+            0x4D, 0x4E, 0x53, 0x54, 0x59, 0x5D, 0x5E, 0x63)
+        for ((width, pids) in listOf(1 to one, 2 to two, 4 to listOf(0xA6))) {
+            for (pid in pids) {
+                val valid = bytes(0x41, pid) + ByteArray(width)
+                assertEquals(width, J2534StandardObd.pidData(pid, valid).size)
+                assertThrows(IllegalArgumentException::class.java) {
+                    J2534StandardObd.pidData(pid, valid.copyOf(valid.size - 1))
+                }
+                assertThrows(IllegalArgumentException::class.java) {
+                    J2534StandardObd.pidData(pid, valid + byteArrayOf(0))
+                }
+            }
+        }
+        assertEquals(setOf(225) to false, J2534StandardObd.supportPage(0xE0, bytes(0x41, 0xE0, 0x80, 0, 0, 0)))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534StandardObd.supportPage(0xE0, bytes(0x41, 0xE0, 0, 0, 0, 1))
+        }
+    }
+
     @Test fun onlyExplicitUnsupportedNrcMayBeIdentifiedAsSuch() {
         assertTrue(J2534StandardObd.isExplicitlyUnsupported(7,bytes(0x7F,7,0x11)))
         assertFalse(J2534StandardObd.isExplicitlyUnsupported(7,bytes(0x7F,7,0x22)))
@@ -67,6 +105,18 @@ class J2534StandardObdTest {
         assertEquals(setOf(7),snapshot.unavailableModes)
         assertEquals(listOf(ObdDtc("P0300","confirmed")),snapshot.records)
     }
+    @Test fun inventoryRetainsOtherModesWhenMode03IsRefused() {
+        assertNull(J2534StandardObd.evidenceDtcs(3, bytes(0x7F, 3, 0x11)))
+        val pending = J2534StandardObd.evidenceDtcs(7, bytes(0x47, 1, 0x01, 0x00))
+        val snapshot = PhysicalObdDtcSnapshot(null, pending, emptyList())
+        assertEquals(setOf(3), snapshot.unavailableModes)
+        assertEquals(mapOf(3 to null, 7 to 1, 10 to 0), snapshot.modeCounts)
+        assertEquals(listOf(ObdDtc("P0100", "pending")), snapshot.records)
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534StandardObd.evidenceDtcs(3, bytes(0x43, 1, 0x01))
+        }
+    }
+
     @Test fun fuelAndEthanolTelemetryRejectsShortOrPaddedPayloads() {
         assertArrayEquals(bytes(0),J2534StandardObd.pidData(0x52,bytes(0x41,0x52,0)))
         assertArrayEquals(bytes(255),J2534StandardObd.pidData(0x52,bytes(0x41,0x52,255)))
@@ -81,6 +131,27 @@ class J2534StandardObdTest {
         }
         assertArrayEquals(bytes(0x80,0,0,0),
             J2534StandardObd.pidData(0x34,bytes(0x41,0x34,0x80,0,0,0)))
+    }
+
+    @Test fun secondaryPhysicalPairsAreAcceptedWithoutAuthorizingPrimaryOnlyOperations() {
+        for (protocol in listOf(33,35)) for (id in 0x7E0..0x7E7) {
+            assertTrue(J2534StandardObd.supportsChannel(id,id+8,protocol))
+            assertEquals(id == 0x7E0, J2534StandardObd.supportsPrimaryChannel(id,id+8,protocol))
+            assertFalse(J2534StandardObd.supportsChannel(id,id+9,protocol))
+        }
+        for (protocol in listOf(34,36)) {
+            assertTrue(J2534StandardObd.supportsChannel(0x18DA11F1,0x18DAF111,protocol))
+            assertFalse(J2534StandardObd.supportsPrimaryChannel(0x18DA11F1,0x18DAF111,protocol))
+            assertFalse(J2534StandardObd.supportsChannel(0x18DA11F1,0x18DAF110,protocol))
+            assertFalse(J2534StandardObd.supportsChannel(0x18DB33F1,0x18DAF110,protocol))
+            assertFalse(J2534StandardObd.supportsChannel(0x18DAF1F1,0x18DAF1F1,protocol))
+        }
+    }
+
+    @Test fun extendedPidAndBitmapLengthsRemainExact() {
+        assertArrayEquals(bytes(0x80), J2534StandardObd.pidData(0x5B, bytes(0x41,0x5B,0x80)))
+        assertTrue(runCatching { J2534StandardObd.pidData(0x5B, bytes(0x41,0x5B,0x80,0)) }.isFailure)
+        assertTrue(runCatching { J2534StandardObd.pidData(0xE0, bytes(0x41,0xE0,0)) }.isFailure)
     }
 
     @Test fun noFunctionalOrSwCanChannel() {

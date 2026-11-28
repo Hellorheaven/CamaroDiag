@@ -35,6 +35,56 @@ object CamaroDiagConnectorCheckpoint {
         val permitsAutomaticRecovery: Boolean get() = false
     }
 
+    /** A fingerprint of two equal local acquisitions, never a signature. */
+    data class Snapshot(
+        val inspection: Inspection,
+        val snapshotSha256: String?,
+        val expectedTransaction: String?,
+        val expectedManifest: String?,
+        val problem: String? = null
+    ) {
+        val exportable: Boolean get() = snapshotSha256 != null
+        val physicalVehicleVerified: Boolean get() = false
+    }
+
+    fun normalizedIdentity(value: String?, length: Int): String? {
+        require(length == 32 || length == 64)
+        if (value == null) return null
+        require(value.length == length && value.all { it in "0123456789abcdefABCDEF" })
+        return value.lowercase(java.util.Locale.ROOT)
+    }
+
+    /** Read the same document twice with independent streams; do not accept
+     * a changing file, a partial record, or an unbounded provider stream. */
+    fun capture(
+        open: () -> java.io.InputStream?,
+        expectedTransaction: String? = null,
+        expectedManifest: String? = null,
+        checkActive: () -> Unit = {}
+    ): Snapshot {
+        val tx = normalizedIdentity(expectedTransaction, 32)
+        val manifest = normalizedIdentity(expectedManifest, 64)
+        fun rejected(reason: String) = Snapshot(inspect(null), null, tx, manifest, reason)
+        fun read(): ByteArray? {
+            checkActive()
+            return open()?.use { readBounded(it, checkActive) }
+        }
+        val first = read() ?: return rejected("UNAVAILABLE")
+        if (first.size != RECORD_SIZE) return rejected("INVALID_SIZE")
+        val second = read() ?: return rejected("UNAVAILABLE")
+        checkActive()
+        if (!java.security.MessageDigest.isEqual(first, second))
+            return rejected("CHANGED_DURING_INSPECTION")
+        val digest = hex(java.security.MessageDigest.getInstance("SHA-256").digest(first))
+        return Snapshot(inspect(first, tx, manifest), digest, tx, manifest)
+    }
+
+    fun requireSameEvidence(previous: Snapshot, current: Snapshot) {
+        check(previous.exportable && previous == current) {
+            "Checkpoint changed or could not be pinned."
+        }
+    }
+
     private fun u8(b: Byte) = b.toInt() and 0xff
     private fun u32(bytes: ByteArray, offset: Int): Long =
         (0..3).fold(0L) { value, i -> value or (u8(bytes[offset + i]).toLong() shl (8 * i)) }
@@ -43,10 +93,14 @@ object CamaroDiagConnectorCheckpoint {
     /** Read at most 65 bytes; neither huge imports nor trailing bytes are accepted.
      *  The caller owns the stream and runs this operation off the UI thread.
      */
-    fun inspectStream(input: java.io.InputStream): Inspection {
+    fun inspectStream(input: java.io.InputStream): Inspection =
+        inspect(readBounded(input) {})
+
+    private fun readBounded(input: java.io.InputStream, checkActive: () -> Unit): ByteArray {
         val buffer = ByteArray(RECORD_SIZE + 1)
         var used = 0
         while (used < buffer.size) {
+            checkActive()
             val count = input.read(buffer, used, buffer.size - used)
             if (count < 0) break
             if (count == 0) {
@@ -57,7 +111,8 @@ object CamaroDiagConnectorCheckpoint {
                 used += count
             }
         }
-        return inspect(buffer.copyOf(used))
+        checkActive()
+        return buffer.copyOf(used)
     }
 
     /** Imported bytes only. A missing record must not be treated as an idle device. */

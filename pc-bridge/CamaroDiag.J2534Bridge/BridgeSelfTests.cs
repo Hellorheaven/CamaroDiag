@@ -18,6 +18,16 @@ internal static class BridgeSelfTests
         var checks = DoIpDiagnosticSessionSelfTests.Run();
         checks += DoIpUdpDiscoverySelfTests.Run();
         checks += DoIpConsolePresentationSelfTests.Run();
+        checks += ObdJ1979FunctionalScanSelfTests.Run();
+        checks += ObdJ1979FreezeSelfTests.Run();
+        checks += ObdJ1979CanNetworkSelfTests.Run();
+        checks += ObdJ1979LiveRecorderSelfTests.Run();
+        checks += ObdJ1979CatalogueSelfTests.Run();
+        checks += ObdJ1979LegacyLiveSelfTests.Run();
+        checks += ObdJ1979EvapTestSelfTests.Run();
+        checks += ObdJ1979ClearRecipeSelfTests.Run();
+        checks += ObdJ1979LegacyScanSelfTests.Run();
+        checks += ObdJ1979LegacyMutationSelfTests.Run();
         void Assert(bool condition, string name)
         {
             checks++;
@@ -386,6 +396,13 @@ internal static class BridgeSelfTests
 
         Assert(StandardObdPhysicalPolicy.SupportsChannel(0x7E0,0x7E8,33), "Standard primary 11-bit OBD channel");
         Assert(StandardObdPhysicalPolicy.SupportsChannel(0x18DA10F1,0x18DAF110,34), "Standard primary 29-bit OBD channel");
+        Assert(StandardObdPhysicalPolicy.SupportsChannel(0x7E7,0x7EF,35), "Explicit secondary physical OBD channel");
+        Assert(StandardObdPhysicalPolicy.SupportsChannel(0x18DA11F1,0x18DAF111,36), "Explicit secondary 29-bit physical OBD channel");
+        Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x7E1,0x7E8,33), "Mismatching responder denied");
+        Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x18DA11F1,0x18DAF110,34), "Mismatching extended responder denied");
+        Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x18DB33F1,0x18DAF110,34), "Functional 29-bit broadcast denied");
+        Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x18DAF1F1,0x18DAF1F1,34), "Tester self-address denied");
+        Assert(!StandardObdPhysicalPolicy.SupportsPrimaryChannel(0x7E1,0x7E9,33), "Secondary read capability does not extend clear authorization");
         Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x7DF,0x7E8,33), "Functional broadcasts not authorized");
         Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x7E0,0x7E8,63), "SW-CAN not standard ISO 15765-4");
         foreach (byte[] req in new byte[][] { [1,0], [1,0x52], [3], [7], [0x0A] })
@@ -411,8 +428,22 @@ internal static class BridgeSelfTests
 
         Assert(StandardObdPhysicalPolicy.AllowsRead([2,2,0]), "Standard freeze-frame DTC request");
         Assert(StandardObdPhysicalPolicy.AllowsRead([6,0]), "Standard Mode 06 supported monitor query");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([8,0]), "Mode 08 control-test inventory");
+        Assert(J2534Device.DecodeReceivedPayload(6,0,10,0,[0,0,7,0xE8,0x48,0x20,0,0,0,0],6,0x7E8,[8,0]) is null,
+            "Mode 08 reply for another identifier rejected");
+        Assert(J2534Device.DecodeReceivedPayload(6,0,10,0,[0,0,7,0xE8,0x48,0,0,0,0,0],6,0x7E8,[8,0]) is not null,
+            "Matching Mode 08 inventory reply accepted");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([8,0xE0]), "Mode 08 continuation inventory");
+        Assert(!StandardObdPhysicalPolicy.AllowsRead([8,1]), "Mode 08 actuation is not a read");
+        Assert(!StandardObdPhysicalPolicy.AllowsRead([8,0,0]), "Malformed Mode 08 inventory rejected");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([9,0]), "Mode 09 information inventory");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([9,8]), "Mode 09 advertised information read");
+        Assert(!StandardObdPhysicalPolicy.AllowsRead([9,8,0]), "Malformed Mode 09 rejected");
         Assert(!StandardObdPhysicalPolicy.AllowsRead([2,2,1]), "Only freeze frame 00 is scoped");
-        Assert(!StandardObdPhysicalPolicy.AllowsRead([6,1]), "Unimplemented monitor read scope rejected");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([6,1]), "Standard monitor read supported");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([6,0xE0]), "Monitor continuation bitmap supported");
+        Assert(!StandardObdPhysicalPolicy.AllowsRead([6]), "Missing monitor identifier rejected");
+        Assert(!StandardObdPhysicalPolicy.AllowsRead([6,1,0]), "Extra monitor request parameter rejected");
         Assert(J2534Device.DecodeReceivedPayload(6,0,9,0,[0,0,7,0xE8,0x42,2,1,3,0],6,0x7E8,[2,2,0]) is null,
             "Wrong freeze-frame number rejected");
         Assert(J2534Device.DecodeReceivedPayload(6,0,7,0,[0,0,7,0xE8,0x46,1,0],6,0x7E8,[6,0]) is null,
@@ -585,6 +616,8 @@ internal static class BridgeSelfTests
         checks += UdsResponseDeadlineSelfTests.Run();
         checks += ObdOnUdsCanDiscoverySelfTests.Run();
         checks += EcuPostFlashAssessmentSelfTests.Run();
+        checks += BridgeRecoveryPresentationSelfTests.Run();
+        checks += NativeE39RecoveryImageAssessmentSelfTests.Run();
         checks += NativeEcuSectorSelfTests.Run();
         checks += NativeMpc5566FlashMapSelfTests.Run();
         checks += NativeE39RamLoaderSelfTests.Run();

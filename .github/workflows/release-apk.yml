@@ -29,6 +29,11 @@ on:
       - 'nuget.config'
       - '.github/workflows/release-apk.yml'
   workflow_dispatch:
+    inputs:
+      acceptance_run_id:
+        description: Successful SAE J1979 final acceptance run (required for PR 117)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -38,8 +43,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  authorize-source:
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/chore/unified-ci')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - name: Verify the accepted PR revision and protocol
+        if: github.ref != 'refs/heads/main'
+        uses: actions/github-script@v8
+        env:
+          ACCEPTANCE_ID: ${{ inputs.acceptance_run_id }}
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const id = process.env.ACCEPTANCE_ID;
+            if (!/^[1-9][0-9]*$/.test(id)) throw Error('A final acceptance run ID is required');
+            const {data: pr} = await github.rest.pulls.get({owner, repo, pull_number: 117});
+            const {data: run} = await github.rest.actions.getWorkflowRun({owner, repo, run_id: id});
+            if (pr.state !== 'open' || pr.head.repo.full_name !== owner + '/' + repo ||
+                pr.head.ref !== 'chore/unified-ci' || pr.head.sha !== context.sha ||
+                run.event !== 'push' || run.path !== '.github/workflows/pr-unit-tests.yml' ||
+                run.head_sha !== context.sha || run.head_branch !== pr.head.ref ||
+                run.status !== 'completed' || run.conclusion !== 'success') {
+              throw Error('The selected run must validate the current head of PR 117');
+            }
+            const {data: marker} = await github.rest.repos.getContent({
+              owner, repo, ref: context.sha, path: '.github/ci-final-checkpoint-request.txt'
+            });
+            const lines = Buffer.from(marker.content, 'base64').toString('utf8').split(/\r?\n/);
+            if (lines[0] !== 'scope: protocol' || !lines.includes('protocol: SAE J1979')) {
+              throw Error('Expected the SAE J1979 final acceptance marker');
+            }
+      - name: Accept main release source
+        if: github.ref == 'refs/heads/main'
+        run: echo "Building main revision $GITHUB_SHA"
+
   windows-preflight:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    needs: authorize-source
     runs-on: windows-latest
     permissions:
       contents: read
@@ -61,7 +104,6 @@ jobs:
 
   release:
     needs: windows-preflight
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -124,6 +166,10 @@ jobs:
           VERSION_CODE=$((VERSION_CODE_BASE + NEXT_PATCH))
           VERSION_NAME="${VERSION_PREFIX}.${NEXT_PATCH}"
           TAG_NAME="v${VERSION_NAME}"
+          if [[ "$GITHUB_REF" != refs/heads/main && ( "$TAG_NAME" != v2.0.47 || "$VERSION_CODE" != 64 ) ]]; then
+            echo "::error::PR 117 is authorized for v2.0.47 (64) only."
+            exit 1
+          fi
 
           if git rev-parse -q --verify "refs/tags/${TAG_NAME}" >/dev/null; then
             echo "Tag ${TAG_NAME} already exists; refusing to overwrite a release." >&2

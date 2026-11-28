@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Run" xml:space="preserve"><value>SAE J1979 CAN</value></data>
+  <data name="Prerequisites" xml:space="preserve"><value>Sélectionnez une interface, confirmez le profil physique du calculateur et arrêtez le pont et la console.</value></data>
+  <data name="InvalidChannel" xml:space="preserve"><value>Sélectionnez une paire d’adresses CAN physiques OBD ISO 15765-4 valide.</value></data>
+  <data name="Running" xml:space="preserve"><value>Campagne de lecture physique J1979 en cours.</value></data>
+  <data name="Completed" xml:space="preserve"><value>Campagne achevée. Consultez les résultats individuels.</value></data>
+  <data name="Partial" xml:space="preserve"><value>Campagne interrompue ou durée maximale atteinte ; consultez les résultats.</value></data>
+  <data name="Unavailable" xml:space="preserve"><value>Indisponible</value></data>
+  <data name="MutationsNotTested" xml:space="preserve"><value>Mode 04, Mode 05 legacy et exécution des commandes Mode 08 non testés.</value></data>
+  <data name="Cancelled" xml:space="preserve"><value>Campagne annulée ou autorisation expirée.</value></data>
+  <data name="Failed" xml:space="preserve"><value>Échec de la campagne :</value></data>
+  <data name="JsonFilter" xml:space="preserve"><value>Rapport JSON (*.json)|*.json</value></data>
+  <data name="ExportFailed" xml:space="preserve"><value>Impossible d’exporter le rapport J1979.</value></data>
+  <data name="EvapRun" xml:space="preserve"><value>Mode 08 — EVAP</value></data>
+  <data name="EvapVinRequired" xml:space="preserve"><value>Saisissez le VIN documenté de 17 caractères du véhicule à tester.</value></data>
+  <data name="EvapWarning" xml:space="preserve"><value>Cette opération demande au calculateur de préparer les conditions du test de fuite EVAP ; elle ne réalise pas elle-même le test. Respectez la procédure constructeur : véhicule immobilisé, moteur arrêté, local ventilé et conditions de sécurité réunies. Le calculateur peut refuser le test. Ne le répétez pas automatiquement.</value></data>
+  <data name="EvapConfirm" xml:space="preserve"><value>Demander une seule fois la préparation du test EVAP sur le VIN {0}, CAN physique {1}/{2} ?</value></data>
+  <data name="EvapRunning" xml:space="preserve"><value>Vérification des conditions du test EVAP.</value></data>
+  <data name="EvapExpired" xml:space="preserve"><value>Autorisation expirée ; état du test potentiellement incertain. Ne le répétez pas automatiquement.</value></data>
+  <data name="EvapNotCompletion" xml:space="preserve"><value>Un acquittement ne prouve ni la fin du test ni son résultat.</value></data>
+  <data name="EvapOutcome_ACKNOWLEDGED" xml:space="preserve"><value>Demande de test acquittée par le calculateur.</value></data>
+  <data name="EvapOutcome_REFUSED" xml:space="preserve"><value>Demande de test refusée par le calculateur.</value></data>
+  <data name="EvapOutcome_UNCERTAIN" xml:space="preserve"><value>État de la demande incertain — ne pas la répéter automatiquement.</value></data>
+  <data name="EvapOutcome_NOT_TESTED" xml:space="preserve"><value>Conditions non vérifiées ; aucune demande de test envoyée.</value></data>
+  <data name="ClearRun" xml:space="preserve"><value>Mode 04 — effacement DTC antipollution</value></data>
+  <data name="ClearVinRequired" xml:space="preserve"><value>Saisissez le VIN documenté de 17 caractères du véhicule à tester.</value></data>
+  <data name="ClearWarning" xml:space="preserve"><value>Cet effacement peut supprimer des défauts antipollution, les trames figées et les informations de préparation des moniteurs. Exportez les preuves initiales. Respectez la procédure constructeur, véhicule immobilisé et moteur arrêté. Ne masquez pas un défaut non résolu. Aucune répétition automatique.</value></data>
+  <data name="ClearConfirm" xml:space="preserve"><value>Demander un seul effacement antipollution sur le VIN {0}, CAN physique {1}/{2} ?</value></data>
+  <data name="ClearRunning" xml:space="preserve"><value>Enregistrement des preuves initiales et contrôle des conditions.</value></data>
+  <data name="ClearExpired" xml:space="preserve"><value>Autorisation expirée. État de la demande potentiellement incertain ; ne pas relancer automatiquement.</value></data>
+  <data name="ClearNotCompletion" xml:space="preserve"><value>Les DTC permanents sont relus et jamais présumés effacés. Un acquittement ne prouve pas l’absence de tous les défauts.</value></data>
+  <data name="ClearOutcome_ACKNOWLEDGED_READBACK" xml:space="preserve"><value>Effacement acquitté ; défauts confirmés et en attente relus.</value></data>
+  <data name="ClearOutcome_ACKNOWLEDGED_PARTIAL" xml:space="preserve"><value>Effacement acquitté ; relecture incomplète.</value></data>
+  <data name="ClearOutcome_REFUSED" xml:space="preserve"><value>Demande refusée par le calculateur.</value></data>
+  <data name="ClearOutcome_UNCERTAIN" xml:space="preserve"><value>État de la demande incertain — ne pas relancer automatiquement.</value></data>
+  <data name="ClearOutcome_NOT_TESTED" xml:space="preserve"><value>Conditions non vérifiées ; aucune demande tentée.</value></data>
+  <data name="LegacyRun" xml:space="preserve"><value>J1979 legacy</value></data>
+  <data name="LegacyCancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="LegacyVariant" xml:space="preserve"><value>Protocole documenté</value></data>
+  <data name="LegacySource" xml:space="preserve"><value>Source de réponse ECU (hex)</value></data>
+  <data name="LegacyConfirmProfile" xml:space="preserve"><value>Je confirme le protocole, l’interface et la source de réponse du calculateur.</value></data>
+  <data name="LegacyScope" xml:space="preserve"><value>Lectures fonctionnelles filtrées sur la source sélectionnée. Pas de scan global véhicule, d’effacement ni d’actionnement.</value></data>
+  <data name="LegacyPrerequisites" xml:space="preserve"><value>Sélectionnez une interface J2534, arrêtez le pont et fermez la console avant la recette legacy.</value></data>
+  <data name="LegacyDiscover" xml:space="preserve"><value>Découvrir les sources</value></data>
+  <data name="LegacyDiscoveryScope" xml:space="preserve"><value>Sources observées sur le PID 00 ; ni couverture exhaustive du réseau ni identité constructeur établie.</value></data>
+  <data name="LegacyMutationRun" xml:space="preserve"><value>Legacy — effacement / EVAP</value></data>
+  <data name="LegacyMutationProfile" xml:space="preserve"><value>Je confirme le protocole du véhicule, le calculateur moteur et toutes les sources antipollution documentées.</value></data>
+  <data name="LegacyMutationScope" xml:space="preserve"><value>Requête fonctionnelle véhicule : tous les calculateurs concernés, même silencieux, peuvent être affectés. Un filtre de réponse ne limite pas cette portée.</value></data>
+  <data name="LegacyMutationNext" xml:space="preserve"><value>Continuer</value></data>
+  <data name="LegacyMutationOperation" xml:space="preserve"><value>Opération indépendante</value></data>
+  <data name="LegacyMutationEngine" xml:space="preserve"><value>Source moteur (hex)</value></data>
+  <data name="LegacyMutationSources" xml:space="preserve"><value>Sources documentées (séparées par virgules)</value></data>
+  <data name="LegacyMutationNewFile" xml:space="preserve"><value>Choisissez un nouveau chemin de rapport et de référence initiale.</value></data>
+  <data name="LegacyMutationConfirm" xml:space="preserve"><value>Confirmer une seule requête fonctionnelle véhicule sur le VIN {0}, {1}, sources documentées {2} ? D’autres calculateurs peuvent être affectés.</value></data>
+  <data name="LegacyMutationUncertain" xml:space="preserve"><value>Campagne interrompue, indisponible ou incertaine. Consultez les preuves enregistrées ; ne relancez pas automatiquement.</value></data>
+  <data name="LegacyMutationSaved" xml:space="preserve"><value>Rapport final enregistré ici :</value></data>
+  <data name="NativeUsbRun" xml:space="preserve"><value>J1979 Connectors USB</value></data>
+  <data name="NativeUsbPrerequisites" xml:space="preserve"><value>Arrêtez le pont, la console et les autres opérations.</value></data>
+  <data name="NativeUsbNoPorts" xml:space="preserve"><value>Aucun port série détecté.</value></data>
+  <data name="NativeUsbSelect" xml:space="preserve"><value>Sélectionner</value></data>
+  <data name="NativeUsbPort" xml:space="preserve"><value>Choisissez le port COM du boîtier qualifié.</value></data>
+  <data name="NativeUsbKey" xml:space="preserve"><value>Choisissez la clé locale de 32 octets</value></data>
+  <data name="NativeUsbKeyFilter" xml:space="preserve"><value>Fichier de clé (*.*)|*.*</value></data>
+  <data name="NativeUsbFolder" xml:space="preserve"><value>Choisissez le dossier privé des rapports.</value></data>
+  <data name="NativeUsbConfirm" xml:space="preserve"><value>Carte qualifiée et profil ECM documenté, véhicule immobilisé. Lancer la lecture sur {0}, VIN {1}, CAN {2}/{3} ?</value></data>
+  <data name="NativeUsbVinMismatch" xml:space="preserve"><value>VIN indisponible ou différent du véhicule sélectionné.</value></data>
+  <data name="NativeUsbProvenance" xml:space="preserve"><value>Preuves enregistrées uniquement ; provenance physique non établie.</value></data>
+  <data name="NativeUsbZeroDtc" xml:space="preserve"><value>0 code vérifié</value></data>
+  <data name="NativeUsbMonitorEncoded" xml:space="preserve"><value>MID {0:X2} • TID {1:X2} • Échelle {2:X2} : valeur {3:X4}, min {4:X4}, max {5:X4} (hex)</value></data>
+  <data name="NativeUsbCalibration" xml:space="preserve"><value>Identifiants de calibration (CALID)</value></data>
+  <data name="NativeUsbCvn" xml:space="preserve"><value>Numéros de vérification (CVN)</value></data>
+  <data name="NativeUsbEcuName" xml:space="preserve"><value>Nom du calculateur</value></data>
+  <data name="NativeUsb_readiness" xml:space="preserve"><value>Préparation des moniteurs antipollution</value></data>
+  <data name="NativeUsb_mil_on" xml:space="preserve"><value>Voyant moteur allumé</value></data>
+  <data name="NativeUsb_mil_off" xml:space="preserve"><value>Voyant moteur éteint</value></data>
+  <data name="NativeUsb_dtc_count" xml:space="preserve"><value>Nombre de défauts confirmés annoncé : {0}</value></data>
+  <data name="NativeUsb_spark" xml:space="preserve"><value>Allumage commandé</value></data>
+  <data name="NativeUsb_compression" xml:space="preserve"><value>Allumage par compression</value></data>
+  <data name="NativeUsb_ready" xml:space="preserve"><value>Prêt</value></data>
+  <data name="NativeUsb_incomplete" xml:space="preserve"><value>Incomplet</value></data>
+  <data name="NativeUsb_no_monitors" xml:space="preserve"><value>Aucun moniteur nommé annoncé</value></data>
+  <data name="NativeUsb_monitor_misfire" xml:space="preserve"><value>Ratés d’allumage</value></data>
+  <data name="NativeUsb_monitor_fuel_system" xml:space="preserve"><value>Système de carburant</value></data>
+  <data name="NativeUsb_monitor_components" xml:space="preserve"><value>Composants</value></data>
+  <data name="NativeUsb_monitor_catalyst" xml:space="preserve"><value>Catalyseur</value></data>
+  <data name="NativeUsb_monitor_heated_catalyst" xml:space="preserve"><value>Catalyseur chauffé</value></data>
+  <data name="NativeUsb_monitor_evaporative_system" xml:space="preserve"><value>Système EVAP</value></data>
+  <data name="NativeUsb_monitor_secondary_air" xml:space="preserve"><value>Air secondaire</value></data>
+  <data name="NativeUsb_monitor_oxygen_sensor" xml:space="preserve"><value>Sonde lambda</value></data>
+  <data name="NativeUsb_monitor_oxygen_sensor_heater" xml:space="preserve"><value>Chauffage sonde lambda</value></data>
+  <data name="NativeUsb_monitor_egr_vvt" xml:space="preserve"><value>EGR / VVT</value></data>
+  <data name="NativeUsb_monitor_nmhc_catalyst" xml:space="preserve"><value>Catalyseur NMHC</value></data>
+  <data name="NativeUsb_monitor_nox_aftertreatment" xml:space="preserve"><value>Post-traitement NOx</value></data>
+  <data name="NativeUsb_monitor_boost_pressure" xml:space="preserve"><value>Pression de suralimentation</value></data>
+  <data name="NativeUsb_monitor_exhaust_gas_sensor" xml:space="preserve"><value>Capteur de gaz d’échappement</value></data>
+  <data name="NativeUsb_monitor_particulate_filter" xml:space="preserve"><value>Filtre à particules</value></data>
+  <data name="NativeUsb_inventory" xml:space="preserve"><value>Identifiants annoncés (lecture seule)</value></data>
+  <data name="NativeUsb_inventory_page" xml:space="preserve"><value>Mode {0} · page {1}</value></data>
+  <data name="NativeUsb_inventory_empty" xml:space="preserve"><value>Aucun identifiant annoncé sur cette page</value></data>
+  <data name="NativeUsb_inventory_next" xml:space="preserve"><value>Suite annoncée</value></data>
+  <data name="NativeUsb_freeze_trigger" xml:space="preserve"><value>Défaut déclencheur des données figées</value></data>
+  <data name="NativeUsb_freeze_absent" xml:space="preserve"><value>Aucun défaut déclencheur annoncé</value></data>
+  <data name="ScanInventory" xml:space="preserve"><value>Inventaire annoncé par service</value></data>
+  <data name="ScanInventoryRow" xml:space="preserve"><value>Mode {0} : {1} identifiants — {2}</value></data>
+  <data name="ScanInventoryComplete" xml:space="preserve"><value>Inventaire complet</value></data>
+  <data name="ScanInventoryPartial" xml:space="preserve"><value>Inventaire partiel ou indisponible</value></data>
+  <data name="ScanInventoryNotApplicable" xml:space="preserve"><value>Aucun déclencheur de données figées</value></data>
+  <data name="ScanDtcMode" xml:space="preserve"><value>Mode DTC {0} : {1}</value></data>
+  <data name="ScanCancelledPartial" xml:space="preserve"><value>Campagne annulée. Résultats reçus précédemment uniquement.</value></data>
+  <data name="ScanInventoryUnavailable" xml:space="preserve"><value>Inventaire indisponible</value></data>
+  <data name="ScanVinInvalid" xml:space="preserve"><value>Laissez le VIN vide ou saisissez le VIN documenté de 17 caractères.</value></data>
+  <data name="ScanVinMatch" xml:space="preserve"><value>VIN conforme au véhicule sélectionné.</value></data>
+  <data name="ScanVinMismatch" xml:space="preserve"><value>VIN discordant — scan arrêté.</value></data>
+  <data name="ScanVinUnverified" xml:space="preserve"><value>VIN indisponible — scan arrêté.</value></data>
+  <data name="ScanVinNotRequested" xml:space="preserve"><value>Comparaison du VIN non demandée.</value></data>
+  <data name="LegacyOptionalVin" xml:space="preserve"><value>VIN attendu (facultatif)</value></data>
+  <data name="NetworkRun" xml:space="preserve"><value>Réseau CAN J1979</value></data>
+  <data name="NetworkDiscoverOnly" xml:space="preserve"><value>Découverte uniquement</value></data>
+  <data name="NetworkConfirm" xml:space="preserve"><value>Je confirme le réseau documenté et les canaux physiques sélectionnés.</value></data>
+  <data name="NetworkProfile" xml:space="preserve"><value>Profil CAN classique (33–36)</value></data>
+  <data name="NetworkSources" xml:space="preserve"><value>CAN IDs de réponse, séparés par virgules</value></data>
+  <data name="NetworkScope" xml:space="preserve"><value>Seul PID 00 est diffusé. Scans physiques distincts ; ni couverture globale ni mutation.</value></data>
+  <data name="LiveRun" xml:space="preserve"><value>Enregistrement J1979</value></data>
+  <data name="LiveChannel" xml:space="preserve"><value>Canal CAN physique</value></data>
+  <data name="LivePids" xml:space="preserve"><value>PID numériques, séparés par virgules</value></data>
+  <data name="LiveVin" xml:space="preserve"><value>VIN attendu</value></data>
+  <data name="LiveCycles" xml:space="preserve"><value>Nombre de cycles</value></data>
+  <data name="LiveInterval" xml:space="preserve"><value>Intervalle des cycles (ms)</value></data>
+  <data name="LiveBudget" xml:space="preserve"><value>Budget total (s)</value></data>
+  <data name="LiveConfirm" xml:space="preserve"><value>Je confirme le calculateur physique documenté et le VIN.</value></data>
+  <data name="LiveCycleCount" xml:space="preserve"><value>Cycles : {0}/{1}</value></data>
+  <data name="LiveSummary" xml:space="preserve"><value>min {0} · max {1} · moyenne {2} {3}</value></data>
+  <data name="LiveScope" xml:space="preserve"><value>Lectures horodatées distinctes ; ni mesure simultanée ni mutation.</value></data>
+  <data name="LivePhysicalCan" xml:space="preserve"><value>CAN classique physique</value></data>
+  <data name="LiveRoute" xml:space="preserve"><value>Transport / variante</value></data>
+  <data name="LiveLegacyConfirm" xml:space="preserve"><value>Confirmer variante legacy, source et VIN documentés. Les requêtes sont fonctionnelles.</value></data>
+  <data name="LiveLegacyScope" xml:space="preserve"><value>Requêtes fonctionnelles ; filtrage de la source uniquement. Trames gérées par le pilote.</value></data>
+  <data name="FreezeRun" xml:space="preserve"><value>Trames figées (mode 02)</value></data>
+  <data name="FreezeFrames" xml:space="preserve"><value>Numéros de trames (hex, séparés par virgules)</value></data>
+  <data name="FreezePids" xml:space="preserve"><value>PID (hex ; vide = tous les PID annoncés)</value></data>
+  <data name="FreezeConfirm" xml:space="preserve"><value>J’ai vérifié le canal physique du calculateur et les numéros de trames.</value></data>
+  <data name="FreezeIdentityRecheck" xml:space="preserve"><value>VIN revérifié : {0}</value></data>
+  <data name="FreezeVerified" xml:space="preserve"><value>vérifié</value></data>
+  <data name="FreezeFrameSummary" xml:space="preserve"><value>Trame {0} — {1} — DTC {2} — {3}/{4} PID</value></data>
+  <data name="FreezeStatus_COMPLETE" xml:space="preserve"><value>Complète</value></data>
+  <data name="FreezeStatus_ABSENT" xml:space="preserve"><value>Aucun déclencheur enregistré</value></data>
+  <data name="FreezeStatus_UNAVAILABLE" xml:space="preserve"><value>Indisponible</value></data>
+  <data name="FreezeStatus_PARTIAL" xml:space="preserve"><value>Partielle</value></data>
+  <data name="FreezeStatus_CHANGED" xml:space="preserve"><value>Déclencheur modifié</value></data>
+  <data name="FreezeNotAdvertised" xml:space="preserve"><value>Non annoncés : {0}</value></data>
+  <data name="FreezeNotRead" xml:space="preserve"><value>Non lus : {0}</value></data>
+  <data name="FreezeUnvisited" xml:space="preserve"><value>Trames non parcourues : {0}</value></data>
+  <data name="FreezeScope" xml:space="preserve"><value>Données enregistrées uniquement ; trames OEM supplémentaires brutes. Aucune validation physique.</value></data>
+  <data name="FreezeNativeRun" xml:space="preserve"><value>Trames figées USB natif</value></data>
+  <data name="FreezeNativeInspect" xml:space="preserve"><value>Inspecter la capture CF/1</value></data>
+  <data name="FreezeNativeSelected" xml:space="preserve"><value>Sélectionné</value></data>
+  <data name="FreezeNativeOffline" xml:space="preserve"><value>Inspection hors ligne</value></data>
+  <data name="FreezeNativeCaptureFilter" xml:space="preserve"><value>Capture native (*.cf)|*.cf</value></data>
+  <data name="FreezeLegacyRun" xml:space="preserve"><value>Trames figées legacy</value></data>
+  <data name="FreezeLegacyConfirm" xml:space="preserve"><value>Je confirme que les requêtes fonctionnelles peuvent atteindre plusieurs calculateurs ; seules les réponses de la source sélectionnée sont utilisées.</value></data>
+  <data name="LiveRawOnly" xml:space="preserve"><value>Trames brutes uniquement (sans interprétation numérique)</value></data>
+  <data name="LiveRawCount" xml:space="preserve"><value>PID {0} : {1}/{2} réponses brutes corrélées</value></data>
+  <data name="CatalogueProject" xml:space="preserve"><value>Projeter un catalogue PID</value></data>
+  <data name="CatalogueFile" xml:space="preserve"><value>Catalogue JSON</value></data>
+  <data name="CatalogueReference" xml:space="preserve"><value>Référence documentée</value></data>
+  <data name="CataloguePin" xml:space="preserve"><value>SHA-256 de la référence</value></data>
+  <data name="CatalogueRawReport" xml:space="preserve"><value>Rapport brut JSON ou capture CL/1</value></data>
+  <data name="CatalogueOutput" xml:space="preserve"><value>Nouveau rapport JSON</value></data>
+  <data name="CatalogueBrowse" xml:space="preserve"><value>Choisir</value></data>
+  <data name="CatalogueAnyFile" xml:space="preserve"><value>Tous les fichiers (*.*)|*.*</value></data>
+  <data name="CatalogueScope" xml:space="preserve"><value>Projection hors ligne des octets. Rejeu du transport non vérifié, conformité normative et provenance physique non établies.</value></data>
+  <data name="CatalogueConfirm" xml:space="preserve"><value>Je confirme le VIN et l’empreinte de la référence.</value></data>
+    <data name="CatalogueFrameCoverage" xml:space="preserve"><value>Couverture des trames Mode 02 (détails dans le JSON)</value></data>
+    <data name="CatalogueFrameCoverageRow" xml:space="preserve"><value>Trame {0} : {1} PID annoncés non documentés, {2} PID annoncés non demandés — {3}</value></data>
+    <data name="CatalogueInventoryComplete" xml:space="preserve"><value>inventaire complet</value></data>
+    <data name="CatalogueInventoryIncomplete" xml:space="preserve"><value>inventaire incomplet</value></data>
+  <data name="CatalogueSaved" xml:space="preserve"><value>Projection enregistrée.</value></data>
+  <data name="CatalogueRejected" xml:space="preserve"><value>Projection refusée. Vérifiez le catalogue, la référence et la capture.</value></data>
+  <data name="LiveNativeRun" xml:space="preserve"><value>Enregistrement USB natif</value></data>
+  <data name="LiveNativeInspect" xml:space="preserve"><value>Inspecter la capture CL/1</value></data>
+  <data name="LiveNativeCaptureFilter" xml:space="preserve"><value>Capture native (*.cl)|*.cl</value></data>
+  <data name="LiveNativeConfirm" xml:space="preserve"><value>Je confirme le calculateur physique autorisé, le VIN, les PID et le véhicule à l’arrêt.</value></data>
+  <data name="LiveNativePids" xml:space="preserve"><value>PID bruts (hex., séparés par virgules)</value></data>
+  <data name="LiveNativeVinRequired" xml:space="preserve"><value>Saisir le VIN connu indépendamment avant inspection.</value></data>
+  <data name="LiveNativeCsv" xml:space="preserve"><value>Exporter CL/1 en CSV</value></data>
+  <data name="LiveNativeCsvFilter" xml:space="preserve"><value>Échantillons CSV (*.csv)|*.csv</value></data>
+  <data name="LiveNativePrefix" xml:space="preserve"><value>Inspecter CL/1 interrompu</value></data>
+  <data name="LiveNativePrefixScope" xml:space="preserve"><value>Enregistrements complets uniquement ; capture non terminée.</value></data>
+  <data name="LiveNativePrefixRecords" xml:space="preserve"><value>Enregistrements complets : {0}</value></data>
+  <data name="LiveNativePrefixSamples" xml:space="preserve"><value>Échantillons bruts corrélés : {0}</value></data>
+  <data name="LiveNativePrefixTail" xml:space="preserve"><value>Octets finaux non vérifiés : {0}</value></data>
+  <data name="NativeMaintenanceInspect" xml:space="preserve"><value>Inspecter le journal de maintenance natif</value></data>
+  <data name="NativeMaintenanceFilter" xml:space="preserve"><value>Journaux CM/1 (*.cm)|*.cm</value></data>
+  <data name="NativeMaintenanceOffline" xml:space="preserve"><value>Inspection du journal hors ligne</value></data>
+  <data name="NativeMaintenanceConsistent" xml:space="preserve"><value>Les enregistrements du journal sont cohérents.</value></data>
+  <data name="NativeMaintenanceRecovery" xml:space="preserve"><value>Récupération requise : ne pas répéter cette opération.</value></data>
+  <data name="NativeMaintenanceNotTested" xml:space="preserve"><value>Commande non testée</value></data>
+  <data name="NativeMaintenanceRefused" xml:space="preserve"><value>Commande refusée par le calculateur</value></data>
+  <data name="NativeMaintenanceUncertain" xml:space="preserve"><value>Résultat de la commande incertain</value></data>
+  <data name="NativeMaintenanceAckPartial" xml:space="preserve"><value>Acquittement ; relecture incomplète</value></data>
+  <data name="NativeMaintenanceAckReadback" xml:space="preserve"><value>Acquittement ; relecture enregistrée</value></data>
+  <data name="NativeMaintenanceAckEvap" xml:space="preserve"><value>Préparation EVAP acquittée ; aucun résultat de test de fuite</value></data>
+  <data name="NativeMaintenanceNoTerminal" xml:space="preserve"><value>Enregistrement terminal absent</value></data>
+  <data name="NativeMaintenanceNoRetry" xml:space="preserve"><value>Aucune relance automatique ni preuve physique.</value></data>
+  <data name="NativeMaintenanceRun" xml:space="preserve"><value>Exécuter une opération native unique</value></data>
+  <data name="NativeMaintenanceOperation" xml:space="preserve"><value>Opération</value></data>
+  <data name="NativeMaintenanceClear" xml:space="preserve"><value>Mode 04 — effacement des informations de diagnostic</value></data>
+  <data name="NativeMaintenanceEvap" xml:space="preserve"><value>Mode 08 — préparation EVAP</value></data>
+  <data name="NativeMaintenanceClearWarning" xml:space="preserve"><value>L’effacement réinitialise les données de diagnostic et les états de préparation. Véhicule immobilisé, moteur arrêté, local ventilé et carte qualifiée requis.</value></data>
+  <data name="NativeMaintenanceEvapWarning" xml:space="preserve"><value>Préparation uniquement, pas un test de fuite. Véhicule immobilisé, moteur arrêté, local ventilé et carte qualifiée requis.</value></data>
+  <data name="NativeMaintenanceAccept" xml:space="preserve"><value>Je reconnais les conséquences et les conditions requises</value></data>
+  <data name="NativeMaintenanceConfirm" xml:space="preserve"><value>Je confirme une opération unique avec autorisation locale indépendante sur le VIN sélectionné.</value></data>
+  <data name="NativeMaintenanceUnverified" xml:space="preserve"><value>Journal non vérifié ; aucun succès revendiqué.</value></data>
+  <data name="NativeMaintenancePrefixInspect" xml:space="preserve"><value>Inspecter un journal de maintenance interrompu</value></data>
+  <data name="NativeMaintenancePrefixConsistent" xml:space="preserve"><value>Enregistrements complets du préfixe contrôlés ; terminal absent. Récupération toujours requise.</value></data>
+  <data name="NativeArchiveRun" xml:space="preserve"><value>Récupérer une archive de maintenance</value></data>
+  <data name="NativeArchiveBudget" xml:space="preserve"><value>Budget de l’opération d’origine (ms)</value></data>
+  <data name="NativeArchiveWarning" xml:space="preserve"><value>Export en lecture seule ; aucune commande de maintenance envoyée. Sélectionner le périmètre d’origine.</value></data>
+  <data name="NativeArchiveAccept" xml:space="preserve"><value>J’autorise l’export en lecture seule</value></data>
+  <data name="NativeArchiveConfirm" xml:space="preserve"><value>Confirmer la récupération du journal existant</value></data>
+  <data name="NativeArchiveReadOnly" xml:space="preserve"><value>Archive en lecture seule (aucun nouveau test véhicule)</value></data>
+  <data name="FreezePrefixInspect" xml:space="preserve"><value>Inspecter une capture CF/1 interrompue</value></data>
+  <data name="FreezePrefixFrames" xml:space="preserve"><value>Avancement par trame (provisoire)</value></data>
+  <data name="FreezePrefixFrameRow" xml:space="preserve"><value>Trame {0} : {1} PID de mesure annoncés, {2} lus</value></data>
+  <data name="FreezePrefixSaved" xml:space="preserve"><value>Inspection CF/1 partielle enregistrée (capture non terminée).</value></data>
+  <data name="FreezePrefixConfirm" xml:space="preserve"><value>Confirmez le VIN indépendant attendu {0}. Seuls les enregistrements complets seront inspectés. Continuer ?</value></data>
+  <data name="FreezePrefixSummary" xml:space="preserve"><value>Observations complètes : {0} ; octets finaux non vérifiés : {1} ; état : {2}</value></data>
+  <data name="FreezePrefixVerify" xml:space="preserve"><value>Vérifier le rapport CF/1 interrompu</value></data>
+  <data name="FreezePrefixReport" xml:space="preserve"><value>Sélectionner le rapport CF/1 JSON enregistré</value></data>
+  <data name="FreezePrefixVerified" xml:space="preserve"><value>La capture originale correspond au rapport partiel. La campagne reste incomplète.</value></data>
+  <data name="FreezePrefixRejected" xml:space="preserve"><value>Le rapport CF/1 ne correspond pas à la capture originale</value></data>
+  <data name="FreezePrefixMissingTerminal" xml:space="preserve"><value>enregistrement final absent</value></data>
+  <data name="FreezePrefixTruncatedHeader" xml:space="preserve"><value>en-tête final incomplet</value></data>
+  <data name="FreezePrefixTruncatedRecord" xml:space="preserve"><value>dernier enregistrement incomplet</value></data>
+  <data name="FreezePrefixIncomplete" xml:space="preserve"><value>capture interrompue</value></data>
+  <data name="LiveNativeScalar" xml:space="preserve"><value>Projection CL/1 (JSON)</value></data>
+  <data name="LiveNativeScalarCsv" xml:space="preserve"><value>Exporter les valeurs CL/1 en CSV</value></data>
+  <data name="LiveNativeScalarScope" xml:space="preserve"><value>Valeurs scalaires documentées uniquement ; les échelles ECU non enregistrées restent indéterminées.</value></data>
+  <data name="LiveNativeScalarIdentity" xml:space="preserve"><value>Identité finale non vérifiée : aucune valeur numérique.</value></data>
+  <data name="LiveNativeScalarMean" xml:space="preserve"><value>Moy.</value></data>
+  <data name="LiveNativeScalarVerify" xml:space="preserve"><value>Vérifier le rapport scalaire CL/1</value></data>
+  <data name="LiveNativeScalarVerifyConfirm" xml:space="preserve"><value>Je confirme indépendamment le VIN {0}. Vérifier ces fichiers originaux hors ligne ?</value></data>
+  <data name="LiveNativeScalarVerified" xml:space="preserve"><value>Rapport scalaire vérifié à partir de la capture originale.</value></data>
+  <data name="LiveNativeScalarRejected" xml:space="preserve"><value>Rapport scalaire refusé. Vérifier la capture originale et le VIN indépendant.</value></data>
+</root>

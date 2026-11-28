@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_scalar_verify_title">Vérifier un rapport numérique CL/1</string>
+    <string name="j1979_scalar_verify_capture">Capture CL/1 originale</string>
+    <string name="j1979_scalar_verify_report">Rapport JSON scalaire</string>
+    <string name="j1979_scalar_verify_confirm">Je confirme indépendamment le VIN %1$s</string>
+    <string name="j1979_scalar_verify_run">Vérifier et exporter la preuve</string>
+    <string name="j1979_scalar_verify_scope">Vérification hors ligne uniquement, sans connexion au véhicule ni attestation physique.</string>
+    <string name="j1979_scalar_verify_saved">Preuve de vérification scalaire enregistrée.</string>
+    <string name="j1979_scalar_verify_rejected">Capture ou rapport refusé : vérifier le VIN et sélectionner les fichiers originaux.</string>
+</resources>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_live_title">J1979 live recording</string>
+    <string name="j1979_live_source">Physical response CAN ID</string>
+    <string name="j1979_live_pids">Numeric PID IDs (hex, comma separated)</string>
+    <string name="j1979_live_cycles">Number of cycles</string>
+    <string name="j1979_live_interval">Cycle interval (ms)</string>
+    <string name="j1979_live_budget">Total budget (s)</string>
+    <string name="j1979_live_confirm">Confirm documented physical ECU and VIN %1$s</string>
+    <string name="j1979_live_run">Start recording</string>
+    <string name="j1979_live_unavailable">A compatible negotiated classic CAN ELM/STN channel is required.</string>
+    <string name="j1979_live_completed">Recording completed</string>
+    <string name="j1979_live_incomplete">Recording incomplete</string>
+    <string name="j1979_live_cycle_count">Cycles: %1$d/%2$d</string>
+    <string name="j1979_live_summary">min %1$s · max %2$s · mean %3$s %4$s</string>
+    <string name="j1979_live_export_csv">Export CSV</string>
+    <string name="j1979_live_scope">Individual timestamped read requests, no simultaneous samples or mutations.</string>
+    <string name="j1979_live_legacy_confirm">Confirm legacy response source and VIN %1$s; requests are functional.</string>
+    <string name="j1979_live_legacy_scope">Header-filtered responses to functional requests; no physical addressing or mutations.</string>
+</resources>

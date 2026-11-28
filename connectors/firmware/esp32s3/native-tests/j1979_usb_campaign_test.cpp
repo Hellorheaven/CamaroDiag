@@ -1,0 +1,166 @@
+#include "../src/j1979_usb_campaign.h"
+#include <cassert>
+#include <vector>
+#include <cstring>
+using U=cd::J1979UsbCampaign;
+using Link=cd::J1979CanReadLink;
+struct Owner final:U::Owner{
+  bool present=true,qualified=true,stable=true,stopped=true,detachOnStop=false;
+  bool recoveryOnStop=false,recovery=false;
+  bool started=false,startOk=true,detachOnStart=false;
+  unsigned starts=0,stops=0;
+  cd::HostSessionArbiter* arbiter=nullptr;
+  cd::InterfaceEvidence currentEvidence(const U::Profile&)override{
+    cd::InterfaceEvidence e;
+    e.qualified=qualified;e.localConsent=true;e.authenticated=true;
+    e.exactProfile=true;e.electricalStable=stable;e.diagnosticAllowlistEnforced=true;
+    e.recoveryPending=recovery;
+    return e;
+  }
+  bool currentHost()override{return present;}
+  bool startReadChannel(const U::Profile&,const cd::HostSessionArbiter::Lease& lease)override{
+    ++starts;
+    if(arbiter)assert(arbiter->owns(lease));
+    started=true; // simulate even partially enabled hardware on failure
+    if(detachOnStart)present=false;
+    return startOk;
+  }
+  bool stopAndVerifyQuiescent()override{++stops;started=false;stable=false;if(detachOnStop)present=false;
+    if(recoveryOnStop)recovery=true;return stopped;}
+};
+struct Bus final:Link{
+  explicit Bus(Owner& o):owner(o){}
+  Owner& owner;
+  bool detachAfterSend=false,ready=false;
+  unsigned sends=0;
+  uint32_t now=0;
+  Frame reply;
+  bool active()override{return owner.started;}
+  uint32_t monotonicMs()override{return now;}
+  bool discardReceive()override{ready=false;return true;}
+  bool send(const Frame& f,uint32_t)override{
+    assert(owner.started);
+    ++sends;++now;
+    reply=Frame{};reply.id=0x7e8;reply.length=8;
+    if(f.data[1]==1&&f.data[2]==0){
+      const uint8_t bytes[]={6,0x41,0,0,0,0,0,0};std::memcpy(reply.data,bytes,8);
+    }else{
+      const uint8_t bytes[]={3,0x7f,f.data[1],0x11,0,0,0,0};std::memcpy(reply.data,bytes,8);
+    }
+    ready=true;
+    if(detachAfterSend)owner.present=false;
+    return true;
+  }
+  Receive receive(Frame& f,uint32_t timeout)override{
+    now+=timeout;if(!ready)return Receive::NoFrame;
+    f=reply;ready=false;return Receive::Data;
+  }
+};
+struct Writer final:cd::J1979CampaignEvidence::Writer{
+  std::vector<uint8_t> bytes;
+  bool accepted=true;
+  bool write(const uint8_t* p,size_t n)override{
+    if(!accepted)return false;
+    bytes.insert(bytes.end(),p,p+n);return true;
+  }
+};
+struct Remote final:cd::J1979CanCampaign::ApplicationLink {
+  explicit Remote(Owner& o):owner(o){}
+  Owner& owner;unsigned exchanges=0;uint32_t now=0;bool detach=false;
+  bool active()override{return owner.started;}
+  bool matches(uint32_t tx,uint32_t rx,bool ext)const override{
+    return tx==0x7e0&&rx==0x7e8&&!ext;
+  }
+  uint32_t monotonicMs()override{return now;}
+  void exchange(const uint8_t* req,size_t size,uint32_t,
+      cd::J1979CanReadExchange::Result& result)override{
+    assert(owner.started);++exchanges;++now;
+    result.elapsedMs=1;
+    if(size==2&&req[0]==1&&req[1]==0){
+      const uint8_t bytes[]={0x41,0,0,0,0,0};
+      std::memcpy(result.response,bytes,6);result.responseSize=6;
+      result.state=cd::J1979CanReadExchange::State::Positive;
+    }else{
+      const uint8_t bytes[]={0x7f,req[0],0x11};
+      std::memcpy(result.response,bytes,3);result.responseSize=3;
+      result.state=cd::J1979CanReadExchange::State::Negative;
+    }
+    if(detach)owner.present=false;
+  }
+};
+static bool hasSummary(const Writer& writer){
+  size_t pos=0;
+  while(pos+12<=writer.bytes.size()){
+    const auto* p=writer.bytes.data()+pos;
+    const size_t n=size_t(p[6])+(size_t(p[7])<<8);
+    if(n+12>writer.bytes.size()-pos)return false;
+    if(p[3]==3)return pos+n+12==writer.bytes.size();
+    pos+=n+12;
+  }
+  return false;
+}
+int main(){
+  U::Profile profile;profile.tx=0x7e0;profile.rx=0x7e8;profile.budgetMs=10000;
+  cd::J1979CanReadExchange::Result scratch;
+  cd::HostSessionArbiter arbiter;
+  Owner owner;owner.arbiter=&arbiter;Bus bus(owner);Writer writer;
+  owner.qualified=false;
+  assert(U::run(arbiter,owner,bus,writer,profile,scratch).outcome==U::Outcome::Denied);
+  assert(bus.sends==0&&writer.bytes.empty()&&owner.starts==0&&owner.stops==0);
+  owner.qualified=true;
+  auto good=U::run(arbiter,owner,bus,writer,profile,scratch);
+  assert(good.outcome==U::Outcome::Complete&&good.campaign.transportObserved);
+  assert(owner.starts==1&&owner.stops==1&&!owner.started&&!owner.stable&&hasSummary(writer)&&!arbiter.recoveryRequired());
+  Owner busy;Bus busyBus(busy);Writer busyWriter;
+  cd::HostSessionArbiter::Lease other;
+  assert(arbiter.acquire(cd::HostInterface::PcBridge,busy.currentEvidence(profile),other));
+  assert(U::run(arbiter,busy,busyBus,busyWriter,profile,scratch).outcome==U::Outcome::Denied);
+  assert(busy.starts==0&&busy.stops==0&&busyBus.sends==0&&arbiter.owns(other));
+  assert(arbiter.release(other));
+  Owner failedStart;failedStart.startOk=false;Bus failedBus(failedStart);Writer failedWriter;
+  assert(U::run(arbiter,failedStart,failedBus,failedWriter,profile,scratch).outcome==U::Outcome::StartFailed);
+  assert(failedStart.starts==1&&failedStart.stops==1&&!failedStart.started&&
+    failedBus.sends==0&&failedWriter.bytes.empty()&&!arbiter.recoveryRequired());
+  Owner lostStart;lostStart.detachOnStart=true;Bus lostStartBus(lostStart);Writer lostStartWriter;
+  assert(U::run(arbiter,lostStart,lostStartBus,lostStartWriter,profile,scratch).outcome==U::Outcome::EvidenceLost);
+  assert(lostStart.starts==1&&lostStart.stops==1&&lostStartBus.sends==0&&lostStartWriter.bytes.empty());
+  cd::HostSessionArbiter unsafeStartArbiter;
+  Owner unsafeStart;unsafeStart.startOk=false;unsafeStart.stopped=false;
+  Bus unsafeBus(unsafeStart);Writer unsafeWriter;
+  assert(U::run(unsafeStartArbiter,unsafeStart,unsafeBus,unsafeWriter,profile,scratch).outcome==U::Outcome::QuiescenceUnverified);
+  assert(unsafeStartArbiter.recoveryRequired()&&unsafeBus.sends==0&&unsafeWriter.bytes.empty());
+  cd::HostSessionArbiter preexisting;
+  Owner pending;pending.recovery=true;Bus pendingBus(pending);Writer pendingWriter;
+  assert(U::run(preexisting,pending,pendingBus,pendingWriter,profile,scratch).outcome==U::Outcome::Denied);
+  assert(preexisting.recoveryRequired()&&pending.starts==0&&pending.stops==0);
+  Owner revoked;revoked.detachOnStop=true;Bus revBus(revoked);Writer revWriter;
+  assert(U::run(arbiter,revoked,revBus,revWriter,profile,scratch).outcome==U::Outcome::EvidenceLost);
+  assert(revoked.stops==1&&!hasSummary(revWriter)&&!arbiter.recoveryRequired());
+  cd::HostSessionArbiter recoveryArbiter;
+  Owner recovery;recovery.recoveryOnStop=true;Bus recBus(recovery);Writer recWriter;
+  assert(U::run(recoveryArbiter,recovery,recBus,recWriter,profile,scratch).outcome==U::Outcome::EvidenceLost);
+  assert(recovery.stops==1&&!hasSummary(recWriter)&&recoveryArbiter.recoveryRequired());
+  Owner alternative;Bus altBus(alternative);Writer altWriter;
+  assert(U::run(recoveryArbiter,alternative,altBus,altWriter,profile,scratch).outcome==U::Outcome::Denied);
+  assert(altBus.sends==0&&altWriter.bytes.empty());
+  Owner detached;Bus lost(detached);Writer prefix;lost.detachAfterSend=true;
+  auto partial=U::run(arbiter,detached,lost,prefix,profile,scratch);
+  assert(partial.outcome==U::Outcome::EvidenceLost&&lost.sends==1&&detached.stops==1);
+  assert(prefix.bytes.size()==25); // only start record before host disappeared
+  Owner remoteOwner;Remote remote(remoteOwner);Writer remoteWriter;
+  assert(U::runApplication(arbiter,remoteOwner,remote,remoteWriter,profile,scratch).outcome==U::Outcome::Complete);
+  assert(remote.exchanges>0&&remoteOwner.starts==1&&remoteOwner.stops==1&&hasSummary(remoteWriter));
+  Owner mismatch;Remote wrong(mismatch);Writer wrongWriter;
+  auto wrongProfile=profile;wrongProfile.tx=0x7e1;wrongProfile.rx=0x7e9;
+  assert(U::runApplication(arbiter,mismatch,wrong,wrongWriter,wrongProfile,scratch).outcome==U::Outcome::Denied);
+  assert(mismatch.starts==0&&wrong.exchanges==0&&wrongWriter.bytes.empty());
+  Owner remoteLost;Remote disconnected(remoteLost);disconnected.detach=true;Writer lostWriter;
+  assert(U::runApplication(arbiter,remoteLost,disconnected,lostWriter,profile,scratch).outcome==U::Outcome::EvidenceLost);
+  assert(disconnected.exchanges==1&&remoteLost.stops==1&&!hasSummary(lostWriter));
+  Owner broken;broken.stopped=false;Bus b(broken);Writer w;
+  assert(U::run(arbiter,broken,b,w,profile,scratch).outcome==U::Outcome::QuiescenceUnverified);
+  assert(arbiter.recoveryRequired()&&!hasSummary(w));
+  Owner next;Bus n(next);Writer nw;
+  assert(U::run(arbiter,next,n,nw,profile,scratch).outcome==U::Outcome::Denied);
+  assert(n.sends==0&&nw.bytes.empty());
+}

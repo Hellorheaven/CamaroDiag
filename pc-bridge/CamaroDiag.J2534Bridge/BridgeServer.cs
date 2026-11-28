@@ -213,7 +213,7 @@ internal sealed class BridgeServer
                             memoryReadMaxReadBytes = device.IsMemoryReadEnabled ? _memoryReadScope?.MaxReadBytes : null,
                             memoryReadSession = device.IsMemoryReadEnabled ? _memoryReadScope?.Session : null,
                             standardObdPhysicalRead = device.IsStandardObdReadEnabled,
-                            standardObdClear = _allowStandardObdClear && device.IsStandardObdReadEnabled
+                            standardObdClear = _allowStandardObdClear && device.IsPrimaryStandardObdChannel
                         }));
                         break;
                     }
@@ -265,7 +265,7 @@ internal sealed class BridgeServer
                     }
                     case "clearStandardObdDtcs":
                     {
-                        if (!_allowStandardObdClear || !device.IsStandardObdReadEnabled ||
+                        if (!_allowStandardObdClear || !device.IsPrimaryStandardObdChannel ||
                             !HasExplicitEcuWriteConsent(root) ||
                             !root.TryGetProperty("confirmed", out var confirmation) ||
                             confirmation.ValueKind != JsonValueKind.True)

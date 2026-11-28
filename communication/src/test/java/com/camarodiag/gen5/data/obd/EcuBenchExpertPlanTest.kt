@@ -21,6 +21,76 @@ class EcuBenchExpertPlanTest {
         sha256 = "ab".repeat(32)
     )
 
+    @Test fun qualifiedHardwareSelectionRequiresExactFirmwareRegionAndAccess() {
+        val firmware = EcuProgrammingDriverContract.FirmwareTarget(
+            "E39A", "controller-live", "os-observed")
+        val descriptor = EcuProgrammingDriverContract.Descriptor(
+            id = "qualified-fake-descriptor-only",
+            transport = EcuProgrammingDriverContract.Transport.J2534,
+            capabilities = EcuProgrammingDriverContract.Capability.values().toSet(),
+            controllerFamilies = setOf("E39A"),
+            physicalHardwareValidated = true,
+            writeTargets = setOf(firmware),
+            writeQualifications = setOf(
+                EcuProgrammingDriverContract.WriteQualification(
+                    firmware, EcuBackupCoverage.Region.CALIBRATION,
+                    EcuBenchExpertPlan.AccessMethod.BENCH)
+            )
+        )
+        val qualified = target.copy(
+            accessMethod = EcuBenchExpertPlan.AccessMethod.BENCH,
+            observedControllerId = firmware.controllerId,
+            observedFirmwareId = firmware.firmwareId,
+            qualifiedWriteRegion = EcuBackupCoverage.Region.CALIBRATION
+        )
+        fun ids(candidate: EcuBenchExpertPlan.Target,
+                desc: EcuProgrammingDriverContract.Descriptor = descriptor) =
+            EcuBenchExpertPlan.matchingQualifiedDriverIds(candidate, listOf(desc))
+        assertEquals(listOf(descriptor.id), ids(qualified))
+        assertTrue(ids(qualified.copy(observedFirmwareId = null)).isEmpty())
+        assertTrue(ids(qualified.copy(observedFirmwareId = "other-os")).isEmpty())
+        assertTrue(ids(qualified.copy(observedControllerId = "other-hardware")).isEmpty())
+        assertTrue(ids(qualified.copy(qualifiedWriteRegion = EcuBackupCoverage.Region.PROGRAM_FLASH)).isEmpty())
+        assertTrue(ids(qualified.copy(region = EcuBenchExpertPlan.MemoryRegion.DFLASH)).isEmpty())
+        assertTrue(ids(qualified.copy(accessMethod = EcuBenchExpertPlan.AccessMethod.OBD)).isEmpty())
+        assertTrue(ids(qualified, descriptor.copy(physicalHardwareValidated = false)).isEmpty())
+        assertTrue(ids(qualified, descriptor.copy(capabilities =
+            descriptor.capabilities - EcuProgrammingDriverContract.Capability.READBACK_VERIFY)).isEmpty())
+        // Descriptors alone do not register a hardware driver in production.
+        assertFalse(EcuBenchExpertPlan.isProgrammingEnabled(
+            qualified, image, EcuBenchExpertPlan.Evidence(true, true, true)))
+        assertTrue(EcuProgrammingDriverContract.registeredHardwareDrivers.isEmpty())
+    }
+
+    @Test fun externalEepromQualificationIsNeverAFlashDriver() {
+        val firmware = EcuProgrammingDriverContract.FirmwareTarget("unknown-family", "hardware-id", "os-id")
+        val descriptor = EcuProgrammingDriverContract.Descriptor(
+            id = "chip-model",
+            transport = EcuProgrammingDriverContract.Transport.EEPROM_ISP,
+            capabilities = EcuProgrammingDriverContract.Capability.values().toSet(),
+            controllerFamilies = setOf(firmware.controllerFamily),
+            physicalHardwareValidated = true,
+            writeTargets = setOf(firmware),
+            writeQualifications = setOf(EcuProgrammingDriverContract.WriteQualification(
+                firmware, EcuBackupCoverage.Region.EXTERNAL_EEPROM,
+                EcuBenchExpertPlan.AccessMethod.EXTERNAL_EEPROM_ISP))
+        )
+        val external = target.copy(controllerFamily = firmware.controllerFamily,
+            accessMethod = EcuBenchExpertPlan.AccessMethod.EXTERNAL_EEPROM_ISP,
+            region = EcuBenchExpertPlan.MemoryRegion.EXTERNAL_EEPROM,
+            observedControllerId = firmware.controllerId,
+            observedFirmwareId = firmware.firmwareId,
+            qualifiedWriteRegion = EcuBackupCoverage.Region.EXTERNAL_EEPROM)
+        assertEquals(listOf("chip-model"),
+            EcuBenchExpertPlan.matchingQualifiedDriverIds(external, listOf(descriptor)))
+        assertTrue(EcuBenchExpertPlan.matchingQualifiedDriverIds(
+            external.copy(region = EcuBenchExpertPlan.MemoryRegion.PFLASH),
+            listOf(descriptor)).isEmpty())
+        assertTrue(EcuBenchExpertPlan.matchingQualifiedDriverIds(
+            external.copy(qualifiedWriteRegion = EcuBackupCoverage.Region.PROGRAM_FLASH),
+            listOf(descriptor)).isEmpty())
+    }
+
     @Test fun noHardwareDriverMeansNoWritesEvenWhenChecklistIsComplete() {
         val proof = EcuBenchExpertPlan.Evidence(
             originalReadbackVerified = true,

@@ -293,12 +293,14 @@ class ElmWifiTransport(
         }
     }
 
-    fun read(buffer: ByteArray): Int {
+    fun read(buffer: ByteArray, timeoutMs: Int = 1200): Int {
+        require(timeoutMs in 1..30_000) { "Wi-Fi read timeout must be finite and positive" }
         val activeSocket = synchronized(sessionLock) {
             if (connectionLost) throw ObdTransportDisconnectedException("Wi-Fi OBD adapter disconnected")
             socket
         } ?: return -1
         return try {
+            activeSocket.soTimeout = timeoutMs
             val count = activeSocket.getInputStream().read(buffer)
             synchronized(sessionLock) {
                 if (socket !== activeSocket) {
