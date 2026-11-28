@@ -87,8 +87,9 @@ class Replay{
             require(index_==source_.size(),"Native transport termination followed by another exchange");
             halt(declared_stop_);return;
         }
-        if(r.status=="NOT_TESTED"&&r.reason.empty()&&declared_stop_=="CONTEXT_CHANGED"){
+        if(r.status=="NOT_TESTED"&&(r.reason.empty()||r.reason=="CONTEXT_CHANGED")&&declared_stop_=="CONTEXT_CHANGED"){
             require(index_==source_.size()&&r.end<plan_.channel.budget_ms,"Native context withdrawal followed by exchange");
+            set(s.detail,r.reason);
             halt(declared_stop_);return;
         }
         require(r.end<plan_.channel.budget_ms&&r.duration<=timeout,"Native accepted exchange outside deadline");

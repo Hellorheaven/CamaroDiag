@@ -82,7 +82,10 @@ static j1979_live_step *query(const j1979_live_plan *p,j1979_live_result *r,
         snprintf(s->detail,sizeof(s->detail),"LATE_RESPONSE");
         halt(r,"BUDGET_EXHAUSTED");return s;
     }
-    if (!current(p)) {halt(r,"CONTEXT_CHANGED");return s;}
+    if (!current(p)) {
+        snprintf(s->detail,sizeof(s->detail),"CONTEXT_CHANGED");
+        halt(r,"CONTEXT_CHANGED");return s;
+    }
     if (end<now || end-now>timeout) {
         snprintf(s->detail,sizeof(s->detail),"EXCHANGE_DEADLINE_EXCEEDED");
         halt(r,"TRANSPORT_ERROR");return s;

@@ -1,4 +1,8 @@
 #include "j1979_live.h"
+#include "j1979_native_live_inspection.hpp"
+#include <stdexcept>
+#include <string>
+#include <cstdlib>
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -84,6 +88,33 @@ static j1979_live_plan plan(fake *f) {
     p.cycles=2;p.interval_ms=500;p.wait=wait_fake;
     return p;
 }
+namespace {
+std::string json_report(const j1979_live_plan& p,const j1979_live_result& r){
+    char* buffer=nullptr;std::size_t size=0;
+    auto* file=open_memstream(&buffer,&size);assert(file);
+    assert(j1979_live_write_json(file,&p,&r,"vcan0"));
+    assert(fclose(file)==0);
+    std::string raw(buffer,size);std::free(buffer);return raw;
+}
+auto replay(const std::string& raw){
+    return cd::network::history::inspect_native_live(cd::json::parse_report(raw),{0x7e0,0x7e8},vin);
+}
+std::string change(std::string s,std::string_view old,std::string_view replacement){
+    auto p=s.find(old);assert(p!=std::string::npos);s.replace(p,old.size(),replacement);return s;
+}
+void rejects(const std::string& raw){
+    bool rejected=false;
+    try{(void)replay(raw);}catch(const std::exception&){rejected=true;}
+    assert(rejected);
+}
+void check_replay(const j1979_live_plan& p,const j1979_live_result& r){
+    auto checked=replay(json_report(p,r));
+    assert(checked.completed==r.completed&&checked.cycles==r.cycles_completed);
+    assert(checked.raw_samples==r.raw_samples&&checked.missing_samples==r.missing_samples);
+    assert(checked.initial_identity==r.initial_vin_valid&&checked.final_identity==r.final_vin_valid);
+    assert(checked.stop_reason==r.stop_reason);
+}
+}
 int main(void) {
     fake f{}; f.clock=1000;
     j1979_live_plan p=plan(&f);
@@ -117,6 +148,15 @@ int main(void) {
     assert(strstr(json,"\"name\":\"vehicle-speed\""));
     assert(strstr(json,"\"number\":42"));
     fclose(stream);
+    check_replay(p,r);
+    const auto original=json_report(p,r);
+    rejects(change(original,"\"number\":1726","\"number\":1727"));
+    rejects(change(original,"\"raw_samples\":4","\"raw_samples\":3"));
+    rejects(change(original,"\"request_hex\":\"010C\"","\"request_hex\":\"010D\""));
+    rejects(change(original,"\"selected_pids\":[12,13]","\"selected_pids\":[13,12]"));
+    rejects(change(original,"\"phase\":\"FINAL_VIN\"","\"phase\":\"PERIODIC_VIN\""));
+    rejects(change(original,"\"interval_ms\":500","\"interval_ms\":501"));
+    rejects(change(original,"\"physical_vehicle_verified\":false","\"physical_vehicle_verified\":true"));
     j1979_live_free(&r);
     assert(!r.steps && !r.step_count);
 
@@ -125,46 +165,51 @@ int main(void) {
     assert(j1979_live_record(&p,&r)==0);
     assert(r.completed && f.vin_requests==3 && r.step_count==8);
     assert(!strcmp(r.steps[4].phase,"PERIODIC_VIN"));
+    check_replay(p,r);
     j1979_live_free(&r);
 
     f = fake{}; f.clock=1000; f.bad_final_vin=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"VIN_MISMATCH"));
-    assert(!r.final_vin_valid);j1979_live_free(&r);
+    assert(!r.final_vin_valid);check_replay(p,r);j1979_live_free(&r);
 
     f = fake{}; f.clock=1000; f.negative_sample=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && r.final_vin_valid && r.missing_samples==2);
     assert(!strcmp(r.stop_reason,"INCOMPLETE_SAMPLES"));
+    check_replay(p,r);
     j1979_live_free(&r);
 
     f = fake{}; f.clock=1000; f.timeout_sample=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && r.missing_samples==2);
     assert(!strcmp(r.stop_reason,"INCOMPLETE_SAMPLES"));
+    check_replay(p,r);
     j1979_live_free(&r);
 
     f = fake{}; f.clock=1000; f.suppress_advertisement=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"PID_NOT_ADVERTISED"));
-    assert(f.requests==2);j1979_live_free(&r);
+    assert(f.requests==2);check_replay(p,r);j1979_live_free(&r);
 
     f = fake{}; f.clock=1000; f.retire_context=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"CONTEXT_CHANGED"));
-    assert(f.requests==3);j1979_live_free(&r);
+    assert(f.requests==3);check_replay(p,r);j1979_live_free(&r);
 
     f = fake{}; f.clock=1000; f.malformed_sample=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"INVALID_PID_WIDTH"));
     assert(r.raw_samples==0 && r.missing_samples==1 && f.requests==3);
     assert(!strcmp(r.steps[2].status,"FAILED"));
+    check_replay(p,r);
     j1979_live_free(&r);
 
     f = fake{}; f.clock=1000; f.oversized_sample=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"UNBOUNDED_REPLY"));
     assert(r.raw_samples==0 && r.missing_samples==1 && f.requests==3);
+    check_replay(p,r);
     j1979_live_free(&r);
 
     p=plan(&f);p.pids[1]=p.pids[0];

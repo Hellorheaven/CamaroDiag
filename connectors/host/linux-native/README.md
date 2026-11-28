@@ -410,3 +410,10 @@ The historical plan inspector additionally recomputes the scalar arithmetic, DTC
 Reconstructs admission, validates the exact ordered selected responder set, matches physical CAN pairs, and replays each ECU's read plan and basic summaries. A failed selection cannot carry physical read observations; terminal failures cannot be followed by new ECU reads. Windows duplicated discovery must match. Does not certify the complete derived catalogue or current hardware identity and does not operate any channel. Use discovery-only verification for an empty selection.
 
 When a historical step includes structured application evidence, the verifier now compares its shape, NRC, DTCs, historical scalar, PID support page, freeze trigger, readiness, raw Mode 06 records, VIN and basic Mode 09 identity fields against original bytes. Unknown non-null application fields or missing evidence in a declared evidence-bearing successful step are rejected. Complex aggregate projections remain separately scoped.
+
+### Offline verification of native live CAN reports
+
+```sh
+camarodiag-native --inspect-j1979-native-live 7E0 7E8 VIN17 LIVE.json PROOF.json
+```
+Use the independently known 17-character VIN instead of `VIN17`. The command replays the native Linux CAN live sequence (SocketCAN or ELM application report), checks the support pages, selected PIDs, identity checks, cycle timing, stop state and numeric projections. It compares the regenerated report, writes a new proof with the source SHA-256, never connects to a vehicle, and does not prove adapter authenticity, physical provenance or actual clock behavior. JSON timing contains only exchange timestamps, not every clock callback; exceptional clock regressions and some historical timing ambiguities may be rejected. Historical Python/Android/Windows live formats are a separate migration target.
