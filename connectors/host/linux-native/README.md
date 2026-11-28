@@ -349,3 +349,20 @@ numérotées ne sont interprétées qu'avec un trigger stable et un VIN recontr�
 sans emprunter les paramètres de mesure actuels. Les régressions ajoutées
 n'ont pas été exécutées. Il ne s'agit ni d'une qualification du véhicule,
 ni d'une parité Python complète, ni d'une release.
+
+## Journal EJR/1, capture ECP/1 et maintenance historique
+
+L'option `--adapter-journal trace.ejr` des commandes ELM CAN scan, live, freeze et maintenance conserve les échanges au fil de l'eau. Une erreur d'écriture ou de relecture retire la session. `--adapter-capture trace.ecr` conserve le format ECR/1 fermé existant. Le terminal EJR/1 prouve la fermeture du transcript, pas l'exécution physique réussie. Un préfixe interrompu est inspectable mais non convertible en ECR/1 complet.
+
+Pour scan/live, `--campaign-capture capture.ecp` conserve le plan, le transcript ECR/1 et la chronologie des callbacks nécessaires au rejeu du moteur de recette. Le rapport d'inspection ECP/1 est le rapport natif interne (et non l'enveloppe ELM). Le format ECP/1 est persisté après la recette ; utiliser EJR/1 en complément pour les interruptions.
+
+```sh
+camarodiag-native --inspect-j1979-elm-journal 6 7E0 7E8 VIN trace.ejr proof.json
+camarodiag-native --recover-j1979-elm-journal 6 7E0 7E8 VIN trace.ejr trace.ecr
+camarodiag-native --inspect-j1979-elm-campaign 6 7E0 7E8 VIN capture.ecp native.json
+camarodiag-native --verify-j1979-elm-campaign 6 7E0 7E8 VIN capture.ecp native.json proof.json
+camarodiag-native --inspect-j1979-legacy-maintenance VIN result.json baseline.json intent.json proof.json
+camarodiag-native --inspect-j1979-historical-can-maintenance VIN result.json baseline.json proof.json
+```
+
+VIN doit être remplacé par le VIN documenté. Les inspecteurs hors ligne n'ouvrent aucun canal véhicule et ne prouvent ni consentement, ni durabilité avant transmission, ni authenticité du calculateur. Le nouvel inspecteur legacy exige les deux préfixes séparés pour une commande déclarée tentée. Le vérificateur historique CAN distingue une baseline absente, séparée ou embarquée. Tests raccordés au Makefile, non exécutés.

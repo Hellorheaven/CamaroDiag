@@ -1,3 +1,13 @@
+## Reprise PR117 — journaux ELM, campagnes et inspection de maintenance historique (28/11/2026)
+
+- Base `5bb8f0be3eee83cdec13fad9a093f6a3eb999d6e`, dernier SHA code `c0ece3575a372c0ab12d83f499b78b1ed47fc033`. Comparaison GitHub avant documentation : **20 commits de développement, 27 fichiers, +1872/-108 lignes**. Objectif 10 000 lignes non atteint. Aucun build ou test lancé.
+- Linux C++20 : EJR/1 append-only avec écriture, fsync et relecture à chaque échange ELM CAN (scan/live/Mode 02/maintenance), récupération ECR/1 après terminal, inspection de préfixe interrompu ; erreur de persistance retire la session. Le CRC n'est pas une authentification.
+- ECP/1 : plan immuable, ECR/1 et trace horodatée des appels horloge/contexte/attente/échange ; rejeu hors ligne du moteur scan/live, comparaison du rapport, CLI et preuve SHA-256. ECP/1 reste enregistré après la recette ; l'EJR/1 optionnel conserve les échanges au fil de l'eau. Rejeu du même moteur, pas deuxième implémentation indépendante du moteur.
+- Maintenance legacy : lecture JSON native, rapprochement du baseline et de l'intention séparés, rejeu des séquences et des réponses brutes, contrôle de fraîcheur avant mutation, revalidation EVAP et VIN final après clear ; absence d'attestation physique ou autorisation de réessai.
+- Inspection historique CAN : portage C++20 de la vérification des rapports Mode 04/08 SocketCAN, Android et J2534 (schémas historiques et alias snake/camel), baseline séparé/embarqué, DTC/readiness et refus/ACK, export compatible et tests synthétiques écrits. Compatibilité exacte avec tous les exports réels pas encore attestée.
+- Arbre Git : 128 Python, 19 C MPC5566, zéro Java ; aucun fichier Python ou C supprimé dans ce lot. Reste la parité des rapports et CLI historiques non encore portés, raccordements produit/firmware, référence normative J1979DA_202607 non fournie et qualification de clôture. Ne pas lancer le gate avant clôture réelle, ni supprimer le corpus historique avant validation.
+- Release APK 2.0.47 non trouvée sur GitHub (404), pas de compilation, signature ou publication, PR #117 toujours ouverte. Gate unique de clôture puis release signée comme v46 ; pas de merge automatique.
+
 ## Reprise PR117 — Mode 02 et maintenance ELM CAN, décodage legacy (28/11/2026)
 
 - Base `23d213871e14c9fe362fd791becb064add26647c`, dernier SHA code `1b237cb012a57b9a0a13ffb852e37e3d46379949`. Comparaison GitHub avant documentation : **20 commits, 33 fichiers, +1451/-97 lignes**. Objectif 10 000 lignes non atteint. Aucun build/test lancé conformément au gate unique de fin de protocole.

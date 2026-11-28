@@ -46,3 +46,7 @@ SHA code : `2f466499f6e0b3a2e9b506b4dd5675cc7291f77b`. Authentification et trans
 ## Reprise du lot natif — 27/11/2026
 
 SHA code : `d4b042da2f48991c48a2846b55d5899483420b1d`. Le scan legacy LSR/1, la maintenance fonctionnelle legacy, la découverte CAN et les campagnes physiques multi-ECU, ainsi que les catalogues locaux et leurs projections CL/1, CF/1 et LLR/1 disposent maintenant de chemins C++20 et de tests de régression écrits. Les schémas et la compatibilité historique restent à rapprocher. Le journal de maintenance et son intention sont persistés et relus avant commande ; la persistance des captures de lecture n'est pas encore incrémentale. Pas de validation exécutée, pas de suppression du corpus Python ni du noyau C MPC5566, pas de release APK.
+
+## Reprise 28/11/2026 — ELM CAN et inspection maintenance
+
+SHA code `c0ece3575a372c0ab12d83f499b78b1ed47fc033`. Journal EJR/1 progressif, capture et rejeu ECP/1 scan/live, inspection native des rapports de maintenance legacy (baseline et intent), portage des schémas historiques CAN Mode 04/08 SocketCAN/Android/J2534 et tests écrits. Les autres exports historiques, les appels produits, les outils Python hors J1979 et les sources C MPC5566 restent à migrer/valider. Ne pas déclarer de parité globale ni de clôture de protocole. Aucun test/build/release exécuté.
