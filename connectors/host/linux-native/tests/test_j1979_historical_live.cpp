@@ -96,6 +96,14 @@ int main(){
     rejected(source,"\"request_hex\":\"0105\"","\"request_hex\":\"0106\"");
     rejected(source,"\"started_elapsed_ms\":102","\"started_elapsed_ms\":20");
     rejected(source,"\"completed_cycles\":2","\"completed_cycles\":1");
+    auto enriched=source;
+    replace(enriched,"\"inventory_complete\":true","\"inventory_complete\":true,\"inventory_pages\":[{\"mode\":1,\"base\":0,\"supported_ids\":[5,12],\"has_next_page\":false}],\"unverified_selected_pids\":[],\"vin_match\":\"MATCH\",\"cancelled\":false,\"not_executed\":[\"MODE_04_CLEAR\",\"MODE_08_CONTROL\"]");
+    assert(inspect_historical_live(cd::json::parse_report(enriched)).completed);
+    rejected(enriched,"\"supported_ids\":[5,12]","\"supported_ids\":[5,13]");
+    rejected(enriched,"\"vin_match\":\"MATCH\"","\"vin_match\":\"MISMATCH\"");
+    rejected(enriched,"\"cancelled\":false","\"cancelled\":true");
+    rejected(enriched,"\"unverified_selected_pids\":[]","\"unverified_selected_pids\":[5]");
+    rejected(enriched,"\"MODE_04_CLEAR\"","\"MODE_04_EXECUTED\"");
     auto windows=source;replace(windows,"\"selected_pids\":[5,12]","\"selected_pids\":\"BQw=\"");
     assert(inspect_historical_live(cd::json::parse_report(windows)).completed);
     rejected(windows,"\"BQw=\"","\"BQx=\"");

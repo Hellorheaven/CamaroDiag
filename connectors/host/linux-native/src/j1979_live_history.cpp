@@ -149,8 +149,15 @@ std::string application(const HistoricalLiveRow& r,bool raw_only,bool legacy){
         if(size!=1&&size!=2)return {};
         return pid<0x55&&size==1?"PASSED":"RAW";
     }
-    const auto width=pid==1?4u:pid==0x13||pid==0x1d?1u:
-        j1979_measurement_width(static_cast<std::uint8_t>(pid));
+    // Archive v1 classification is deliberately separate from the expanded
+    // current scalar catalogue. A known modern decoder does not change the
+    // recorded RAW status of a historically untyped response.
+    constexpr auto one=std::to_array<unsigned>({4,5,6,7,8,9,10,11,13,14,15,17,19,29,
+        44,45,46,47,48,51,69,70,71,72,73,74,75,76,82,90,91,92,97,98});
+    constexpr auto two=std::to_array<unsigned>({12,16,31,33,34,35,49,50,60,61,62,63,66,67,
+        68,77,78,83,84,89,93,94,99});
+    const auto width=pid==1||pid==0xa6?4u:std::binary_search(one.begin(),one.end(),pid)?1u:
+        std::binary_search(two.begin(),two.end(),pid)?2u:0u;
     return width?(size==width?"PASSED":""):"RAW";
 }
 struct Signal {unsigned pid;std::string name,unit;std::uint64_t encoded;double number;};
@@ -256,7 +263,7 @@ class Replay {
     std::vector<cd::j1979::Observation> context_rows_;
     std::vector<unsigned> configs_;
     Array clean_,pages_;
-    bool scaling_{},layout_{},layout_attempted_{},inventory_complete_{},terminal_{},final_{};
+    bool scaling_{},layout_{},layout_attempted_{},inventory_complete_{},terminal_{},final_{},inventory_closed_{};
     unsigned sample_index_{},next_page_{},last_end_{},identity_count_{};
     std::optional<unsigned> last_start_,last_identity_;
     std::string identity_,initial_;
@@ -334,7 +341,7 @@ class Replay {
             ++identity_count_;
             if(identity_!=out_.vin)terminal_=true;else last_identity_=r.end;
         }else if(r.phase=="INVENTORY"){
-            require(identity_==out_.vin&&!sample_index_&&!final_&&!inventory_complete_&&next_page_<=224&&
+            require(identity_==out_.vin&&!sample_index_&&!final_&&!inventory_complete_&&next_page_<=224&&!inventory_closed_&&
                 q==Bytes{1,static_cast<std::uint8_t>(next_page_)}&&configs_.empty()&&!layout_attempted_,
                 "Historical inventory page outside admitted sequence");
             context_rows_.push_back(observation(r));
@@ -343,9 +350,9 @@ class Replay {
                 std::vector<unsigned> ids;
                 for(unsigned i=0;i<31;++i)if(data[i/8]&(0x80u>>(i%8))){ids.push_back(next_page_+i+1);advertised_.insert(next_page_+i+1);}
                 inventory_complete_=!(data.back()&1);
-                pages_.push_back(obj({{"base",num(next_page_)},{"supported_ids",numbers(ids)},{"has_next_page",flag(!inventory_complete_)}}));
+                pages_.push_back(obj({{"mode",num(1)},{"base",num(next_page_)},{"supported_ids",numbers(ids)},{"has_next_page",flag(!inventory_complete_)}}));
                 next_page_+=32;
-            }else terminal_=true;
+            }else{inventory_closed_=true;if(!selected_supported())terminal_=true;}
         }else if(r.phase=="SCALING"){
             require(scaling_&&!layout_attempted_&&identity_==out_.vin&&!sample_index_&&!final_&&selected_supported()&&
                 q[0]==1&&required_configs_.contains(q[1])&&advertised_.contains(q[1])&&
@@ -396,6 +403,25 @@ public:
         if(layout_)fields_equal(field(body_,"trim_layout"),layout);
         exact(optional(body_,"observed_vin"),initial_.empty()?Value{}:str(initial_));
         exact(field(body_,"advertised_pids"),numbers(advertised_));
+        if(const auto* page_claim=property(body_,"inventory_pages")){
+            const auto& saved=array(*page_claim,8);
+            require(saved.size()==pages_.size(),"Historical inventory page count differs");
+            for(std::size_t i=0;i<saved.size();++i){
+                const auto& actual=saved[i];const auto& expected=pages_[i];
+                for(auto key:{"base","supported_ids","has_next_page"})exact(field(actual,key),expected.at(key),key);
+                if(const auto* m=property(actual,"mode"))exact(*m,num(1),"mode");
+            }
+        }
+        if(const auto* unverified=property(body_,"unverified_selected_pids")){
+            std::vector<unsigned> missing;
+            for(auto p:out_.pids)if(!advertised_.contains(p))missing.push_back(p);
+            exact(*unverified,numbers(missing));
+        }
+        if(const auto* match=property(body_,"vin_match"))
+            exact(*match,str(initial_.empty()?"UNVERIFIED":initial_==out_.vin?"MATCH":"MISMATCH"));
+        if(const auto* cancelled=property(body_,"cancelled"))exact(*cancelled,flag(out_.stop=="CANCELLED"));
+        if(const auto* omitted=property(body_,"not_executed"))
+            exact(*omitted,arr({str("MODE_04_CLEAR"),str("MODE_08_CONTROL")}));
         require(field(body_,"inventory_complete").boolean()==inventory_complete_,"Historical inventory completion differs");
         require(out_.duration+2>=last_end_,"Historical recording ends before observation");
         const auto possible=sample_index_/out_.pids.size();
@@ -429,7 +455,7 @@ public:
             {"initial_vin",initial_.empty()?Value{}:str(initial_)},{"final_identity_verified",flag(out_.final_identity)},
             {"channel",out_.channel},{"requested_cycles",num(out_.cycles)},{"completed_cycles",num(out_.completed_cycles)},
             {"raw_only",flag(out_.raw_only)},{"selected_pids",numbers(out_.pids)},{"advertised_pids",numbers(advertised_)},
-            {"inventory_complete",flag(inventory_complete_)},{"summary",arr(std::move(summary))},
+            {"inventory_complete",flag(inventory_complete_)},{"inventory_pages",arr(std::move(pages_))},{"summary",arr(std::move(summary))},
             {"multi_signal_summary",arr(std::move(channel_summary))},{"samples",arr(std::move(clean_))},
             {"trim_layout",layout},{"scaling_configuration",scaling},
             {"scaling_context_verified",flag(required_configs_.empty()||(scaling_&&scaling_verified()))},
