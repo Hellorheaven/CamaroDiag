@@ -1,6 +1,11 @@
 #include "j1979_legacy_scan_history.hpp"
 #include "j1979_native_report_detail.hpp"
 #include "j1979_measurement.h"
+#include "j1979_historical_can_plan.hpp"
+#include "j1979_legacy_monitor.hpp"
+#include <sstream>
+#include <iomanip>
+#include <locale>
 #include <algorithm>
 #include <cmath>
 namespace cd::legacy::history {
@@ -82,6 +87,149 @@ void dtcs(const Value& v,const HistoricalScan& s){
         require(actual==it->second,"Legacy DTC summary differs");
     }
 }
+Value normalize(const Value& v){
+    if(const auto* o=std::get_if<Value::Object>(&v.data)){
+        Value::Object out;
+        for(const auto& [k,x]:*o){
+            std::string key;
+            for(char c:k){
+                if(c>='A'&&c<='Z'){key+='_';key+=static_cast<char>(c-'A'+'a');}
+                else key+=c;
+            }
+            require(out.emplace(key,normalize(x)).second,"Ambiguous legacy summary key");
+        }
+        return Value{std::move(out)};
+    }
+    if(const auto* a=std::get_if<Value::Array>(&v.data)){
+        Value::Array out;for(const auto& x:*a)out.push_back(normalize(x));return Value{std::move(out)};
+    }
+    return v;
+}
+Value reduce(const Value& v,std::initializer_list<std::string_view> keys,unsigned source){
+    Value::Array result;
+    require(v.array().size()<=4096u*128u,"Legacy summary count exceeds limit");
+    for(const auto& row:v.array()){
+        const auto n=normalize(row);
+        if(const auto* p=n.find("source")){
+            const auto b=cd::network::history::detail::bytes(*p,1);
+            require(b.size()==1&&b[0]==source,"Legacy summary names a foreign source");
+        }
+        Value::Object fields;
+        for(const auto key:keys){
+            const auto* p=n.find(key);
+            fields.emplace(key,p?*p:Value{});
+        }
+        result.push_back(Value{std::move(fields)});
+    }
+    return Value{std::move(result)};
+}
+void check(const Value& actual,const Value& expected){
+    require(cd::network::history::detail::compare(actual,expected),"Legacy derived projection differs");
+}
+std::string scalar_rows(const HistoricalScan& s){
+    std::ostringstream o;o.imbue(std::locale::classic());o<<std::setprecision(15)<<'[';bool first=true;
+    for(const auto& step:s.steps){
+        if(step.accepted.size()!=1||step.request.size()<2||(step.request[0]!=1&&step.request[0]!=2))continue;
+        const auto& q=step.request;const auto& r=step.accepted.front();
+        j1979_measurement m{};
+        if(!j1979_measurement_decode(q.data(),q.size(),r.data(),r.size(),&m))continue;
+        if(q[1]>=6&&q[1]<=9&&r.size()!=q.size()+1)continue;
+        double number=m.number;
+        if(!m.interpreted){
+            const auto off=q.size();
+            if(q[1]==0x0b)number=r[off];
+            else if(q[1]==0x10)number=(unsigned(r[off])*256+r[off+1])/100.0;
+            else if(q[1]==0x44)number=(unsigned(r[off])*256+r[off+1])/32768.0;
+            else if(q[1]>=6&&q[1]<=9)number=(int(r[off])-128)*100.0/128;
+            else continue;
+        }
+        if(!first)o<<',';
+        first=false;
+        o<<"{\"mode\":"<<unsigned(m.mode)<<",\"pid\":"<<unsigned(m.pid)<<",\"name\":"<<json::quote(m.name)
+            <<",\"unit\":"<<json::quote(m.unit)<<",\"number\":"<<number<<'}';
+    }
+    o<<']';return o.str();
+}
+std::string readiness(const HistoricalScan& s){
+    const auto it=std::find_if(s.steps.begin(),s.steps.end(),[](const HistoricalStep& r){
+        return r.request==Data{1,1}&&r.accepted.size()==1;
+    });
+    if(it==s.steps.end())return "null";
+    const auto& r=it->accepted.front();
+    require(r.size()==6,"Invalid legacy readiness bytes");
+    const unsigned a=r[2],b=r[3],c=r[4],d=r[5];
+    const bool compression=(b&8)!=0;
+    constexpr std::array<std::string_view,3> continuous{"misfire","fuel-system","components"};
+    constexpr std::array<std::string_view,8> spark{"catalyst","heated-catalyst","evaporative-system","secondary-air","",
+        "oxygen-sensor","oxygen-sensor-heater","egr-vvt"};
+    constexpr std::array<std::string_view,8> diesel{"nmhc-catalyst","nox-aftertreatment","","boost-pressure","",
+        "exhaust-gas-sensor","particulate-filter","egr-vvt"};
+    std::ostringstream o;
+    o<<"{\"mil_on\":"<<((a&128)?"true":"false")<<",\"confirmed_dtc_count\":"<<(a&127)
+        <<",\"compression_ignition\":"<<(compression?"true":"false")<<",\"byte_b\":"<<b<<",\"byte_c\":"<<c
+        <<",\"byte_d\":"<<d<<",\"supported_monitors\":{";
+    bool first=true;
+    auto emit=[&](auto names,unsigned support,unsigned incomplete){
+        for(unsigned i=0;i<names.size();++i)if(!names[i].empty()&&(support&(1u<<i))){
+            if(!first)o<<',';
+            first=false;
+            o<<json::quote(names[i])<<':'<<((incomplete&(1u<<i))?"false":"true");
+        }
+    };
+    emit(continuous,b,b>>4);emit(compression?diesel:spark,c,d);
+    o<<"}}";return o.str();
+}
+Value monitor_rows(const HistoricalScan& s){
+    Value::Array rows;
+    for(const auto& step:s.steps){
+        if(step.status!="PASSED"||step.request.size()<2||step.request[1]%32||
+            (step.request[0]!=5&&step.request[0]!=6))continue;
+        for(std::size_t i=0;i<step.accepted.size();++i){
+            auto record=decode_monitor(step.request,step.accepted[i]);
+            require(record.has_value(),"Invalid legacy monitor record");
+            std::ostringstream o;o.imbue(std::locale::classic());o<<std::setprecision(15);write_monitor(o,*record);
+            auto fields=json::parse_report(o.str()).object();
+            fields.erase("scale_verified");fields.erase("diagnostic_verdict");
+            fields.emplace("request_hex",Value{hex(step.request)});
+            fields.emplace("record_index",Value{json::Integer{std::to_string(i)}});
+            rows.push_back(Value{std::move(fields)});
+        }
+    }
+    return Value{std::move(rows)};
+}
+void verify_projections(const Value& body,HistoricalScan& s){
+    std::vector<cd::j1979::Observation> observations;
+    observations.reserve(s.steps.size());
+    for(const auto& r:s.steps){
+        const bool accepted=r.accepted.size()==1;
+        observations.push_back({r.request,accepted?cd::j1979::Bytes(r.accepted.front()):cd::j1979::Bytes{},accepted,true});
+    }
+    const auto p=cd::network::history::historical_projections(observations);
+    if(const auto* v=claim(body,"measurements")){
+        check(reduce(*v,{"mode","pid","name","number","unit"},s.source),json::parse_report(scalar_rows(s)));
+        s.checked_summary_fields.emplace_back("measurements");
+    }
+    if(const auto* v=claim(body,"multi_signal_records")){
+        const auto actual=reduce(*v,{"request_hex","signals"},s.source);
+        using cd::network::history::detail::compare;
+        require(compare(actual,json::parse_report(p.multi))||compare(actual,json::parse_report(p.old_multi)),
+            "Legacy multi-signal projection differs");
+        s.checked_summary_fields.emplace_back("multi_signal_records");
+    }
+    if(const auto* v=claim(body,"status_records")){
+        check(reduce(*v,{"request_hex","states"},s.source),json::parse_report(p.status));
+        s.checked_summary_fields.emplace_back("status_records");
+    }
+    for(const auto& [key,encoded]:std::array<std::pair<std::string_view,std::string_view>,2>{{
+        {"contextual_measurements",p.context},{"operating_context",p.operating}}})
+        if(const auto* v=claim(body,key)){check(normalize(*v),json::parse_report(encoded));s.checked_summary_fields.emplace_back(key);}
+    if(const auto* v=claim(body,"readiness")){
+        check(normalize(*v),json::parse_report(readiness(s)));s.checked_summary_fields.emplace_back("readiness");
+    }
+    if(const auto* v=claim(body,"legacy_monitor_results")){
+        check(normalize(*v),monitor_rows(s));s.checked_summary_fields.emplace_back("legacy_monitor_results");
+    }
+}
 void freeze(const Value& v,const HistoricalScan& s){
     require(s.freeze_present.has_value()&&required(v,"present").boolean()==*s.freeze_present,"Legacy freeze presence differs");
     const auto& code=required(v,"dtc");
@@ -89,6 +237,7 @@ void freeze(const Value& v,const HistoricalScan& s){
 }
 }
 void verify_historical_scan_summary(const Value& body,HistoricalScan& s){
+    verify_projections(body,s);
     if(const auto* p=claim(body,"inventory")){inventory(*p,s);s.checked_summary_fields.emplace_back("inventory");}
     if(const auto* p=claim(body,"dtc_modes")){dtcs(*p,s);s.checked_summary_fields.emplace_back("dtc_modes");}
     for(auto k:{"freeze_trigger","freeze_frame_trigger"})if(const auto* p=claim(body,k)){

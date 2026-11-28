@@ -1,5 +1,6 @@
 #pragma once
 #include "native_json.hpp"
+#include "j1979_context.hpp"
 #include <array>
 #include <optional>
 #include <span>
@@ -50,6 +51,11 @@ PlanInspection inspect_plan(const json::Value& body,PlanOrder,std::optional<std:
 // configuration-dependent numerical claims. Compare saved basic summaries.
 void verify_basic_summary(const json::Value&,PlanInspection&);
 std::string basic_summary_json(const PlanInspection&);
+// Common historical arithmetic projections, never an authorization for live values.
+struct HistoricalProjections {
+    std::string status,multi,old_multi,context,operating;
+};
+HistoricalProjections historical_projections(std::span<const cd::j1979::Observation>);
 void verify_derived_summary(const json::Value&,PlanInspection&);
 std::string plan_report(const PlanInspection&,std::string_view digest={});
 }

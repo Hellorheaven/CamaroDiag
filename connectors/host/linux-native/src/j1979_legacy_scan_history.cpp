@@ -317,7 +317,7 @@ std::string historical_scan_report(const HistoricalScan& s,std::string_view dige
     const auto boolean=[](bool b){return b?"true":"false";};
     std::ostringstream o;
     o<<"{\"schema\":\"camarodiag-j1979-historical-legacy-inspection-linux-v1\","
-        "\"verification_scope\":\"SELECTED_SOURCE_FRAMES_AND_READ_PLAN\","
+        "\"verification_scope\":\"SELECTED_SOURCE_FRAMES_READ_PLAN_AND_REPORTED_SUMMARIES\","
         "\"consistent\":true,\"completed\":"<<boolean(s.completed)<<",\"protocol\":"<<static_cast<unsigned>(s.protocol)
         <<",\"selected_response_source\":"<<json::quote(address(s.source))
         <<",\"declared_vin\":"<<nullable(s.declared_vin)<<",\"observed_vin\":"<<nullable(s.observed_vin)

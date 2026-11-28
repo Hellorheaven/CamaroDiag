@@ -316,15 +316,21 @@ Value canonical_info(const Value& claimed){
     return Value{std::move(rows)};
 }
 }
+HistoricalProjections historical_projections(std::span<const cd::j1979::Observation> observations){
+    std::ostringstream states;
+    cd::j1979::write_status_json(states,observations);
+    return {states.str(),multi(observations,false),multi(observations,true),
+        scaling(observations),operating(observations)};
+}
 void verify_derived_summary(const Value& body,PlanInspection& p){
     std::vector<cd::j1979::Observation> observations;
     for(const auto& s:p.steps){
         const cd::j1979::Bytes response=s.response?cd::j1979::Bytes(*s.response):cd::j1979::Bytes{};
         observations.push_back({s.request,response,s.status=="RAW"||s.status=="PASSED",true});
     }
-    std::ostringstream states;
-    cd::j1979::write_status_json(states,observations);
-    const auto m=monitors(p),v=info(p),s=states.str(),c=scaling(observations),op=operating(observations);
+    const auto projection=historical_projections(observations);
+    const auto m=monitors(p),v=info(p);
+    const auto& s=projection.status;const auto& c=projection.context;const auto& op=projection.operating;
     for(const auto& [name,encoded]:std::array<std::pair<std::string_view,std::string_view>,5>{{
         {"scaled_monitor_records",m},{"extended_vehicle_info",v},{"status_records",s},
         {"contextual_measurements",c},{"operating_context",op}}}){
@@ -334,13 +340,13 @@ void verify_derived_summary(const Value& body,PlanInspection& p){
             ++p.derived_groups_checked;
         }
     }
-    const auto current_multi=multi(observations,false);
+    const auto& current_multi=projection.multi;
     std::string catalogue="NOT_REPORTED";
     if(const auto* saved=claim(body,"multi_signal_records")){
         const auto canonical=normalize(*saved);
         if(equal(canonical,json::parse_report(current_multi)))catalogue="CURRENT";
         else{
-            require(equal(canonical,json::parse_report(multi(observations,true))),"Historical multi-signal records differ");
+            require(equal(canonical,json::parse_report(projection.old_multi)),"Historical multi-signal records differ");
             catalogue="HISTORICAL_49";
         }
         ++p.derived_groups_checked;
