@@ -103,6 +103,18 @@ int main(){
     assert(cd::json::parse_report(old.derived_summary).at("multi_signal_report_catalog").string()=="HISTORICAL_49");
     auto wrong_multi=multi_body;const auto number_pos=wrong_multi.find("\"number\":0.5");
     assert(number_pos!=std::string::npos);wrong_multi.replace(number_pos,12,"\"number\":0.6");rejects(wrong_multi);
+    auto contextual=steps;
+    contextual[4]=row("0100","410004200008");
+    contextual[5]=row("0106","41068080","RAW");
+    contextual.insert(contextual.begin()+6,row("010B","410B64"));
+    contextual.insert(contextual.begin()+7,row("011D","411D30"));
+    auto context_body=wrap(contextual);
+    context_body.pop_back();
+    context_body+=R"(,"contextual_measurements":{"configuration":[{"pid":79,"state":"DEFAULT_UNSUPPORTED","data_hex":null},{"pid":80,"state":"DEFAULT_UNSUPPORTED","data_hex":null}],"records":[{"request_hex":"010B","configuration_pid":79,"signals":[{"name":"intake-manifold-absolute-pressure","unit":"kPa","raw_encoded":100,"number":100,"scale_source":"DEFAULT"}]}]},"operating_context":{"drive_cycle":null,"fuel_trims":[{"request_hex":"0106","frame":null,"layout_1d":48,"upper_bank_verified":true,"signals":[{"bank":1,"name":"short-term-fuel-trim-bank-1","raw_encoded":128,"unit":"%","number":0,"attribution":"DEFINED"},{"bank":3,"name":"short-term-fuel-trim-bank-3","raw_encoded":128,"unit":"%","number":0,"attribution":"DEFINED"}]}]}})";
+    const auto ctx=inspect_plan(cd::json::parse_report(context_body),PlanOrder::historical,std::string(vin));
+    assert(ctx.derived_groups_checked==2);
+    const auto scale_pos=context_body.find("\"number\":100");assert(scale_pos!=std::string::npos);
+    context_body.replace(scale_pos,12,"\"number\":101");rejects(context_body);
     auto changed=steps;changed[5]=row("0106","410680");rejects(wrap(changed));
     changed=steps;changed[5]=row("0105","4105");rejects(wrap(changed));
     changed=steps;changed[5]=row("04","44");rejects(wrap(changed));

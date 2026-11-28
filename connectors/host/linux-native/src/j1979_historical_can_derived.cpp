@@ -162,6 +162,119 @@ std::string multi(std::span<const cd::j1979::Observation> observations,bool old_
     }
     o<<']';return o.str();
 }
+std::string range_state(cd::j1979::RangeState s){
+    using enum cd::j1979::RangeState;
+    switch(s){
+        case unverified:return "UNVERIFIED";
+        case default_unsupported:return "DEFAULT_UNSUPPORTED";
+        case ecu_configuration:return "ECU_CONFIGURATION";
+    }
+    throw std::invalid_argument("Unknown historical range");
+}
+void optional_number(std::ostream& o,std::optional<double> n){if(n)number(o,*n);else o<<"null";}
+void optional_bool(std::ostream& o,std::optional<bool> b){if(b)o<<(*b?"true":"false");else o<<"null";}
+std::string scaling(std::span<const cd::j1979::Observation> observations){
+    const auto context=cd::j1979::derive_context(observations);
+    std::ostringstream o;o.imbue(std::locale::classic());
+    o<<"{\"configuration\":[";
+    const std::array<std::pair<unsigned,cd::j1979::Range>,2> ranges{{{0x4f,context.scaling.pid4f},{0x50,context.scaling.pid50}}};
+    for(std::size_t i=0;i<ranges.size();++i){
+        if(i)o<<',';
+        const auto& [pid,r]=ranges[i];
+        o<<"{\"pid\":"<<pid<<",\"state\":"<<json::quote(range_state(r.state))<<",\"data_hex\":";
+        if(r.state==cd::j1979::RangeState::ecu_configuration)o<<json::quote(hex(r.data));else o<<"null";
+        o<<'}';
+    }
+    o<<"],\"records\":[";bool first=true;
+    for(const auto& row:observations){
+        const auto record=cd::j1979::scale(row,context.scaling);
+        if(!record)continue;
+        if(!first)o<<',';
+        first=false;
+        o<<"{\"request_hex\":"<<json::quote(hex(row.request))<<",\"configuration_pid\":"<<record->configuration_pid<<",\"signals\":[";
+        for(std::size_t i=0;i<record->signals.size();++i){
+            if(i)o<<',';
+            const auto& s=record->signals[i];
+            o<<"{\"name\":"<<json::quote(s.name)<<",\"unit\":"<<json::quote(s.unit)
+                <<",\"raw_encoded\":"<<s.raw<<",\"number\":";
+            optional_number(o,s.number);o<<",\"scale_source\":"<<json::quote(s.scale_source)<<'}';
+        }
+        o<<"]}";
+    }
+    o<<"]}";return o.str();
+}
+struct HistoricalContext {
+    std::optional<cd::j1979::Bytes> layout,baseline,cycle;
+};
+HistoricalContext historic_context(std::span<const cd::j1979::Observation> observations){
+    HistoricalContext ctx;
+    unsigned layouts=0,baselines=0,cycles=0;
+    for(const auto& row:observations){
+        if(row.request.size()!=2||row.request[0]!=1)continue;
+        const auto data=cd::j1979::payload(row);
+        if(!data)continue;
+        switch(row.request[1]){
+            case 0x1d:++layouts;ctx.layout=data;break;
+            case 1:++baselines;ctx.baseline=data;break;
+            case 0x41:++cycles;ctx.cycle=data;break;
+            default:break;
+        }
+    }
+    if(layouts!=1||!ctx.layout||ctx.layout->size()!=1)ctx.layout.reset();
+    if(baselines!=1)ctx.baseline.reset();
+    if(cycles!=1)ctx.cycle.reset();
+    return ctx;
+}
+std::string operating(std::span<const cd::j1979::Observation> observations){
+    const auto ctx=historic_context(observations);
+    cd::j1979::Layout layout{};
+    if(ctx.layout)layout={cd::j1979::LayoutState::verified,ctx.layout->front()};
+    std::ostringstream o;o.imbue(std::locale::classic());
+    o<<"{\"drive_cycle\":";
+    const auto cycle=ctx.cycle?cd::j1979::drive_cycle(*ctx.cycle,ctx.baseline):std::nullopt;
+    if(!cycle)o<<"null";
+    else{
+        o<<"{\"request_hex\":\"0141\",\"raw_hex\":"<<json::quote(hex(cycle->raw))<<",\"baseline_raw_hex\":";
+        if(ctx.baseline)o<<json::quote(hex(*ctx.baseline));else o<<"null";
+        o<<",\"support_verified\":"<<(cycle->support_verified?"true":"false")
+            <<",\"compression_ignition\":"<<(cycle->compression_ignition?"true":"false")
+            <<",\"consistent\":"<<(cycle->consistent?"true":"false")<<",\"monitors\":[";
+        for(std::size_t i=0;i<cycle->monitors.size();++i){
+            if(i)o<<',';
+            const auto& m=cycle->monitors[i];
+            o<<"{\"name\":"<<json::quote(m.name)<<",\"supported\":";optional_bool(o,m.supported);
+            o<<",\"enabled\":";optional_bool(o,m.enabled);
+            o<<",\"complete\":";optional_bool(o,m.complete);
+            o<<",\"enabled_bit\":"<<(m.enabled_bit?"true":"false")
+                <<",\"incomplete_bit\":"<<(m.incomplete_bit?"true":"false")
+                <<",\"consistent\":"<<(m.consistent?"true":"false")<<'}';
+        }
+        o<<"]}";
+    }
+    o<<",\"fuel_trims\":[";bool first=true;
+    for(const auto& row:observations){
+        const auto trim=cd::j1979::trims(row,layout);
+        if(!trim)continue;
+        if(!first)o<<',';
+        first=false;
+        o<<"{\"request_hex\":"<<json::quote(hex(row.request))<<",\"frame\":";
+        if(trim->frame)o<<*trim->frame;else o<<"null";
+        o<<",\"layout_1d\":";
+        if(layout.value)o<<unsigned(*layout.value);else o<<"null";
+        o<<",\"upper_bank_verified\":";optional_bool(o,trim->upper_bank_verified);
+        o<<",\"signals\":[";
+        for(std::size_t i=0;i<trim->signals.size();++i){
+            if(i)o<<',';
+            const auto& s=trim->signals[i];
+            o<<"{\"bank\":"<<s.bank<<",\"name\":"<<json::quote(s.name)<<",\"raw_encoded\":"<<s.raw
+                <<",\"unit\":\"%\",\"number\":";
+            optional_number(o,s.number);
+            o<<",\"attribution\":"<<json::quote(s.number?"DEFINED":"UNVERIFIED_UPPER_BANK")<<'}';
+        }
+        o<<"]}";
+    }
+    o<<"]}";return o.str();
+}
 Value canonical_info(const Value& claimed){
     Value::Array rows;
     const auto normalized=normalize(claimed);
@@ -205,13 +318,16 @@ Value canonical_info(const Value& claimed){
 }
 void verify_derived_summary(const Value& body,PlanInspection& p){
     std::vector<cd::j1979::Observation> observations;
-    for(const auto& s:p.steps)if(s.response)
-        observations.push_back({s.request,*s.response,s.status=="RAW"||s.status=="PASSED",true});
+    for(const auto& s:p.steps){
+        const cd::j1979::Bytes response=s.response?cd::j1979::Bytes(*s.response):cd::j1979::Bytes{};
+        observations.push_back({s.request,response,s.status=="RAW"||s.status=="PASSED",true});
+    }
     std::ostringstream states;
     cd::j1979::write_status_json(states,observations);
-    const auto m=monitors(p),v=info(p),s=states.str();
-    for(const auto& [name,encoded]:std::array<std::pair<std::string_view,std::string_view>,3>{{
-        {"scaled_monitor_records",m},{"extended_vehicle_info",v},{"status_records",s}}}){
+    const auto m=monitors(p),v=info(p),s=states.str(),c=scaling(observations),op=operating(observations);
+    for(const auto& [name,encoded]:std::array<std::pair<std::string_view,std::string_view>,5>{{
+        {"scaled_monitor_records",m},{"extended_vehicle_info",v},{"status_records",s},
+        {"contextual_measurements",c},{"operating_context",op}}}){
         if(const auto* saved=claim(body,name)){
             const auto canonical=name=="extended_vehicle_info"?canonical_info(*saved):normalize(*saved);
             require(equal(canonical,json::parse_report(encoded)),"Derived report differs from recorded bytes");
@@ -231,6 +347,7 @@ void verify_derived_summary(const Value& body,PlanInspection& p){
     }
     p.derived_summary="{\"scaled_monitor_records\":"+m+",\"extended_vehicle_info\":"+v+",\"status_records\":"+s+
         ",\"multi_signal_records\":"+current_multi+",\"multi_signal_report_catalog\":"+json::quote(catalogue)+
-        ",\"historical_arithmetic_only\":true,\"contextual_verified\":false}";
+        ",\"contextual_measurements\":"+c+",\"operating_context\":"+op+
+        ",\"historical_arithmetic_only\":true,\"physical_identity_verified\":false}";
 }
 }
