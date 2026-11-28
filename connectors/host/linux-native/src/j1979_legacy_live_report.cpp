@@ -165,4 +165,60 @@ std::string live_report(const LiveResult& r){
     });
     o<<"}\n";return o.str();
 }
+
+namespace {
+void cell(std::ostream& o,std::string_view value){
+    o<<'"';
+    for(char c:value){if(c=='"')o<<'"';o<<c;}
+    o<<'"';
+}
+void optional_cell(std::ostream& o,std::string_view value){
+    if(!value.empty())cell(o,value);
+}
+}
+std::string live_csv(const LiveResult& r){
+    if(!r.plan.valid()||!valid_protocol(r.protocol)||!valid_source(r.source)||r.trace.size()>live_max_trace||
+        r.samples.size()>r.plan.pids.size()*r.plan.cycles||r.context_requests.size()!=r.context_responses.size())
+        throw std::invalid_argument("Invalid legacy live CSV scope");
+    std::vector<cd::j1979::Observation> admission;
+    for(std::size_t i=0;i<r.context_requests.size();++i)
+        admission.push_back({r.context_requests[i],r.context_responses[i],!r.context_responses[i].empty(),true});
+    const auto context=r.identity_rechecked?cd::j1979::derive_context(admission):cd::j1979::Context{};
+    std::ostringstream o;o.imbue(std::locale::classic());o<<std::setprecision(15);
+    o<<"cycle,pid_hex,started_elapsed_ms,elapsed_ms,duration_ms,status,value,unit,request_hex,response_hex,detail,signal_name\n";
+    std::size_t next=0;
+    for(const auto& sample:r.samples){
+        while(next<r.trace.size()&&(r.trace[next].phase!=LivePhase::sample||r.trace[next].exchange.command=="WAIT"))++next;
+        if(next==r.trace.size())throw std::invalid_argument("Legacy CSV sample lacks corresponding exchange");
+        const auto& x=r.trace[next++];
+        const Data request{1,static_cast<std::uint8_t>(sample.pid)};
+        if(x.cycle!=sample.cycle||x.exchange.command!=hex(request)||x.ended_ms!=sample.elapsed_ms||
+            x.started_ms>x.ended_ms||x.exchange.duration_ms!=x.ended_ms-x.started_ms)
+            throw std::invalid_argument("Legacy CSV sample and trace differ");
+        const auto projected=values(r,sample,context);
+        const auto emit=[&](const Value* v){
+            const Data pid{static_cast<std::uint8_t>(sample.pid)};
+            o<<sample.cycle<<',';cell(o,hex(pid));
+            o<<','<<x.started_ms<<','<<x.ended_ms<<','<<x.exchange.duration_ms<<',';cell(o,sample.status);
+            o<<',';
+            if(v&&v->number&&std::isfinite(*v->number))o<<*v->number;
+            o<<',';if(v)cell(o,v->unit);
+            o<<',';cell(o,x.exchange.command);
+            o<<',';if(!sample.response.empty())cell(o,hex(sample.response));
+            o<<',';optional_cell(o,sample.detail);
+            o<<',';if(v)cell(o,v->name);
+            o<<'\n';
+        };
+        if(projected.empty())emit(nullptr);
+        else for(const auto& v:projected)emit(&v);
+    }
+    // A cancelled WAIT or periodic identity has no sample row. Every other
+    // trace sample must have exactly one corresponding observation.
+    for(;next<r.trace.size();++next)
+        if(r.trace[next].phase==LivePhase::sample&&r.trace[next].exchange.command!="WAIT")
+            throw std::invalid_argument("Legacy CSV omitted a sample exchange");
+    auto result=o.str();
+    if(result.size()>64u*1024u*1024u)throw std::invalid_argument("Legacy CSV output limit");
+    return result;
+}
 }

@@ -467,3 +467,8 @@ The source recording is never rewritten. The commands verify the raw request seq
 camarodiag-native compare-native-live --report run1.json --report run2.json --tx 7E0 --rx 7E8 --vin VIN17 --output comparison.json
 ```
 Comparison replays each raw native report, not its exported projections. It requires the same VIN and CAN pair, distinct input hashes, and at most sixteen recordings. Per-channel means are compared only when all recordings retain identity, numeric samples and identical scaling provenance (including configuration bytes where applicable). Missing channels and unverified identity are explicit, not zero. No diagnostic or time alignment claim is made.
+
+```sh
+camarodiag-native export-legacy-live-csv --capture session.llr --protocol 2 --source 10 --vin VIN17 --output samples.csv
+```
+The exporter replays binary LLR/1, verifies selected-source checksums and correlates each sample with its exact exchange timestamps. Unverified final identity or raw-only mode leaves engineering cells empty. It never opens the adapter and never overwrites an existing output.

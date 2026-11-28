@@ -1798,6 +1798,36 @@ static int legacy_live_replay(const char* protocol,const char* source,const char
     }catch(const std::exception& e){return error(e.what());}
 }
 
+static int legacy_live_csv_cli(int argc,char** argv){
+    const char* protocol=nullptr;const char* source=nullptr;const char* vin=nullptr;
+    const char* capture=nullptr;const char* output=nullptr;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing legacy CSV option value");
+        const char* value=argv[i++];
+        if(key=="--protocol"&&!protocol)protocol=value;
+        else if(key=="--source"&&!source)source=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else if(key=="--capture"&&!capture)capture=value;
+        else if(key=="--output"&&!output)output=value;
+        else return error("Unexpected or duplicate legacy CSV option");
+    }
+    uint32_t p=0,n=0;
+    if(!protocol||!source||!vin||!capture||!output||!decimal_uint32(protocol,&p)||
+        p<1||p>5||strlen(source)!=2||!hex_uint32(source,&n)||!cd::legacy::valid_source(n)||!cf1_valid_vin(vin))
+        return error("Legacy CSV requires independent protocol, source, VIN and capture");
+    try{
+        input original{},again{};
+        if(!load_regular(capture,cd::legacy::live_max_capture,&original))return error("Bounded LLR/1 capture required");
+        const auto replay=cd::legacy::inspect_live_capture({original.bytes.get(),original.length},
+            static_cast<cd::legacy::Protocol>(p),n,vin);
+        const auto csv=cd::legacy::live_csv(replay);
+        if(!load_regular(capture,cd::legacy::live_max_capture,&again)||!same_input(&original,&again))
+            return error("Legacy CSV source changed");
+        if(!atomic_create(output,csv.data(),csv.size()))return error("Legacy CSV destination unavailable");
+        return replay.completed&&replay.identity_rechecked?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
 static int legacy_scan_replay(const char* protocol,const char* source,const char* vin,
     const char* capture_path,const char* report_path,const char* proof_path){
     uint32_t p=0,n=0;
@@ -2939,6 +2969,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native verify-native-live-projection --report RAW.json --projection NUMERIC.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
         "  camarodiag-native project-native-live --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output PROJECTION.json\n"
         "  camarodiag-native export-native-live-csv --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
+        "  camarodiag-native export-legacy-live-csv --capture CAPTURE.llr --protocol 2 --source 10 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native compare-native-live --report A.json --report B.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
         "  camarodiag-native compare-live --report A.json --report B.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-native-freeze --capture CAPTURE.cf --report REPORT.json [--vin VIN] --output PROOF.json\n"
@@ -3296,6 +3327,7 @@ int main(int argc, char **argv) {
     if(argc>=2&&!strcmp(argv[1],"verify-native-live-projection"))return project_native_live_cli(argc,argv,false,true);
     if(argc>=2&&!strcmp(argv[1],"project-native-live"))return project_native_live_cli(argc,argv,false);
     if(argc>=2&&!strcmp(argv[1],"export-native-live-csv"))return project_native_live_cli(argc,argv,true);
+    if(argc>=2&&!strcmp(argv[1],"export-legacy-live-csv"))return legacy_live_csv_cli(argc,argv);
     if(argc>=2&&!strcmp(argv[1],"compare-native-live"))return compare_native_live_cli(argc,argv);
     if(argc>=2&&!strcmp(argv[1],"compare-live"))return compare_live_compat_cli(argc,argv);
     if(argc>=2&&!strcmp(argv[1],"verify-can-mutation"))return historical_maintenance_compat_cli(argc,argv,true);

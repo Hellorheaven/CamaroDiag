@@ -41,4 +41,6 @@ using Wait=std::function<void(unsigned)>;
 LiveResult acquire_live(Elm&,unsigned,const LivePlan&,Clock,Current,Wait,const std::function<void(const LiveExchange&)>& sink={});
 LiveResult replay_live(Protocol,unsigned,const LivePlan&,std::span<const LiveExchange>);
 std::string live_report(const LiveResult&);
+// Long-form CSV from independently replayed LLR/1 evidence; no physical I/O.
+std::string live_csv(const LiveResult&);
 }

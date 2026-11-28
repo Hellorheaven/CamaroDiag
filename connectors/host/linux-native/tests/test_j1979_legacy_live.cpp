@@ -76,6 +76,10 @@ void variants(){
         assert(r.samples.size()==2&&r.samples[0].status=="PASSED"&&r.advertised.contains(12));
         assert(r.other_sources==std::set<unsigned>{0x20});
         auto report=live_report(r);
+        const auto csv=live_csv(r);
+        assert(csv.find("cycle,pid_hex,started_elapsed_ms,elapsed_ms")!=std::string::npos);
+        assert(csv.find("2000,\"rpm\",\"010C\",\"410C1F40\"")!=std::string::npos);
+        assert(csv.find("2100,\"rpm\",\"010C\",\"410C20D0\"")!=std::string::npos);
         assert(report.find("2000")!=std::string::npos&&report.find("2100")!=std::string::npos);
         assert(report.find("\"physical_vehicle_verified\":false")!=std::string::npos);
         auto raw=encode_live_capture({p,0x10,plan(),t});
@@ -89,6 +93,9 @@ void variants(){
         corrupt=raw;corrupt.push_back(0);rejects([&]{decode_live_capture(corrupt);});
         auto raw_result=replay_live(p,0x10,plan(true),t);
         assert(raw_result.completed&&raw_result.samples[0].status=="RAW");
+        const auto raw_csv=live_csv(raw_result);
+        assert(raw_csv.find("\"RAW\",,,\"010C\"")!=std::string::npos);
+        assert(raw_csv.find("\"rpm\"")==std::string::npos);
         auto periodic=replay_live(p,0x10,plan(false,31000),fixture(p,31000));
         assert(periodic.completed&&periodic.trace.size()==t.size()+5);
         Sim sim(p,t);Elm elm(sim,p,true,[]{return true;});elm.configure();
@@ -107,6 +114,7 @@ void failures(){
     auto wrong=t;wrong.back().exchange.raw=vin_rows(p,OTHER);
     auto changed=replay_live(p,0x10,plan(),wrong);
     assert(!changed.completed&&!changed.identity_rechecked&&changed.error=="FINAL_VIN_MISMATCH");
+    assert(live_csv(changed).find("\"rpm\"")==std::string::npos);
     wrong=t;wrong[7].exchange.raw+=wrong[7].exchange.raw;wrong.resize(8);
     auto duplicate=replay_live(p,0x10,plan(),wrong);
     assert(!duplicate.completed&&duplicate.error=="AMBIGUOUS_SELECTED_SOURCE");
