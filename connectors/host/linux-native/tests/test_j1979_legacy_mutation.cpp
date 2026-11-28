@@ -105,6 +105,21 @@ MutationResult run(Fake& f,MutationOperation op,bool fail_intent=false){
     rejects([&]{another.run(p,true,true,clock,current,journal);});
     return result;
 }
+
+void scope_validation(){
+    const auto good=plan(Protocol::vpw,MutationOperation::clear);
+    assert(good.valid());
+    auto p=good;p.protocol=static_cast<Protocol>(6);assert(!p.valid());
+    p=good;p.operation=static_cast<MutationOperation>(0);assert(!p.valid());
+    p=good;p.sources.clear();assert(!p.valid());
+    p=good;p.engine=0x30;assert(!p.valid());
+    for(auto invalid:{0u,0xf1u,0xffu,256u}){p=good;p.sources.insert(invalid);assert(!p.valid());}
+    p=good;p.budget_ms=999;assert(!p.valid());p.budget_ms=60001;assert(!p.valid());
+    p=good;p.vin[0]='Q';assert(!p.valid());
+    p=good;p.vin.pop_back();assert(!p.valid());
+    p=good;for(unsigned i=1;i<=33;++i)p.sources.insert(i);assert(!p.valid());
+}
+
 void variants(){
     for(unsigned n=1;n<=5;++n){
         const auto p=static_cast<Protocol>(n);
@@ -176,4 +191,5 @@ void failures(){
     assert(!read_allowed(Data{4}));
 }
 }
-int main(){variants();failures();}
+int main(){
+    scope_validation();variants();failures();}

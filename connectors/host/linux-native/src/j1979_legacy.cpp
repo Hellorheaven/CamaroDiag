@@ -43,6 +43,15 @@ unsigned nibble(char c){
 }
 bool valid_protocol(Protocol p){const auto n=static_cast<unsigned>(p);return n>=1&&n<=5;}
 bool valid_source(unsigned n){return n>0&&n<255&&n!=0xf1;}
+bool MutationPlan::valid()const{
+    // Scope is an explicit operator declaration, not proof of complete
+    // network coverage. Keep this predicate pure and usable by replay.
+    return valid_protocol(protocol)&&(operation==MutationOperation::clear||operation==MutationOperation::evap)&&
+        vin.size()==17&&std::all_of(vin.begin(),vin.end(),[](unsigned char c){
+            return (c>='0'&&c<='9')||(c>='A'&&c<='Z'&&c!='I'&&c!='O'&&c!='Q');
+        })&&budget_ms>=1000&&budget_ms<=60000&&sources.size()>=1&&sources.size()<=32&&
+        sources.contains(engine)&&std::all_of(sources.begin(),sources.end(),valid_source);
+}
 std::string_view name(Protocol p){
     switch(p){
     case Protocol::pwm:return "SAE J1850 PWM";

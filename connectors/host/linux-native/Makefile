@@ -168,7 +168,7 @@ test-j1979-monitor: build/test_j1979_monitor_scaling.o build/j1979_monitor_scali
 test-j1979-native-c: build/test_j1979_native_c.o build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-cf1: build/test_cf1.o build/cf1.o build/cf1_complete.o build/j1979_cf1_history.o build/j1979_historical_freeze.o build/j1979_can_freeze_history.o build/j1979_legacy_freeze_plan.o build/j1979_legacy_identity.o build/j1979_legacy.o build/j1979_legacy_mutation.o build/j1979_elm.o build/j1979_policy.o build/j1979_can.o build/native_json.o $(DECODER_OBJECTS)
+test-cf1: build/test_cf1.o build/cf1.o build/cf1_complete.o build/j1979_cf1_history.o build/j1979_historical_freeze.o build/j1979_can_freeze_history.o build/j1979_legacy_freeze_plan.o build/j1979_legacy_identity.o build/j1979_legacy.o build/j1979_elm.o build/j1979_policy.o build/j1979_can.o build/native_json.o $(DECODER_OBJECTS)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-cu3: build/test_cu3.o build/cl1_crypto.o build/cl1.o build/cf1.o
