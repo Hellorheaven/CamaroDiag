@@ -25,6 +25,9 @@ struct HistoricalScan {
     std::optional<std::string> freeze_dtc;
     std::vector<std::string> checked_summary_fields;
 };
+// Historical J2534 evidence has no link checksum; only headers and bytes.
+Frame inspect_driver_frame(const json::Value&,Protocol,unsigned source);
+Data driver_request_frame(Protocol,Bytes request);
 HistoricalScan inspect_historical_scan(const json::Value&,std::optional<std::string> expected_vin={});
 std::string historical_scan_report(const HistoricalScan&,std::string_view digest={});
 void verify_historical_scan_summary(const json::Value&,HistoricalScan&);

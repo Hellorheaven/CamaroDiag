@@ -201,6 +201,8 @@ std::string dtc(const std::uint8_t* b){
     char text[6]{};require(cd_j1979_native_dtc_code(b,text),"Invalid legacy DTC");return text;
 }
 }
+Frame inspect_driver_frame(const Value& v,Protocol p,unsigned id){return driver_frame(v,p,id);}
+Data driver_request_frame(Protocol p,Bytes q){return tx_frame(p,q);}
 HistoricalScan inspect_historical_scan(const Value& root,std::optional<std::string> expected){
     HistoricalScan out{};
     const auto& body=admission(root,out);
