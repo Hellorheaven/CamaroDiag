@@ -2234,7 +2234,7 @@ static int catalogue_inventory_cli(const char* mode,const char* catalogue_path,c
         return 0;
     }catch(const std::exception& e){return error(e.what());}
 }
-static int catalogue_projection_cli(int argc,char** argv,bool verify){
+static int catalogue_projection_cli(int argc,char** argv,bool verify,bool csv=false){
     const int required=verify?10:9;
     if(argc!=required&&argc!=required+2)return error("Invalid catalogue projection arguments");
     const std::string_view kind=argv[2];
@@ -2267,7 +2267,7 @@ static int catalogue_projection_cli(int argc,char** argv,bool verify){
         const auto projected=kind=="cf1"?cd::catalogue::project_cf1(raw,vin,parsed,capture.digest,catalogue.digest):
             legacy?cd::catalogue::project_llr1(raw,vin,protocol,source,parsed,capture.digest,catalogue.digest):
             cd::catalogue::project_cl1(raw,vin,parsed,capture.digest,catalogue.digest);
-        const auto canonical=cd::catalogue::report(parsed,projected);
+        const auto canonical=csv?cd::catalogue::projection_csv(parsed,projected):cd::catalogue::report(parsed,projected);
         if(verify){
             if(!load_regular(output,cd::catalogue::max_projection,&stored)||!separate(&stored,&capture)||
                 !separate(&stored,&catalogue)||!ref.separate_from(stored)||stored.length!=canonical.size()||
@@ -3188,6 +3188,8 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-catalogue live|freeze CATALOGUE REFERENCE SHA256 OUTPUT\n"
         "  camarodiag-native --project-j1979-catalogue cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN OUTPUT [PROTOCOL SOURCE]\n"
         "  camarodiag-native --verify-j1979-catalogue cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN PROJECTION PROOF [PROTOCOL SOURCE]\n"
+        "  camarodiag-native --export-j1979-catalogue-csv cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN OUTPUT [PROTOCOL SOURCE]\n"
+        "  camarodiag-native --verify-j1979-catalogue-csv cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN CSV PROOF [PROTOCOL SOURCE]\n"
         "  camarodiag-native --help\n"
         "Examples:\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix incomplete.cf 2G1FA1E30D7654321 partial.json\n"
@@ -3827,6 +3829,8 @@ int main(int argc, char **argv) {
     if (argc==7 && !strcmp(argv[1],"--inspect-j1979-catalogue"))return catalogue_inventory_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
     if (argc>=3 && !strcmp(argv[1],"--project-j1979-catalogue"))return catalogue_projection_cli(argc,argv,false);
     if (argc>=3 && !strcmp(argv[1],"--verify-j1979-catalogue"))return catalogue_projection_cli(argc,argv,true);
+    if (argc>=3 && !strcmp(argv[1],"--export-j1979-catalogue-csv"))return catalogue_projection_cli(argc,argv,false,true);
+    if (argc>=3 && !strcmp(argv[1],"--verify-j1979-catalogue-csv"))return catalogue_projection_cli(argc,argv,true,true);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-live"))return legacy_live_cli(argc,argv);
     if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-live"))return legacy_live_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);
     if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-live"))return legacy_live_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);

@@ -129,4 +129,62 @@ std::string report(const Catalogue& c,const Projection& p){
     }
     o<<"}\n";return bounded(o);
 }
+
+namespace {
+void csv_text(std::ostream& out,std::string_view value){
+    out<<'"';
+    for(char c:value){if(c=='"')out<<'"';out<<c;}
+    out<<'"';
+}
+std::string bytes_hex(Bytes b){
+    constexpr char digits[]="0123456789ABCDEF";
+    std::string s;s.reserve(b.size()*2);
+    for(auto x:b){s+=digits[x>>4];s+=digits[x&15];}
+    return s;
+}
+}
+std::string projection_csv(const Catalogue& c,const Projection& p){
+    if(c.mode!=p.mode||!valid_digest(p.catalogue_sha256)||!valid_digest(p.source_sha256)||
+        !valid_digest(c.reference_sha256))throw std::invalid_argument("Projection provenance mismatch");
+    std::ostringstream o;o.imbue(std::locale::classic());
+    o<<"pid_hex,frame,step_index,cycle,elapsed_ms,source_status,response_hex,projection_status,"
+        "definition_reference,signal_name,unit,signal_reference,signal_status,raw,enumeration,numerator,denominator,"
+        "vin,transport,tx,rx,legacy_protocol,legacy_source,source_capture_sha256,catalogue_sha256,reference_sha256,"
+        "source_completed,final_identity_verified,normative_compliance_verified,physical_vehicle_verified\r\n";
+    for(const auto& row:p.rows){
+        if(!p.identity_rechecked&&!row.signals.empty())throw std::invalid_argument("Unverified identity carries catalogue values");
+        const auto emit=[&](const SignalResult* signal){
+            bool first=true;
+            auto next=[&](){if(!first)o<<',';first=false;};
+            auto field=[&](std::string_view v){next();csv_text(o,v);};
+            auto integer=[&](unsigned v){next();o<<v;};
+            auto blank=[&](){next();};
+            const std::array<std::uint8_t,1> pid{static_cast<std::uint8_t>(row.pid)};
+            if(!row.pid||row.pid>255)throw std::invalid_argument("Invalid catalogue row PID");
+            field(bytes_hex(pid));
+            if(row.frame){integer(*row.frame);integer(row.step_index);blank();blank();}
+            else{blank();blank();integer(row.cycle);integer(row.elapsed_ms);}
+            field(row.source_status);field(bytes_hex(row.response));field(row.status);field(row.reference);
+            if(signal){
+                field(signal->name);field(signal->unit);field(signal->reference);field(signal->status);
+                if(signal->raw)field(*signal->raw);else blank();
+                if(signal->enumeration)field(*signal->enumeration);else blank();
+                if(signal->value){field(signal->value->numerator);field(signal->value->denominator);}
+                else{blank();blank();}
+            }else for(unsigned i=0;i<8;++i)blank();
+            field(p.vin);field(p.transport==Transport::can?"CAN":"LEGACY");
+            if(p.transport==Transport::can){integer(p.tx);integer(p.rx);blank();blank();}
+            else{blank();blank();integer(p.legacy_protocol);integer(p.legacy_source);}
+            field(p.source_sha256);field(p.catalogue_sha256);field(c.reference_sha256);
+            field(tf(p.completed));field(tf(p.identity_rechecked));field("false");field("false");
+            o<<"\r\n";
+            if(!o||o.tellp()>static_cast<std::streamoff>(max_projection))
+                throw std::invalid_argument("Catalogue CSV byte limit");
+        };
+        if(row.signals.empty())emit(nullptr);
+        else for(const auto& signal:row.signals)emit(&signal);
+    }
+    return bounded(o);
+}
+
 }

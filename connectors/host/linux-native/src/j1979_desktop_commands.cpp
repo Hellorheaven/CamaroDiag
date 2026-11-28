@@ -52,8 +52,8 @@ Field catalogue_file(){return positional(f("catalogue","Catalogue JSON local",""
 Field reference_file(){return positional(f("reference","Référence normative locale","",K::input_file));}
 Field reference_pin(){return positional(f("pin","SHA-256 indépendant de la référence","",K::text));}
 std::vector<Field> catalogue_fields(bool verify){
-    auto protocol_field=positional(protocol());protocol_field.required=false;protocol_field.hint.clear();
-    auto source_field=positional(source());source_field.required=false;source_field.hint.clear();
+    auto protocol_field=positional(protocol());protocol_field.required=false;protocol_field.placeholder.clear();
+    auto source_field=positional(source());source_field.required=false;source_field.placeholder.clear();
     std::vector<Field> fields{catalogue_kind(false),catalogue_file(),reference_file(),reference_pin(),
         positional(capture(false)),positional(vin())};
     if(verify)fields.push_back(positional(projection()));
@@ -70,7 +70,7 @@ Field optional_cl1(std::string key,std::string label){
 Field optional_evidence(std::string key,std::string label,std::string flag){
     return f(std::move(key),std::move(label),std::move(flag),K::input_file,"",false);
 }
-Field optional_profile(){auto field=profile();field.required=false;field.hint.clear();return field;}
+Field optional_profile(){auto field=profile();field.required=false;field.placeholder.clear();return field;}
 std::vector<Field> evidence_fields(bool verify){
     std::vector<Field> fields{
         optional_evidence("scj","Journal SocketCAN SCJ","--scj"),
@@ -175,6 +175,8 @@ const std::vector<Operation>& operations(){
         op("inspect-catalogue","Hors ligne — Inventaire du catalogue","Contrôle la référence locale et les définitions, sans prétendre à une certification SAE.","--inspect-j1979-catalogue",{catalogue_kind(true),catalogue_file(),reference_file(),reference_pin(),positional(output())}),
         op("project-catalogue","Hors ligne — Projection du catalogue","Rejoue CL/1, CF/1 ou LLR/1 et applique les définitions documentées.","--project-j1979-catalogue",catalogue_fields(false)),
         op("verify-catalogue","Hors ligne — Vérifier la projection catalogue","Reconstruit les mesures exactes depuis la capture et la référence locale.","--verify-j1979-catalogue",catalogue_fields(true)),
+        op("csv-catalogue","Hors ligne — CSV exact du catalogue","Valeurs rationnelles exactes, provenance et états non interprétés.","--export-j1979-catalogue-csv",catalogue_fields(false)),
+        op("verify-catalogue-csv","Hors ligne — Vérifier CSV du catalogue","Compare les octets du CSV avec le rejeu original.","--verify-j1979-catalogue-csv",catalogue_fields(true)),
         op("inspect-native-freeze","Hors ligne — Lire CF/1","Reconstruit les résultats de trames figées depuis la capture.","--inspect-j1979-freeze-native",{positional(capture(false)),positional(vin()),positional(output())}),
         op("inspect-native-freeze-prefix","Hors ligne — Préfixe CF/1","Inspecte la partie conservée d’une capture interrompue.","--inspect-j1979-freeze-native-prefix",{positional(capture(false)),positional(vin()),positional(output())}),
         op("verify-native-freeze-prefix","Hors ligne — Vérifier préfixe CF/1","Compare un rapport partiel à son préfixe de capture.","--verify-j1979-freeze-native-prefix",{positional(capture(false)),positional(prefix_report()),positional(output()),positional(vin())}),
@@ -311,7 +313,7 @@ Invocation prepare(const Operation& supplied,const Values& values){
         const bool has_profile=selected!=values.end()&&!selected->second.empty();
         require(sources==1&&ecp==has_profile,"Une seule preuve originale ; profil ELM obligatoire uniquement pour ECP");
     }
-    if(op.id=="project-catalogue"||op.id=="verify-catalogue"){
+    if(op.id=="project-catalogue"||op.id=="verify-catalogue"||op.id=="csv-catalogue"||op.id=="verify-catalogue-csv"){
         const auto present=[&](std::string_view key){
             const auto it=values.find(key);return it!=values.end()&&!it->second.empty();
         };

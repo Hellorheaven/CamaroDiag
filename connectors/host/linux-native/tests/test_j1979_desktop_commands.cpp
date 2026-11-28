@@ -103,6 +103,9 @@ int main(){
     cat["projection"]=report;
     assert((prepare(find("verify-catalogue"),cat).args==std::vector<std::string>{
         "--verify-j1979-catalogue","cl1",catalogue,normative,pin,capture,values["vin"],report,proof}));
+    assert(prepare(find("verify-catalogue-csv"),cat).args.front()=="--verify-j1979-catalogue-csv");
+    auto csv_cat=cat;csv_cat.erase("projection");
+    assert(prepare(find("csv-catalogue"),csv_cat).args.front()=="--export-j1979-catalogue-csv");
     cat["catalogue-kind"]="llr1";
     rejects([&]{(void)prepare(find("verify-catalogue"),cat);});
     cat["protocol"]="2";cat["source"]="10";

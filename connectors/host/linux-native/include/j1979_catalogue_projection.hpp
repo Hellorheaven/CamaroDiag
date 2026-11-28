@@ -28,4 +28,7 @@ Projection project_cl1(Bytes,std::string_view vin,const Catalogue&,std::string_v
 Projection project_cf1(Bytes,std::string_view vin,const Catalogue&,std::string_view source_sha,std::string_view catalogue_sha);
 Projection project_llr1(Bytes,std::string_view vin,unsigned protocol,unsigned source,const Catalogue&,std::string_view source_sha,std::string_view catalogue_sha);
 std::string report(const Catalogue&,const Projection&);
+// Exact rational values, no conversion to floating point. One row per
+// signal, or one empty signal row for an uninterpreted source observation.
+std::string projection_csv(const Catalogue&,const Projection&);
 }
