@@ -6,6 +6,7 @@
 #include "cl1_usb.h"
 #include "j1979_can_cli.h"
 #include "j1979_socket_campaign.hpp"
+#include "j1979_network_journal.hpp"
 #include "j1979_can_network.hpp"
 #include "j1979_elm_can.hpp"
 #include "j1979_elm_can_trace.hpp"
@@ -1991,7 +1992,7 @@ static int legacy_maintenance_cli(int argc,char** argv){
 }
 
 struct NetworkOptions{
-    const char* interface{},*output{},*vin{};
+    const char* interface{},*output{},*vin{},*journal_directory{};
     unsigned window_ms{1500},budget_ms{180000};
     bool extended{},confirmed{},window_set{},budget_set{};
     std::vector<std::uint32_t> ids;
@@ -2008,6 +2009,7 @@ static bool parse_network(int argc,char** argv,NetworkOptions& o,bool scan){
         const char* value=argv[++i];
         if(flag=="--interface"){if(o.interface)return false;o.interface=value;}
         else if(flag=="--output"){if(o.output)return false;o.output=value;}
+        else if(flag=="--journal-directory"&&scan){if(o.journal_directory)return false;o.journal_directory=value;}
         else if(flag=="--vin"&&scan){if(o.vin||!cf1_valid_vin(value))return false;o.vin=value;}
         else if(flag=="--window-ms"){
             uint32_t n=0;if(o.window_set||!decimal_uint32(value,&n)||n<1||n>30000)return false;
@@ -2052,11 +2054,15 @@ static int network_cli(int argc,char** argv,bool scan){
     try{
         if(!signals.term)return error("Cancellation handlers unavailable");
         const auto current=[](){return legacy_cancelled==0;};
+        std::unique_ptr<cd::network::JournalDirectory> journals;
+        if(o.journal_directory)journals=std::make_unique<cd::network::JournalDirectory>(o.journal_directory);
         const auto discovery=cd::network::discover_socket(o.interface,o.extended,o.window_ms,current);
+        if(journals)journals->save_discovery(discovery);
         std::string json;bool completed=false;
         if(scan){
             const auto result=cd::network::scan_selected(discovery,o.ids,o.vin,o.budget_ms,cd::legacy::monotonic_ms,
                 current,[&](cd::network::Pair pair,unsigned budget){
+                    if(journals)return journals->scan(pair,budget,o.interface,o.vin,&legacy_cancelled);
                     return cd::network::scan_socket(pair,budget,o.interface,o.vin,&legacy_cancelled);
                 });
             json=cd::network::report(result);completed=result.completed;
@@ -2922,7 +2928,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --j1979-elm-can-freeze --port /dev/ttyUSB0 --profile 6 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture freeze.cf --output freeze.json --confirm-physical-channel [--extended] [--adapter-capture trace.ecr] [--adapter-journal trace.ejr]\n"
         "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr] [--campaign-capture capture.ecp]\n"
         "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr] [--campaign-capture capture.ecp]\n"
-        "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended]\n"
+        "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended] [--journal-directory NEW_DIR]\n"
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel [--journal capture.scj]\n"
         "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel\n"
         "  camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --output live.json --confirm-physical-channel [--journal capture.scj]\n"
