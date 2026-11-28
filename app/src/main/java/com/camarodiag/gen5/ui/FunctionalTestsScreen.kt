@@ -56,6 +56,7 @@ fun FunctionalTestsScreen(
     liveProtocol: Int?,
     onRunLive: (com.camarodiag.gen5.data.obd.J1979LivePlan,Long,VehicleProfile)->Unit,
     onExportLiveCsv: ()->Unit,
+    onExportNativeScalar: (Boolean)->Unit,
     onProjectCatalogue: (android.net.Uri,android.net.Uri,android.net.Uri,String,Long,VehicleProfile)->Unit,
     onInspectNativePrefix: (android.net.Uri,Long,VehicleProfile)->Unit,
     onInspectNativeFreezePrefix: (android.net.Uri,Long,VehicleProfile)->Unit,
@@ -372,6 +373,7 @@ fun FunctionalTestsScreen(
                         OutlinedButton(onClick=onExportLiveCsv,enabled=!state.running && state.canExport) {
                             Text(stringResource(R.string.j1979_live_export_csv))
                         }
+                        J1979NativeScalarPanel(native,!state.running&&state.canExport,fr,onExportNativeScalar)
                     }
                 }
                 if (state.checks.isNotEmpty()) {

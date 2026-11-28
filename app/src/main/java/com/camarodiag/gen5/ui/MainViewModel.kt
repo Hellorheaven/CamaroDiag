@@ -7032,6 +7032,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportFunctionalNativeScalar(csv:Boolean) {
+        val account=authenticatedAccountUid?:return
+        val generation=accountSessionGeneration
+        val snapshot=_functionalTestState.value
+        val evidence=snapshot.nativeLiveEvidence?:return
+        if(snapshot.running||!snapshot.canExport||!evidence.captureIntegrityVerified)return
+        val sourceDigest=evidence.sha256?:return
+        fun current()=isCurrentAccountGeneration(generation)&&authenticatedAccountUid==account&&
+            currentLicenseLevel==LicenseLevel.OWNER&&_functionalTestState.value===snapshot
+        viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            try {
+                val bytes=withContext(Dispatchers.IO) {
+                    check(current())
+                    val replay=com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.verifiedReplay(evidence)
+                    val projection=com.camarodiag.connectors.J1979LiveScalarProjection.project(replay,evidence.target.channel.vehicle)
+                    check(current())
+                    if(csv) com.camarodiag.connectors.J1979LiveScalarProjection.csv(projection,sourceDigest)
+                    else JSONObject(projection.report()).apply {
+                        put("capture_sha256",sourceDigest)
+                        put("expected_vin_independently_supplied",true)
+                    }.toString(2).toByteArray(Charsets.UTF_8)
+                }
+                val extension=if(csv)"csv" else "json"
+                val path=CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_SAE-J1979_CL1_SCALAR_"+snapshot.startedAtMillis+"."+extension,
+                    if(csv)"text/csv" else "application/json",category=CamaroDiagExportStorage.Category.TESTS,
+                    beforePublish={
+                        check(current()&&com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.digest(evidence.capture)==sourceDigest)
+                    },verifyStaged={input ->
+                        val read=input.readBytes()
+                        check(read.contentEquals(bytes))
+                    }){it.write(bytes)}
+                if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_success)+"\n"+path
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_failed)}
+        }
+    }
+
     fun exportFunctionalNativeLiveCsv() {
         val account=authenticatedAccountUid?:return
         val generation=accountSessionGeneration

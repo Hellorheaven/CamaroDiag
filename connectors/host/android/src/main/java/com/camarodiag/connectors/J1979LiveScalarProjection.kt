@@ -116,14 +116,17 @@ object J1979LiveScalarProjection {
             complete&&identity&&channels.all { it.count==it.requested },samples.toList(),channels)
     }
     /** UTF-8, stable numeric formatting and explicit missing values. */
-    fun csv(p:Projection):ByteArray {
-        val out=StringBuilder("cycle,pid_hex,elapsed_ms,source_status,interpretation,name,number,unit,response_hex\r\n")
+    fun csv(p:Projection,captureSha256:String):ByteArray {
+        require(captureSha256.matches(Regex("[0-9a-f]{64}")))
+        val out=StringBuilder("cycle,pid_hex,elapsed_ms,source_status,interpretation,name,number,unit,response_hex,vin,tx_can_id,rx_can_id,capture_sha256\r\n")
         fun quote(s:String?)=s?.let { "\""+it.replace("\"","\"\"")+"\"" }.orEmpty()
         for(s in p.samples) {
             out.append(s.cycle).append(',').append(hex(s.pid)).append(',').append(s.elapsedMs).append(',')
                 .append(s.sourceStatus).append(',').append(s.interpretation).append(',').append(quote(s.name)).append(',')
                 .append(s.number?.toString().orEmpty()).append(',').append(quote(s.unit)).append(',')
-                .append(s.responseHex.orEmpty()).append("\r\n")
+                .append(s.responseHex.orEmpty()).append(',').append(p.vin).append(',')
+                .append(p.tx.toString(16).uppercase(Locale.ROOT)).append(',')
+                .append(p.rx.toString(16).uppercase(Locale.ROOT)).append(',').append(captureSha256).append("\r\n")
             require(out.length<=40*1024*1024)
         }
         return out.toString().toByteArray(Charsets.UTF_8)

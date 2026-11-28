@@ -90,7 +90,7 @@ object J1979LiveUsbTest {
         check(projection.channels[0].mean==40.5&&projection.channels[0].count==2)
         check(projection.channels[1].mean==1165.125&&projection.channels[1].missing==0)
         check(projection.report()["physical_vehicle_verified"]==false)
-        check(J1979LiveScalarProjection.csv(projection).toString(Charsets.UTF_8).contains("DOCUMENTED_SCALAR"))
+        check(J1979LiveScalarProjection.csv(projection,"a".repeat(64)).toString(Charsets.UTF_8).contains("DOCUMENTED_SCALAR"))
         check(runCatching { J1979LiveScalarProjection.project(decoded,"1FA6P8TH0L5100000") }.isFailure)
         val unverified=J1979LiveNativeReplay.Result(decoded.profile,decoded.observationsReceived,true,false,false,false,
             "OFFLINE_CL1",decoded.summary?.plus("final_identity_verified" to false),decoded.result,null,null)
