@@ -1,4 +1,4 @@
-#include "j1979_native_live_inspection.hpp"
+#include "j1979_live_projection_detail.hpp"
 #include "j1979_native_report_detail.hpp"
 #include "j1979_context.hpp"
 #include "j1979_multi.hpp"
@@ -138,6 +138,10 @@ void csv_line(std::ostringstream& csv,const Value& row,const Value* signal){
 NativeLiveProjection project_native_live(const json::Value& source,Pair pair,std::string_view vin){
     const auto verified=inspect_native_live(source,pair,vin);
     const auto root=json::parse_report(verified.canonical,64u*1024u*1024u);
+    return projection_detail::project_replayed_rows(root,verified,vin);
+}
+NativeLiveProjection projection_detail::project_replayed_rows(const json::Value& root,
+    const LiveInspection& verified,std::string_view vin){
     const auto& steps=root.at("steps").array();
     const bool identity=verified.initial_identity&&verified.final_identity;
     std::vector<Row> rows;rows.reserve(steps.size());

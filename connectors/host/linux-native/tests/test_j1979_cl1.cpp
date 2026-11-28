@@ -1,4 +1,6 @@
 #include "cl1.h"
+#include "j1979_native_live_inspection.hpp"
+#include <stdexcept>
 #include "cf1.h"
 #include <assert.h>
 #include <stdint.h>
@@ -85,6 +87,24 @@ int main(void) {
     assert(result.raw_samples==1 && result.raw_bytes==50);
     assert(result.initial_vin && result.final_vin && result.inventory_complete);
     assert(result.raw_per_pid[0]==1);
+
+    using namespace cd::network::history;
+    const auto projected=project_cl1_live({f.bytes,f.used},{0x7e0,0x7e8},vin);
+    assert(projected.complete&&projected.report.at("source_transport").string()=="OFFLINE_CL1");
+    assert(projected.report.at("identity_rechecked").boolean());
+    assert(!projected.report.at("physical_vehicle_verified").boolean());
+    const auto& samples=projected.report.at("samples").array();
+    assert(samples.size()==1&&samples[0].at("pid").unsigned_integer()==12);
+    assert(samples[0].at("response_hex").string()=="410C1AF8");
+    assert(samples[0].at("signals").array()[0].at("number").finite_number()==1726);
+    assert(projected.report.at("channel_summary").array()[0].at("mean").finite_number()==1726);
+    assert(native_live_csv(projected).find("engine-rpm")!=std::string::npos);
+    bool refused=false;
+    try{(void)project_cl1_live({f.bytes,f.used},{0x7e1,0x7e9},vin);}
+    catch(const std::invalid_argument&){refused=true;}assert(refused);
+    refused=false;
+    try{(void)project_cl1_live({f.bytes,f.used-1},{0x7e0,0x7e8},vin);}
+    catch(const std::invalid_argument&){refused=true;}assert(refused);
 
     /* Full receipt never qualifies as interrupted prefix. */
     assert(cl1_inspect_prefix(f.bytes,f.used,vin,&result,error,sizeof(error))!=0);
