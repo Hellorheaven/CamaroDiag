@@ -472,3 +472,11 @@ Comparison replays each raw native report, not its exported projections. It requ
 camarodiag-native export-legacy-live-csv --capture session.llr --protocol 2 --source 10 --vin VIN17 --output samples.csv
 ```
 The exporter replays binary LLR/1, verifies selected-source checksums and correlates each sample with its exact exchange timestamps. Unverified final identity or raw-only mode leaves engineering cells empty. It never opens the adapter and never overwrites an existing output.
+
+### Journaled selected SocketCAN network
+
+```sh
+camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN17 --output network.json --journal-directory NEW_DIR --confirm-functional-scope
+camarodiag-native verify-network-journals --report network.json --journal-directory NEW_DIR --interface can0 --vin VIN17 --output network-proof.json
+```
+The directory must not exist. Functional discovery is saved before physical scans; each attempted selected ECU receives a private SCJ journal. The verifier rejects unrelated entries, foreign scope, swapped journals, missing successful reports and invalid terminal states. Header-only or torn journals retain their interrupted status; the command never connects to an ECU. A completed proof requires all selected ECU journals to bind to the report. This does not independently authenticate the original vehicle, adapter or discovery transmission.

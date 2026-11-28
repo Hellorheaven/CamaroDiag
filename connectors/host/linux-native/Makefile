@@ -27,7 +27,8 @@ build/test_%.o: tests/test_%.cpp | build
 $(TARGET): $(CXX_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(CXXSTRICT) $^ $(LDFLAGS) $(LDLIBS) -o $@
 
-test: test-j1979-socket-campaign test-j1979-legacy-mutation-history test-j1979-historical-live test-j1979-historical-freeze test-j1979-legacy-scan-history test-j1979-native-can-inspection test-j1979-historical-can-network test-j1979-historical-can-plan test-native-json-report test-j1979-network-history test-j1979-legacy-discovery-history test-j1979-can-history test-j1979-elm-campaign test-j1979-elm-journal test-j1979-legacy-decoding test-j1979-legacy-journal test-j1979-host-freeze test-j1979-elm-can test-j1979-host-maintenance test-j1979-catalogue test-j1979-can-network test-j1979-legacy-mutation test-j1979-legacy-live test-j1979-legacy-freeze test-j1979-legacy-scan test-j1979-legacy test-j1979-projection test-cu1 test-j1979-cj1 test-j1979-cm1 test-j1979-context test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
+test: test-j1979-network-journal test-j1979-socket-campaign test-j1979-legacy-mutation-history test-j1979-historical-live test-j1979-historical-freeze test-j1979-legacy-scan-history test-j1979-native-can-inspection test-j1979-historical-can-network test-j1979-historical-can-plan test-native-json-report test-j1979-network-history test-j1979-legacy-discovery-history test-j1979-can-history test-j1979-elm-campaign test-j1979-elm-journal test-j1979-legacy-decoding test-j1979-legacy-journal test-j1979-host-freeze test-j1979-elm-can test-j1979-host-maintenance test-j1979-catalogue test-j1979-can-network test-j1979-legacy-mutation test-j1979-legacy-live test-j1979-legacy-freeze test-j1979-legacy-scan test-j1979-legacy test-j1979-projection test-cu1 test-j1979-cj1 test-j1979-cm1 test-j1979-context test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
+	./test-j1979-network-journal
 	./test-j1979-socket-campaign
 	./test-j1979-historical-live
 	./test-j1979-historical-freeze
@@ -188,6 +189,9 @@ test-j1979-can: build/test_j1979_can.o build/j1979_can.o $(DECODER_OBJECTS) buil
 test-j1979-isotp: build/test_j1979_isotp.o build/j1979_isotp.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
+test-j1979-network-journal: build/test_j1979_network_journal.o build/j1979_network_journal.o build/j1979_network_journal_history.o build/j1979_network_journal_read.o build/j1979_socket_campaign.o build/j1979_socket_campaign_wire.o build/j1979_socket_campaign_storage.o build/j1979_network_history.o build/j1979_can_network.o build/j1979_can_network_report.o build/j1979_historical_can_plan.o build/j1979_historical_can_summary.o build/j1979_historical_can_derived.o build/j1979_native_can_inspection.o build/j1979_isotp.o build/j1979_can.o build/j1979_live.o build/native_json.o build/j1979_policy.o $(DECODER_OBJECTS)
+	$(CXX) $(CXXFLAGS) $(CXXSTRICT) $^ $(LDFLAGS) $(LDLIBS) -o $@
+
 test-j1979-socket-campaign: build/test_j1979_socket_campaign.o build/j1979_socket_campaign.o build/j1979_socket_campaign_wire.o build/j1979_socket_campaign_storage.o build/j1979_isotp.o build/j1979_can.o build/j1979_live.o build/native_json.o build/j1979_policy.o $(DECODER_OBJECTS)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
@@ -199,7 +203,7 @@ test-j1979-cl1: build/test_j1979_cl1.o build/cl1.o build/cf1.o
 
 clean:
 	rm -rf build
-	rm -f $(TARGET) test-j1979-socket-campaign test-j1979-legacy-mutation-history test-j1979-historical-live test-j1979-historical-freeze test-j1979-legacy-scan-history test-j1979-native-can-inspection test-j1979-historical-can-network test-j1979-historical-can-plan test-native-json-report test-j1979-network-history test-j1979-legacy-discovery-history test-j1979-can-history test-j1979-elm-campaign test-j1979-elm-journal test-j1979-legacy-decoding test-j1979-legacy-journal test-j1979-host-freeze test-j1979-elm-can test-j1979-host-maintenance test-j1979-catalogue test-j1979-can-network test-j1979-legacy-mutation test-j1979-legacy-live test-j1979-legacy-freeze test-j1979-legacy-scan test-j1979-legacy test-j1979-projection test-cu1 test-j1979-cj1 test-j1979-cm1 test-j1979-context test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
+	rm -f $(TARGET) test-j1979-network-journal test-j1979-socket-campaign test-j1979-legacy-mutation-history test-j1979-historical-live test-j1979-historical-freeze test-j1979-legacy-scan-history test-j1979-native-can-inspection test-j1979-historical-can-network test-j1979-historical-can-plan test-native-json-report test-j1979-network-history test-j1979-legacy-discovery-history test-j1979-can-history test-j1979-elm-campaign test-j1979-elm-journal test-j1979-legacy-decoding test-j1979-legacy-journal test-j1979-host-freeze test-j1979-elm-can test-j1979-host-maintenance test-j1979-catalogue test-j1979-can-network test-j1979-legacy-mutation test-j1979-legacy-live test-j1979-legacy-freeze test-j1979-legacy-scan test-j1979-legacy test-j1979-projection test-cu1 test-j1979-cj1 test-j1979-cm1 test-j1979-context test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
 
 PREFIX ?= /usr/local
 DESTDIR ?=

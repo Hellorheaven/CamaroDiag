@@ -30,7 +30,8 @@ std::set<std::string> names(int fd){
     if(copy<0)throw std::runtime_error("Network journal directory stream unavailable");
     DIR* raw=fdopendir(copy);
     if(!raw){close(copy);throw std::runtime_error("Network journal directory stream unavailable");}
-    const std::unique_ptr<DIR,decltype(&closedir)> directory(raw,&closedir);
+    const auto close_directory=[](DIR* stream){if(stream)closedir(stream);};
+    const std::unique_ptr<DIR,decltype(close_directory)> directory(raw,close_directory);
     std::set<std::string> found;
     for(;;){
         errno=0;const auto* entry=readdir(directory.get());
