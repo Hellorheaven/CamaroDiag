@@ -44,11 +44,11 @@ bool j1979_measurement_decode(const uint8_t *req,size_t qlen,
     if (!req || !res || (qlen!=2 && qlen!=3) ||
         (req[0]!=1 && req[0]!=2) ||
         (req[0]==1 && qlen!=2) ||
-        (req[0]==2 && (qlen!=3 || req[2]!=0))) return false;
+        (req[0]==2 && qlen!=3)) return false;
     const std::span<const uint8_t> response{res,n};
     const size_t offset=req[0]==2 ? 3u:2u;
     if (n<offset+1u || res[0]!=(uint8_t)(req[0]+0x40) ||
-        res[1]!=req[1] || (req[0]==2 && res[2]!=0))
+        res[1]!=req[1] || (req[0]==2 && res[2]!=req[2]))
         return false;
     unsigned width=j1979_measurement_width(req[1]);
     if(!width)return false;
@@ -131,7 +131,7 @@ bool j1979_measurement_decode(const uint8_t *req,size_t qlen,
     /* ISO 15031 ECU-specific scaling needs independently observed Mode 01
      * PID 4F/50 configuration. Never infer a range from a single sample.
      */
-    if (req[1]==0x0b || req[1]==0x10 || req[1]==0x44 ||
+    if ((req[0]==2 && trim) || req[1]==0x0b || req[1]==0x10 || req[1]==0x44 ||
         (req[1]>=0x24 && req[1]<=0x2b) ||
         (req[1]>=0x34 && req[1]<=0x3b)) {
         out->context_required=true;out->number=0;out->interpreted=false;

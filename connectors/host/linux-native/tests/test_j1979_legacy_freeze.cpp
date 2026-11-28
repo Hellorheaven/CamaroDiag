@@ -100,12 +100,34 @@ void all_variants(){
         assert(replay_freeze(p,0x10,plan(),acquired.trace).all_frames_stable);
     }
 }
+void numbered_frame(){
+    for(unsigned n=1;n<=5;++n){
+        const auto p=static_cast<Protocol>(n);
+        Trace t;identity(t,p,VIN);
+        add(t,"020007",wire(p,0x10,{0x42,0,7,0x40,0x10,0,0}));
+        add(t,"020207",wire(p,0x10,{0x42,2,7,1,0x33}));
+        add(t,"020C07",wire(p,0x10,{0x42,12,7,0x1f,0x40}));
+        add(t,"020207",wire(p,0x10,{0x42,2,7,1,0x33}));
+        identity(t,p,VIN);
+        const FreezePlan selected{std::string(VIN),{7},{12},60000};
+        const auto result=replay_freeze(p,0x10,selected,t);
+        assert(result.completed&&result.frames[0].state=="COMPLETE");
+        const auto json=freeze_report(result);
+        assert(json.find("\"mode\":2,\"frame\":7,\"pid\":12")!=std::string::npos);
+        assert(json.find("\"number\":2000")!=std::string::npos);
+        t[7].raw=wire(p,0x10,{0x42,12,0,0x1f,0x40});
+        const auto wrong=replay_freeze(p,0x10,selected,t);
+        assert(wrong.frames[0].state=="PARTIAL");
+        assert(freeze_report(wrong).find("\"number\":2000")==std::string::npos);
+    }
+}
 void interrupted_and_corrupt(){
     const auto p=Protocol::vpw;
     auto trace=fixture(p);
     trace[9].raw=wire(p,0x10,{0x42,2,0,1,0x34});
     auto changed=replay_freeze(p,0x10,plan(),trace);
     assert(changed.completed&&!changed.all_frames_stable&&changed.frames[0].state=="CHANGED");
+    assert(freeze_report(changed).find("\"number\":2000")==std::string::npos);
     trace=fixture(p);trace[8].raw=wire(p,0x10,{0x42,12,0,0x1f});
     auto malformed=replay_freeze(p,0x10,plan(),trace);
     assert(malformed.completed&&!malformed.all_frames_stable&&malformed.frames[0].state=="PARTIAL");
@@ -144,4 +166,4 @@ void plan_admission(){
     invalid=valid;invalid.vin[0]='I';assert(!invalid.valid());
 }
 }
-int main(){plan_admission();all_variants();interrupted_and_corrupt();}
+int main(){plan_admission();all_variants();numbered_frame();interrupted_and_corrupt();}

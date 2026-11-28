@@ -40,6 +40,13 @@ int main(void) {
     const uint8_t trim_req[2]={1,6},trim[4]={0x41,6,128,200};
     assert(j1979_measurement_decode(trim_req,2,trim,4,&m));
     assert(m.interpreted && m.upper_trim_unverified && m.number==0);
+    const uint8_t freeze7_req[3]={2,0x0c,7},freeze7_rpm[5]={0x42,0x0c,7,0x1a,0xf8};
+    measurement(freeze7_req,3,freeze7_rpm,5,"engine-rpm",1726);
+    assert(j1979_measurement_decode(freeze7_req,3,freeze7_rpm,5,&m)&&m.frame==7);
+    assert(!j1979_measurement_decode(freeze_req,3,freeze7_rpm,5,&m));
+    const uint8_t frozen_trim_req[3]={2,6,7},frozen_trim[5]={0x42,6,7,128,200};
+    assert(j1979_measurement_decode(frozen_trim_req,3,frozen_trim,5,&m));
+    assert(m.context_required&&!m.interpreted);
     const uint8_t wrong_pid[4]={0x41,0x0d,0x1a,0xf8};
     assert(!j1979_measurement_decode(rpm_req,2,wrong_pid,4,&m));
     assert(!j1979_measurement_decode(rpm_req,2,rpm,3,&m));

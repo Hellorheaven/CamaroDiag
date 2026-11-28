@@ -1,6 +1,7 @@
 #include "j1979_legacy_freeze.hpp"
 #include "j1979_measurement.h"
 #include "j1979_policy.h"
+#include <algorithm>
 #include <iomanip>
 #include <locale>
 #include <sstream>
@@ -42,13 +43,13 @@ std::string_view outcome(FreezeOutcome state){
     return "INVALID";
 }
 void measurement(std::ostream& o,const FreezeStep& s,bool verified){
-    if(!verified||s.status!="PASSED"||s.request.size()!=3||s.request[0]!=2||s.request[2]!=0){
+    if(!verified||s.status!="PASSED"||s.request.size()!=3||s.request[0]!=2){
         o<<"null";return;
     }
     j1979_measurement m{};
     if(!j1979_measurement_decode(s.request.data(),s.request.size(),s.response.data(),s.response.size(),&m)||
         !m.interpreted||m.context_required){o<<"null";return;}
-    o<<"{\"mode\":2,\"frame\":0,\"pid\":"<<unsigned(s.request[1])<<",\"name\":";
+    o<<"{\"mode\":2,\"frame\":"<<unsigned(m.frame)<<",\"pid\":"<<unsigned(m.pid)<<",\"name\":";
     quote(o,m.name?m.name:"");o<<",\"unit\":";quote(o,m.unit?m.unit:"");o<<",\"number\":"<<m.number<<'}';
 }
 }
@@ -92,13 +93,19 @@ std::string freeze_report(const FreezeResult& r){
         o<<unsigned(r.plan.frames[i]);
     }
     o<<"],\"steps\":";
+    unsigned step_index=0;
     array(o,r.steps,[&](const FreezeStep& step){
+        const auto index=step_index++;
+        const bool verified=r.identity_rechecked&&std::any_of(r.frames.begin(),r.frames.end(),[&](const FrozenFrame& f){
+            return f.state=="COMPLETE"&&f.trigger_stable&&step.request.size()==3&&step.request[2]==f.frame&&
+                std::find(f.measurement_steps.begin(),f.measurement_steps.end(),index)!=f.measurement_steps.end();
+        });
         o<<"{\"request_hex\":";quote(o,hex(step.request));
         o<<",\"response_hex\":";if(step.response.empty())o<<"null";else quote(o,hex(step.response));
         o<<",\"status\":";quote(o,step.status);o<<",\"detail\":";nullable(o,step.detail);
         o<<",\"transport_outcome\":";quote(o,outcome(step.outcome));
         o<<",\"first_exchange\":"<<step.first_exchange<<",\"exchange_count\":"<<step.exchange_count
-            <<",\"measurement\":";measurement(o,step,r.identity_rechecked);o<<'}';
+            <<",\"measurement\":";measurement(o,step,verified);o<<'}';
     });
     o<<",\"transport_exchanges\":";
     array(o,r.trace,[&](const FreezeExchange& x){
