@@ -109,6 +109,14 @@ int main(void) {
     assert(native_live_csv(projected).find("engine-rpm")!=std::string::npos);
     // Compare two independently replayed recordings, never user-edited
     // engineering data. Different evidence digests are required.
+    const auto scalar=project_cl1_scalar({f.bytes,f.used},{0x7e0,0x7e8},vin,std::string(64,'a'));
+    assert(scalar.complete&&scalar.report.at("schema").string()=="camarodiag-j1979-cl1-scalar-projection-v1");
+    assert(scalar.report.at("samples").array()[0].at("number").finite_number()==1726);
+    assert(scalar.report.at("channels").array()[0].at("missing").unsigned_integer()==0);
+    assert(verify_cl1_scalar(scalar,cd::json::parse_report(cd::json::serialize(scalar.report))));
+    auto changed=scalar.report.object();changed["capture_sha256"]=cd::json::Value{std::string(64,'b')};
+    assert(!verify_cl1_scalar(scalar,cd::json::Value{changed}));
+    assert(cl1_scalar_csv(scalar).find("DOCUMENTED_SCALAR")!=std::string::npos);
     const std::array runs{projected,projected};
     const std::array hashes{std::string(64,'a'),std::string(64,'b')};
     const auto comparison=compare_native_live(runs,hashes);

@@ -25,6 +25,11 @@ std::string native_live_csv(const NativeLiveProjection&);
 // promoted to a configuration merely because a matching PID was selected.
 NativeLiveProjection project_cl1_live(std::span<const std::uint8_t> capture,
     Pair pair,std::string_view expected_vin);
+// Portable scalar subset shared by Android and Windows. The richer native
+// projection is intentionally a different schema.
+NativeLiveProjection project_cl1_scalar(std::span<const std::uint8_t>,Pair,std::string_view vin,std::string_view digest);
+std::string cl1_scalar_csv(const NativeLiveProjection&);
+bool verify_cl1_scalar(const NativeLiveProjection&,const json::Value& saved);
 NativeLiveProjection bind_native_live_projection(NativeLiveProjection,std::string_view source_digest);
 json::Value verify_native_live_projection(const json::Value& source,const json::Value& saved,
     Pair,std::string_view vin,std::string_view source_digest,std::string_view projection_digest);
