@@ -61,6 +61,7 @@ fun FunctionalTestsScreen(
     onInspectNativePrefix: (android.net.Uri,Long,VehicleProfile)->Unit,
     onInspectNativeFreezePrefix: (android.net.Uri,Long,VehicleProfile)->Unit,
     onVerifyNativeFreezePrefix: (android.net.Uri,android.net.Uri,Long,VehicleProfile)->Unit,
+    onVerifyNativeScalar: (android.net.Uri,android.net.Uri,Long,VehicleProfile)->Unit,
     onInspectNativeMaintenance: (android.net.Uri,Long,VehicleProfile)->Unit,
     onInspectNativeMaintenancePrefix: (android.net.Uri,Long,VehicleProfile)->Unit,
     onRunFreeze: (com.camarodiag.gen5.data.obd.J1979FreezePlan,Long,VehicleProfile)->Unit,
@@ -247,6 +248,7 @@ fun FunctionalTestsScreen(
                     J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativePrefix)
                     J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativeFreezePrefix,freeze=true)
                     J1979FreezePrefixVerifyPanel(!state.running,vehicle,connectionGeneration,onVerifyNativeFreezePrefix)
+                    J1979FreezePrefixVerifyPanel(!state.running,vehicle,connectionGeneration,onVerifyNativeScalar,scalar=true)
                     J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativeMaintenance,maintenance=true)
                     J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativeMaintenancePrefix,maintenance=true,interrupted=true)
                     J1979FreezePanel(liveProtocol?.takeIf { it in 1..9 },state,vehicle,connectionGeneration,onRunFreeze)

@@ -23,7 +23,7 @@ import com.camarodiag.gen5.domain.model.VehicleProfile
  * or promotes a partial CF/1 capture to a completed diagnostic campaign. */
 @Composable
 internal fun J1979FreezePrefixVerifyPanel(enabled:Boolean,vehicle:VehicleProfile,generation:Long,
-    verify:(Uri,Uri,Long,VehicleProfile)->Unit) {
+    verify:(Uri,Uri,Long,VehicleProfile)->Unit,scalar:Boolean=false) {
     var expanded by remember { mutableStateOf(false) }
     var capture by remember(vehicle,generation) { mutableStateOf<Uri?>(null) }
     var report by remember(vehicle,generation) { mutableStateOf<Uri?>(null) }
@@ -50,7 +50,7 @@ internal fun J1979FreezePrefixVerifyPanel(enabled:Boolean,vehicle:VehicleProfile
         capture?.scheme=="content" && report?.scheme=="content" &&
         J1979CatalogueProjection.validVin(vehicle.vin)
     OutlinedButton(onClick={expanded=!expanded},modifier=Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.j1979_freeze_prefix_verify_title))
+        Text(stringResource(if(scalar) R.string.j1979_scalar_verify_title else R.string.j1979_freeze_prefix_verify_title))
     }
     if(!expanded)return
     Column(verticalArrangement=Arrangement.spacedBy(6.dp),modifier=Modifier.fillMaxWidth()) {
@@ -58,7 +58,7 @@ internal fun J1979FreezePrefixVerifyPanel(enabled:Boolean,vehicle:VehicleProfile
             capturePending=current
             capturePicker.launch(arrayOf("*/*"))
         },enabled=enabled&&!picking,modifier=Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.j1979_freeze_prefix_verify_capture)+" — "+
+            Text(stringResource(if(scalar) R.string.j1979_scalar_verify_capture else R.string.j1979_freeze_prefix_verify_capture)+" — "+
                 stringResource(if(capture==null) R.string.j1979_catalogue_not_selected
                     else R.string.j1979_catalogue_selected))
         }
@@ -66,13 +66,13 @@ internal fun J1979FreezePrefixVerifyPanel(enabled:Boolean,vehicle:VehicleProfile
             reportPending=current
             reportPicker.launch(arrayOf("application/json","text/plain","application/octet-stream"))
         },enabled=enabled&&!picking,modifier=Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.j1979_freeze_prefix_verify_report)+" — "+
+            Text(stringResource(if(scalar) R.string.j1979_scalar_verify_report else R.string.j1979_freeze_prefix_verify_report)+" — "+
                 stringResource(if(report==null) R.string.j1979_catalogue_not_selected
                     else R.string.j1979_catalogue_selected))
         }
         Row(verticalAlignment=Alignment.CenterVertically) {
             Checkbox(checked=confirmed,onCheckedChange={confirmed=it},enabled=enabled&&!picking)
-            Text(stringResource(R.string.j1979_freeze_prefix_verify_confirm,vehicle.vin))
+            Text(stringResource(if(scalar) R.string.j1979_scalar_verify_confirm else R.string.j1979_freeze_prefix_verify_confirm,vehicle.vin))
         }
         OutlinedButton(onClick={
             val raw=capture
@@ -82,8 +82,8 @@ internal fun J1979FreezePrefixVerifyPanel(enabled:Boolean,vehicle:VehicleProfile
                 verify(raw,json,generation,vehicle)
             }
         },enabled=enabled&&!picking&&confirmed&&valid,modifier=Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.j1979_freeze_prefix_verify_run))
+            Text(stringResource(if(scalar) R.string.j1979_scalar_verify_run else R.string.j1979_freeze_prefix_verify_run))
         }
-        Text(stringResource(R.string.j1979_freeze_prefix_verify_scope),fontSize=11.sp)
+        Text(stringResource(if(scalar) R.string.j1979_scalar_verify_scope else R.string.j1979_freeze_prefix_verify_scope),fontSize=11.sp)
     }
 }

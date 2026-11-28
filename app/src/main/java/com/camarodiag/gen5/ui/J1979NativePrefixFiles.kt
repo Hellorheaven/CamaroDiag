@@ -75,6 +75,28 @@ internal object J1979NativePrefixFiles {
         val reportSha: String
     )
 
+    suspend fun prepareScalarVerification(resolver:ContentResolver,capture:Uri,report:Uri,
+                                          vin:String,current:()->Unit):J1979ScalarVerification.Verified {
+        require(capture!=report&&capture.scheme=="content"&&report.scheme=="content")
+        val original=ByteArrayOutputStream()
+        val candidate=ByteArrayOutputStream()
+        read(resolver,capture,current,J1979LiveNativeReplay.MAX_CAPTURE) { b,n -> original.write(b,0,n) }
+        read(resolver,report,current,J1979ScalarVerification.MAX_REPORT_BYTES) { b,n -> candidate.write(b,0,n) }
+        val checked=J1979ScalarVerification.verify(original.toByteArray(),candidate.toByteArray(),vin)
+        revalidateScalarVerification(resolver,capture,report,checked.captureSha,checked.reportSha,current)
+        return checked
+    }
+
+    fun revalidateScalarVerification(resolver:ContentResolver,capture:Uri,report:Uri,
+                                     captureSha:String,reportSha:String,current:()->Unit) {
+        require(capture!=report)
+        check(digest(resolver,capture,current)==captureSha) { "CL/1 source changed" }
+        check(digest(resolver,report,current,J1979ScalarVerification.MAX_REPORT_BYTES)==reportSha) {
+            "CL/1 scalar report changed"
+        }
+        current()
+    }
+
     suspend fun prepareFreezeVerification(resolver: ContentResolver,capture: Uri,report: Uri,
                                           vin: String,current:()->Unit): FreezeVerificationPrepared {
         require(capture != report && capture.scheme=="content" && report.scheme=="content") {
