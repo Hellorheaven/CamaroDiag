@@ -23,27 +23,6 @@ unsigned source(const Value& v){
     const auto b=raw_bytes(v,1);require(b.size()==1&&valid_source(b[0]),"Invalid selected freeze source");return b[0];
 }
 std::string address(unsigned n){return hex(Data{static_cast<std::uint8_t>(n)});}
-void timestamp(const Value& v){
-    // ISO 8601 offset-bearing metadata only; never infer a monotonic bus clock.
-    const auto& s=v.string();
-    require(s.size()>=20&&s.size()<=64,"Invalid freeze timestamp length");
-    const auto digit=[&](std::size_t i){return i<s.size()&&s[i]>='0'&&s[i]<='9';};
-    const auto num=[&](std::size_t p,std::size_t count){
-        unsigned n=0;for(std::size_t i=p;i<p+count;++i){require(digit(i),"Invalid freeze timestamp digit");n=n*10+s[i]-'0';}
-        return n;
-    };
-    require(s[4]=='-'&&s[7]=='-'&&(s[10]=='T'||s[10]==' ')&&s[13]==':'&&s[16]==':',"Invalid timestamp separators");
-    const std::chrono::year_month_day date{std::chrono::year(static_cast<int>(num(0,4))),
-        std::chrono::month(num(5,2)),std::chrono::day(num(8,2))};
-    require(date.ok()&&num(11,2)<=23&&num(14,2)<=59&&num(17,2)<=59,"Invalid timestamp calendar fields");
-    std::size_t i=19;
-    if(i<s.size()&&(s[i]=='.'||s[i]==',')){
-        ++i;require(digit(i),"Empty timestamp fraction");while(digit(i))++i;
-    }
-    if(i+1==s.size()&&s[i]=='Z')return;
-    require(i+6==s.size()&&(s[i]=='+'||s[i]=='-')&&s[i+3]==':'&&num(i+1,2)<=23&&num(i+4,2)<=59,
-        "Timestamp lacks valid timezone");
-}
 struct Exchange {
     std::string command,status;
     std::vector<Data> selected;
@@ -185,7 +164,7 @@ HistoricalFreezeInspection inspect_historical_freeze(const Value& root,std::opti
         root.at("response_hex_representation").string()=="NORMALIZED_APPLICATION_PAYLOAD","Legacy freeze functional scope differs");
     require(root.at("response_attribution").string()==(out.driver?"J2534_DRIVER_MANAGED_SELECTED_HEADER":"CHECKSUM_VERIFIED_LEGACY_HEADER"),
         "Legacy freeze response attribution differs");
-    timestamp(root.at("started_at_utc"));timestamp(root.at("finished_at_utc"));
+    cd::network::history::validate_historical_timestamp(root.at("started_at_utc"));cd::network::history::validate_historical_timestamp(root.at("finished_at_utc"));
     const auto& problem=root.at("transport_problem");
     require(problem.null()||problem.string()=="TRANSPORT_ERROR"||problem.string()=="CANCELLED","Unknown legacy freeze transport problem");
     out.protocol=static_cast<Protocol>(bounded(root.at("expected_protocol"),1,5));
