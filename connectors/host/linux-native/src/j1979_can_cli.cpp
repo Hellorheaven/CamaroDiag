@@ -3,6 +3,11 @@
 #include "j1979_can.h"
 #include "j1979_isotp.h"
 #include "j1979_live.h"
+#include "j1979_socket_campaign.hpp"
+#include <time.h>
+#include <memory>
+#include <exception>
+#include <stdexcept>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -23,7 +28,7 @@ static void cancel_handler(int signal_number) {
     cancel_requested = 1;
 }
 typedef struct {
-    const char *interface_name, *output, *vin;
+    const char *interface_name, *output, *vin, *journal;
     uint32_t tx, rx;
     unsigned budget_ms, cycles, interval_ms, pid_count;
     uint8_t pids[J1979_LIVE_MAX_PIDS];
@@ -76,6 +81,9 @@ static bool parse(int argc, char **argv, options *o) {
         } else if (!strcmp(flag,"--output")) {
             if (o->output) return false;
             o->output=value;
+        } else if (!strcmp(flag,"--journal")) {
+            if (o->journal) return false;
+            o->journal=value;
         } else if (!strcmp(flag,"--vin")) {
             if (o->vin||!j1979_can_valid_vin(value)) return false;
             o->vin=value;
@@ -99,11 +107,37 @@ static bool parse(int argc, char **argv, options *o) {
             o->interval_set=true;
         } else return false;
     }
-    return o->confirmed && o->tx_set && o->rx_set && o->output &&
+    return (!o->journal || o->budget_ms>=1000) && o->confirmed && o->tx_set && o->rx_set && o->output &&
         o->vin && (!o->live || (o->pid_count &&
         o->pid_count * o->cycles <= J1979_LIVE_MAX_SAMPLES)) &&
         j1979_isotp_valid_interface(o->interface_name) &&
         j1979_can_physical_pair(o->tx,o->rx);
+}
+namespace {
+struct JournalFd {
+    int value{-1};
+    ~JournalFd(){if(value>=0)close(value);}
+};
+std::uint64_t journal_clock(void*){
+    timespec ts{};
+    if(clock_gettime(CLOCK_MONOTONIC,&ts))return 0;
+    return std::uint64_t(ts.tv_sec)*1000+std::uint64_t(ts.tv_nsec)/1000000;
+}
+bool journal_wait(void* context,unsigned ms){
+    if(!j1979_isotp_current(context)||!ms||ms>100)return false;
+    timespec remaining{static_cast<time_t>(ms/1000),static_cast<long>(ms%1000)*1000000};
+    while(nanosleep(&remaining,&remaining)){
+        if(errno!=EINTR||!j1979_isotp_current(context))return false;
+    }
+    return j1979_isotp_current(context);
+}
+cd::socketcampaign::Plan journal_plan(const options& o){
+    cd::socketcampaign::Plan p{};
+    p.operation=o.live?cd::socketcampaign::Operation::live:cd::socketcampaign::Operation::scan;
+    p.tx=o.tx;p.rx=o.rx;p.vin=o.vin;p.interface=o.interface_name;p.budget_ms=o.budget_ms;
+    if(o.live){p.cycles=o.cycles;p.interval_ms=o.interval_ms;p.pids.assign(o.pids,o.pids+o.pid_count);}
+    return p;
+}
 }
 int j1979_can_cli(int argc, char **argv) {
     options o{};
@@ -135,6 +169,20 @@ int j1979_can_cli(int argc, char **argv) {
     }
     FILE *stream=fdopen(fd,"w");
     if (!stream) {close(fd);unlink(o.output);return 2;}
+    JournalFd journal_fd;
+    std::unique_ptr<cd::socketcampaign::Writer> journal;
+    cd::socketcampaign::Plan scope{};
+    if(o.journal){
+        try{
+            scope=journal_plan(o);
+            if(!scope.valid())throw std::invalid_argument("Invalid journal campaign scope");
+            journal_fd.value=open(o.journal,O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+            journal=std::make_unique<cd::socketcampaign::Writer>(journal_fd.value,scope);
+        }catch(const std::exception& e){
+            fprintf(stderr,"SocketCAN journal unavailable: %s\n",e.what());
+            fclose(stream);return 2;
+        }
+    }
     cancel_requested=0;
     struct sigaction handler{},old_int{},old_term{};
     handler.sa_handler=cancel_handler;
@@ -148,6 +196,29 @@ int j1979_can_cli(int argc, char **argv) {
     link.socket_fd=-1;
     bool opened=restored_handlers &&
         j1979_isotp_open(&link,o.interface_name,o.tx,o.rx,&cancel_requested);
+    if(journal){
+        // The journal header exists before opening a physical channel.
+        // A failure leaves a prefix; never invent a terminal or retry.
+        bool complete=false;
+        try{
+            if(!opened)throw std::runtime_error("Selected SocketCAN ISO-TP unavailable");
+            const cd::socketcampaign::Link physical{j1979_isotp_exchange,journal_clock,j1979_isotp_current,journal_wait,&link};
+            const auto result=cd::socketcampaign::record(scope,physical,*journal);
+            j1979_isotp_close(&link);
+            if(fwrite(result.report.data(),1,result.report.size(),stream)!=result.report.size()||
+                fflush(stream)||fsync(fd))
+                throw std::runtime_error("SocketCAN report persistence failed");
+            // The terminal binds the exact report only after durable output.
+            cd::socketcampaign::finish(*journal,result);
+            complete=result.completed;
+        }catch(const std::exception& e){
+            fprintf(stderr,"SocketCAN journal retained without confirmed completion: %s\n",e.what());
+            j1979_isotp_close(&link);
+        }
+        if(restored_handlers){sigaction(SIGINT,&old_int,NULL);sigaction(SIGTERM,&old_term,NULL);}
+        if(fclose(stream))complete=false;
+        return complete?0:2;
+    }
     j1979_can_plan plan{};
     plan.exchange=j1979_isotp_exchange;
     plan.clock=nullptr; /* CLOCK_MONOTONIC in the native C++ campaign engine */

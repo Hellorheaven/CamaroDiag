@@ -5,6 +5,7 @@
 #include "cl1.h"
 #include "cl1_usb.h"
 #include "j1979_can_cli.h"
+#include "j1979_socket_campaign.hpp"
 #include "j1979_can_network.hpp"
 #include "j1979_elm_can.hpp"
 #include "j1979_elm_can_trace.hpp"
@@ -2922,9 +2923,9 @@ static void usage(FILE *stream) {
         "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr] [--campaign-capture capture.ecp]\n"
         "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr] [--campaign-capture capture.ecp]\n"
         "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended]\n"
-        "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel\n"
+        "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel [--journal capture.scj]\n"
         "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel\n"
-        "  camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --output live.json --confirm-physical-channel\n"
+        "  camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --output live.json --confirm-physical-channel [--journal capture.scj]\n"
         "  camarodiag-native --inspect-j1979-live-native-prefix CAPTURE.cl VIN PREFIX.json\n"
         "  camarodiag-native --inspect-j1979-live-native CAPTURE.cl VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-live-native-prefix CAPTURE.cl PREFIX.json PROOF.json VIN\n"
@@ -2962,6 +2963,9 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-legacy-maintenance VIN FINAL.json BASELINE.json INTENT.json PROOF.json\n"
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
+        "  camarodiag-native inspect-socketcan-journal --journal CAPTURE.scj --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "  camarodiag-native recover-socketcan-report --journal CAPTURE.scj --tx 7E0 --rx 7E8 --vin VIN --output REPORT.json\n"
+        "  camarodiag-native verify-socketcan-journal --journal CAPTURE.scj --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
         "  camarodiag-native --inspect-j1979-native-live TX RX VIN REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-native-can-plan TX RX VIN REPORT.json PROOF.json\n"
         "  camarodiag-native verify-legacy-discovery --report REPORT.json --output PROOF.json\n"
@@ -3104,6 +3108,62 @@ static int native_can_plan_cli(const char* tx_text,const char* rx_text,const cha
         if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Native physical report changed");
         if(!atomic_create(output,proof.data(),proof.size()))return error("Native physical proof destination unavailable");
         return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int socket_campaign_cli(int argc,char** argv,std::string_view command){
+    const char* path=nullptr;const char* report=nullptr;const char* output=nullptr;
+    const char* vin=nullptr;const char* tx=nullptr;const char* rx=nullptr;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing SocketCAN journal argument");
+        const char* value=argv[i++];
+        if(key=="--journal"&&!path)path=value;
+        else if(key=="--report"&&!report&&command=="verify-socketcan-journal")report=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else if(key=="--tx"&&!tx)tx=value;
+        else if(key=="--rx"&&!rx)rx=value;
+        else return error("Unexpected or duplicate SocketCAN journal option");
+    }
+    if(!path||!output||!vin||!tx||!rx||(command=="verify-socketcan-journal"&&!report))
+        return error("SocketCAN journal, independent TX/RX/VIN and new output required");
+    try{
+        const auto id=[](std::string_view s){
+            std::uint32_t n{};const auto [end,ec]=std::from_chars(s.data(),s.data()+s.size(),n,16);
+            if(s.empty()||s.size()>8||ec!=std::errc{}||end!=s.data()+s.size()||n>0x1fffffffu)
+                throw std::invalid_argument("Invalid independent CAN ID");
+            return n;
+        };
+        input original{},again{},saved{},saved_again{};
+        if(!load_regular(path,cd::socketcampaign::max_journal,&original))return error("Invalid bounded SCJ file");
+        const bool prefix=command=="inspect-socketcan-journal";
+        const auto journal=cd::socketcampaign::decode({original.bytes.get(),original.length},prefix);
+        if(journal.plan.vin!=vin||journal.plan.tx!=id(tx)||journal.plan.rx!=id(rx))
+            return error("SocketCAN journal differs from independent selected scope");
+        const auto replay=cd::socketcampaign::replay(journal);
+        std::string result;
+        if(command=="recover-socketcan-report"){
+            if(!journal.terminal||replay.prefix||replay.report.empty())return error("Cannot recover a report from a prefix");
+            result=replay.report;
+        }else{
+            auto proof=cd::socketcampaign::proof(journal,replay,original.digest).object();
+            if(report){
+                if(!load_regular(report,cd::socketcampaign::max_report,&saved)||!separate(&original,&saved))
+                    return error("Distinct bounded SCJ report required");
+                const bool equal=saved.length==replay.report.size()&&
+                    !memcmp(saved.bytes.get(),replay.report.data(),saved.length);
+                proof.emplace("source_report_sha256",cd::json::Value{std::string(saved.digest)});
+                proof.emplace("report_consistent",cd::json::Value{equal});
+                if(!equal)return error("SCJ report differs from callback replay");
+                if(!load_regular(report,cd::socketcampaign::max_report,&saved_again)||!same_input(&saved,&saved_again))
+                    return error("SCJ report changed during verification");
+            }
+            result=cd::json::serialize(cd::json::Value{std::move(proof)})+"\n";
+        }
+        if(!load_regular(path,cd::socketcampaign::max_journal,&again)||!same_input(&original,&again))
+            return error("SCJ changed during inspection");
+        if(!atomic_create(output,result.data(),result.size()))return error("SCJ output unavailable");
+        return replay.completed&&!replay.prefix?0:2;
     }catch(const std::exception& e){return error(e.what());}
 }
 static int project_native_live_cli(int argc,char** argv,bool csv,bool verify=false){
@@ -3325,6 +3385,7 @@ int main(int argc, char **argv) {
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-live"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-can-plan"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
     if(argc>=2&&!strcmp(argv[1],"verify-native-live-projection"))return project_native_live_cli(argc,argv,false,true);
+    if(argc>=2&&(!strcmp(argv[1],"inspect-socketcan-journal")||!strcmp(argv[1],"recover-socketcan-report")||!strcmp(argv[1],"verify-socketcan-journal")))return socket_campaign_cli(argc,argv,argv[1]);
     if(argc>=2&&!strcmp(argv[1],"project-native-live"))return project_native_live_cli(argc,argv,false);
     if(argc>=2&&!strcmp(argv[1],"export-native-live-csv"))return project_native_live_cli(argc,argv,true);
     if(argc>=2&&!strcmp(argv[1],"export-legacy-live-csv"))return legacy_live_csv_cli(argc,argv);
