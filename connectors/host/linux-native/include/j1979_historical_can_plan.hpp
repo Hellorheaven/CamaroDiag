@@ -40,6 +40,8 @@ struct PlanInspection {
     std::array<DtcMode,3> dtcs{};
     bool basic_summary_checked{};
     unsigned application_evidence_checked{};
+    std::string derived_summary;
+    unsigned derived_groups_checked{};
 };
 // Verifies read-only request order and the historical application envelope.
 // Derived report projections are intentionally not certified by this API.
@@ -48,5 +50,6 @@ PlanInspection inspect_plan(const json::Value& body,PlanOrder,std::optional<std:
 // configuration-dependent numerical claims. Compare saved basic summaries.
 void verify_basic_summary(const json::Value&,PlanInspection&);
 std::string basic_summary_json(const PlanInspection&);
+void verify_derived_summary(const json::Value&,PlanInspection&);
 std::string plan_report(const PlanInspection&,std::string_view digest={});
 }

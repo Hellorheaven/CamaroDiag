@@ -234,6 +234,7 @@ PlanInspection inspect_plan(const Value& body,PlanOrder order,std::optional<std:
     require(vin_field(body,"observed_vin")==out.initial_vin,"Reported VIN differs from raw response");
     if(const auto* final=get(body,"final_vin");final)require(vin_field(body,"final_vin")==out.final_vin,"Final reported VIN differs");
     verify_basic_summary(body,out);
+    verify_derived_summary(body,out);
     return out;
 }
 std::string plan_report(const PlanInspection& r,std::string_view digest){
@@ -254,7 +255,7 @@ std::string plan_report(const PlanInspection& r,std::string_view digest){
         out<<"{\"mode\":"<<inv.mode<<",\"state\":"<<json::quote(inv.state)<<",\"verified_pages\":"<<inv.pages<<",\"advertised_ids\":[";
         for(std::size_t j=0;j<inv.ids.size();++j){if(j)out<<',';out<<inv.ids[j];}out<<"]}";
     }
-    out<<"],\"basic_summary\":"<<basic_summary_json(r)<<",\"steps\":[";
+    out<<"],\"basic_summary\":"<<basic_summary_json(r)<<",\"derived_summary\":"<<r.derived_summary<<",\"derived_groups_checked\":"<<r.derived_groups_checked<<",\"steps\":[";
     for(std::size_t i=0;i<r.steps.size();++i){
         if(i)out<<',';
         const auto& s=r.steps[i];
