@@ -2938,6 +2938,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native compare-legacy-discovery-scan --discovery DISCOVERY.json --scan SCAN.json --output PROOF.json\n"
         "  camarodiag-native project-native-live --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output PROJECTION.json\n"
         "  camarodiag-native export-native-live-csv --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
+        "  camarodiag-native compare-native-live --report A.json --report B.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
         "  camarodiag-native compare-live --report A.json --report B.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-native-freeze --capture CAPTURE.cf --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-j1979-capture --capture CAPTURE.cj1 --report REPORT.json [--vin VIN] --output PROOF.json\n"
@@ -3108,6 +3109,55 @@ static int project_native_live_cli(int argc,char** argv,bool csv){
         return projected.complete?0:2;
     }catch(const std::exception& e){return error(e.what());}
 }
+static int compare_native_live_cli(int argc,char** argv){
+    std::vector<const char*> paths;
+    const char* output=nullptr;const char* vin=nullptr;const char* tx=nullptr;const char* rx=nullptr;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing native comparison option");
+        const char* value=argv[i++];
+        if(key=="--report"&&paths.size()<16)paths.push_back(value);
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else if(key=="--tx"&&!tx)tx=value;
+        else if(key=="--rx"&&!rx)rx=value;
+        else return error("Unexpected or duplicate native comparison option");
+    }
+    if(paths.size()<2||!output||!vin||!tx||!rx)return error("Native comparison requires 2 to 16 reports, TX, RX, VIN and output");
+    try{
+        auto id=[](std::string_view s){
+            std::uint32_t n{};
+            const auto [end,ec]=std::from_chars(s.data(),s.data()+s.size(),n,16);
+            if(s.empty()||s.size()>8||ec!=std::errc{}||end!=s.data()+s.size()||n>0x1fffffffu)
+                throw std::invalid_argument("Invalid explicit hexadecimal CAN identifier");
+            return n;
+        };
+        const cd::network::Pair pair{id(tx),id(rx)};
+        constexpr std::size_t maximum=64u*1024u*1024u,total_limit=128u*1024u*1024u;
+        std::size_t total=0;
+        std::vector<input> snapshots(paths.size());
+        std::vector<cd::network::history::NativeLiveProjection> projections;
+        std::vector<std::string> digests;
+        for(std::size_t i=0;i<paths.size();++i){
+            auto& in=snapshots[i];
+            if(!load_regular(paths[i],maximum,&in)||in.length>total_limit-total)
+                return error("Bounded native comparison inputs required");
+            total+=in.length;
+            const auto root=cd::json::parse_report({reinterpret_cast<const char*>(in.bytes.get()),in.length},maximum);
+            projections.push_back(cd::network::history::project_native_live(root,pair,vin));
+            digests.emplace_back(in.digest);
+        }
+        const auto result=cd::network::history::compare_native_live(projections,digests);
+        const auto proof=cd::json::serialize(result)+"\n";
+        for(std::size_t i=0;i<paths.size();++i){
+            input again{};
+            if(!load_regular(paths[i],maximum,&again)||!same_input(&snapshots[i],&again))
+                return error("Native comparison input changed");
+        }
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Native comparison output unavailable");
+        return result.at("all_identities_rechecked").boolean()?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
 static int compare_live_compat_cli(int argc,char** argv){
     std::vector<const char*> paths;
     const char* output=nullptr;std::optional<std::string> vin;
@@ -3231,6 +3281,7 @@ int main(int argc, char **argv) {
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-can-plan"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
     if(argc>=2&&!strcmp(argv[1],"project-native-live"))return project_native_live_cli(argc,argv,false);
     if(argc>=2&&!strcmp(argv[1],"export-native-live-csv"))return project_native_live_cli(argc,argv,true);
+    if(argc>=2&&!strcmp(argv[1],"compare-native-live"))return compare_native_live_cli(argc,argv);
     if(argc>=2&&!strcmp(argv[1],"compare-live"))return compare_live_compat_cli(argc,argv);
     if(argc>=2&&!strcmp(argv[1],"verify-can-mutation"))return historical_maintenance_compat_cli(argc,argv,true);
     if(argc>=2&&!strcmp(argv[1],"verify-legacy-mutation"))return historical_maintenance_compat_cli(argc,argv,false);
