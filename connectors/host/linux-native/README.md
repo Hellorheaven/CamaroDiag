@@ -549,3 +549,31 @@ whole-vehicle coverage or physical authenticity.
 État : chemins natifs écrits, tests de régression ajoutés, validation de
 clôture non exécutée. Les contrats historiques Python et les autres protocoles
 restent à migrer intégralement avant leur suppression.
+
+
+## Portable CL/1 scalar verification (Android / Windows / Linux)
+
+The enriched Linux projection and the portable scalar projection are
+different contracts. The portable schema
+`camarodiag-j1979-cl1-scalar-projection-v1` deliberately excludes
+context-dependent measurements without independent configuration evidence.
+
+~~~sh
+camarodiag-native --project-j1979-live-native session.cl VIN scalar.json
+camarodiag-native --export-j1979-live-native-values-csv session.cl VIN scalar.csv
+camarodiag-native --verify-j1979-live-native-projection session.cl VIN scalar.json proof.json
+~~~
+
+Same positional arguments on Windows with `CamaroDiag.J2534Bridge.exe`.
+The verifier checks the original receipt, digest, independent VIN and every
+report field, accepting property ordering and finite engineering rounding
+differences only. A consistent partial recording returns 7; a rejected
+input returns 2. Optional proof publication is exclusive. The explicit
+pair commands remain available where an independent CAN pair is required.
+
+FR : les écrans de tests fonctionnels Android et Windows proposent la
+vérification du rapport scalaire avec la capture originale CL/1 et export
+de preuve JSON. Le format portable reste distinct du format Linux enrichi.
+Aucun de ces contrôles ne contacte le véhicule. Les tests synthétiques
+des trois hôtes utilisent la même chronologie de température/régime ;
+leur exécution reste réservée au gate de clôture.

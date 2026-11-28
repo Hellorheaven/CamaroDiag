@@ -3096,6 +3096,10 @@ static void usage(FILE *stream) {
         "  camarodiag-native project-cl1-scalar --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output SCALAR.json\n"
         "  camarodiag-native export-cl1-scalar-csv --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output SCALAR.csv\n"
         "  camarodiag-native verify-cl1-scalar --capture CAPTURE.cl --projection SCALAR.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "  camarodiag-native --project-j1979-live-native CAPTURE.cl VIN SCALAR.json\n"
+        "  camarodiag-native --export-j1979-live-native-values-csv CAPTURE.cl VIN SCALAR.csv\n"
+        "  camarodiag-native --verify-j1979-live-native-projection CAPTURE.cl VIN SCALAR.json [PROOF.json]\n"
+        "    Shared offline Windows/Linux CLI: pair replayed from original plan, 0 complete, 7 incomplete, 2 rejected.\n"
         "    Scalar JSON is the portable Android/Windows contract. The enriched native projection is separate.\n"
         "  camarodiag-native export-native-live-csv --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native export-legacy-live-csv --capture CAPTURE.llr --protocol 2 --source 10 --vin VIN --output SAMPLES.csv\n"
@@ -3321,6 +3325,50 @@ static int socket_campaign_cli(int argc,char** argv,std::string_view command){
         return replay.completed&&!replay.prefix?0:2;
     }catch(const std::exception& e){return error(e.what());}
 }
+// Shared positional CL/1 CLI used by the Windows bridge. The CAN pair is
+// replayed from the capture plan; the caller still supplies an independent
+// VIN. This compatibility path is offline only and does not open an ECU.
+static int cl1_scalar_compat_cli(int argc,char** argv,std::string_view op){
+    const bool verify=op=="--verify-j1979-live-native-projection";
+    const bool csv=op=="--export-j1979-live-native-values-csv";
+    if((verify&&(argc!=5&&argc!=6))||(!verify&&argc!=5))
+        return error("Expected original CL/1 capture, independent VIN, JSON/CSV destination or projection and optional proof");
+    const char* source=argv[2];const char* vin=argv[3];const char* target=argv[4];
+    if(!cf1_valid_vin(vin)||!*source||!*target)return error("Independent CL/1 VIN and distinct files required");
+    try{
+        constexpr std::size_t maximum=64u*1024u*1024u;
+        input raw{},stored{};
+        if(!load_regular(source,CL1_MAX_CAPTURE,&raw))return error("Invalid bounded CL/1 source");
+        cl1_result checked{};std::array<char,256> failure{};
+        if(cl1_inspect_complete(raw.bytes.get(),raw.length,vin,&checked,failure.data(),failure.size()))
+            return error(failure.data());
+        const auto projected=cd::network::history::project_cl1_scalar(
+            {raw.bytes.get(),raw.length},{checked.plan.tx,checked.plan.rx},vin,raw.digest);
+        if(verify){
+            if(!load_regular(target,maximum,&stored)||!separate(&raw,&stored))
+                return error("Separate original capture and portable JSON report required");
+            const auto candidate=cd::json::parse_report({reinterpret_cast<const char*>(stored.bytes.get()),stored.length},maximum);
+            if(!cd::network::history::verify_cl1_scalar(projected,candidate))
+                return error("Portable projection differs from independent CL/1 replay");
+            if(!recheck_input(source,CL1_MAX_CAPTURE,raw)||!recheck_input(target,maximum,stored))
+                return error("CL/1 capture or report changed during verification");
+            const auto proof=std::string("{\"schema\":\"camarodiag-j1979-cl1-projection-verification-v1\","
+                "\"consistent\":true,\"capture_sha256\":\"")+raw.digest+"\",\"projection_sha256\":\""+stored.digest+
+                "\",\"numeric_projection_complete\":"+(projected.complete?"true":"false")+
+                ",\"physical_vehicle_verified\":false,\"authenticated\":false,\"permits_programming\":false}\n";
+            if(argc==6&&!atomic_create(argv[5],proof.data(),proof.size()))return error("New proof destination unavailable");
+            fputs(proof.c_str(),stdout);
+        }else{
+            const auto data=csv?cd::network::history::cl1_scalar_csv(projected):cd::json::serialize(projected.report)+"\n";
+            if(!recheck_input(source,CL1_MAX_CAPTURE,raw))return error("CL/1 source changed");
+            if(!atomic_create(target,data.data(),data.size()))return error("New scalar destination unavailable");
+            printf("{\"identity_rechecked\":%s,\"numeric_projection_complete\":%s}\n",
+                projected.report.at("identity_rechecked").boolean()?"true":"false",projected.complete?"true":"false");
+        }
+        return projected.complete?0:7;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static int cl1_numeric_cli(int argc,char** argv,std::string_view operation){
     const char *capture=nullptr,*vin=nullptr,*tx=nullptr,*rx=nullptr,*output=nullptr,*projection=nullptr;
     const bool scalar=operation=="project-cl1-scalar"||operation=="export-cl1-scalar-csv"||
@@ -3615,6 +3663,9 @@ int main(int argc, char **argv) {
     if(argc>=2&&!strcmp(argv[1],"verify-native-live-projection"))return project_native_live_cli(argc,argv,false,true);
     if(argc>=2&&!strcmp(argv[1],"verify-network-journals"))return verify_network_journal_cli(argc,argv);
     if(argc>=2&&(!strcmp(argv[1],"inspect-socketcan-journal")||!strcmp(argv[1],"recover-socketcan-report")||!strcmp(argv[1],"verify-socketcan-journal")))return socket_campaign_cli(argc,argv,argv[1]);
+    if(argc>=2&&(!strcmp(argv[1],"--project-j1979-live-native")||
+        !strcmp(argv[1],"--export-j1979-live-native-values-csv")||!strcmp(argv[1],"--verify-j1979-live-native-projection")))
+        return cl1_scalar_compat_cli(argc,argv,argv[1]);
     if(argc>=2&&(!strcmp(argv[1],"project-cl1-live")||!strcmp(argv[1],"export-cl1-live-csv")||
         !strcmp(argv[1],"verify-cl1-live-projection")||!strcmp(argv[1],"project-cl1-scalar")||
         !strcmp(argv[1],"export-cl1-scalar-csv")||!strcmp(argv[1],"verify-cl1-scalar")))
@@ -3676,7 +3727,7 @@ int main(int argc, char **argv) {
         return cm1_cli(argv[2],argv[3],argv[4],argv[5],false);
     if (argc==6 && !strcmp(argv[1],"--verify-j1979-maintenance-prefix"))
         return cm1_cli(argv[2],argv[3],argv[4],argv[5],true);
-    if (argc >= 3 && !strcmp(argv[1], "--j1979-live-usb-native"))
+    if (argc >= 3 && (!strcmp(argv[1], "--j1979-live-usb-native")||!strcmp(argv[1],"--j1979-live-native")))
         return capture_cl1_native(argc,argv);
     if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-elm-campaign"))return elm_campaign_cli(argc,argv,false);
     if (argc>=3 && !strcmp(argv[1],"--verify-j1979-elm-campaign"))return elm_campaign_cli(argc,argv,true);

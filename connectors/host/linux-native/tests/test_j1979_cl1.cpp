@@ -85,6 +85,44 @@ static fixture complete(Case variant=Case::success) {
     assert(seq==6);
     return f;
 }
+// Exact two-PID chronology used by the Android and Windows synthetic
+// CU/3 tests. Independently generated CL/1 frames, not captured hardware.
+static fixture portable_fixture(){
+    fixture f{};
+    uint8_t plan[CL1_PLAN_SIZE]{};
+    le32(plan,0x7e0);le32(plan+4,0x7e8);memcpy(plan+9,vin,17);
+    plan[26]=2;plan[27]=5;plan[28]=12;
+    le16(plan+59,2);le16(plan+61,100);le32(plan+63,1000);
+    unsigned seq=0;record(&f,1,seq++,plan,sizeof(plan));
+    uint8_t identity[20]{0x49,2,1};memcpy(identity+3,vin,17);
+    const uint8_t vq[]{9,2},iq[]{1,0},tq[]{1,5},rq[]{1,12};
+    const uint8_t bitmap[]{0x41,0,8,0x10,0,0};
+    const uint8_t t1[]{0x41,5,0x50},t2[]{0x41,5,0x51};
+    const uint8_t r1[]{0x41,12,0x12,0x34},r2[]{0x41,12,0x12,0x35};
+    // Use 100 ms timeout exactly as both other hosts; the test helper
+    // usually uses 1000 ms and therefore must not be used for this plan.
+    auto add=[&](unsigned phase,unsigned state,unsigned cycle,unsigned pid,unsigned at,
+        const uint8_t* request,const uint8_t* response,std::size_t length){
+        std::array<uint8_t,CL1_EVENT_SIZE+20> data{};
+        data[0]=static_cast<uint8_t>(phase);data[1]=static_cast<uint8_t>(state);data[2]=1;
+        le16(data.data()+4,cycle);data[6]=static_cast<uint8_t>(pid);
+        le32(data.data()+8,at);le32(data.data()+12,at+5);le16(data.data()+16,100);
+        le16(data.data()+18,static_cast<unsigned>(length));le32(data.data()+20,5);
+        memcpy(data.data()+24,request,2);memcpy(data.data()+26,response,length);
+        record(&f,2,seq++,data.data(),CL1_EVENT_SIZE+length);
+    };
+    add(1,1,0,0,0,vq,identity,20);add(2,1,0,0,5,iq,bitmap,6);
+    add(4,2,1,5,10,tq,t1,3);add(4,2,1,12,15,rq,r1,4);
+    add(4,2,2,5,110,tq,t2,3);add(4,2,2,12,115,rq,r2,4);
+    add(5,1,0,0,120,vq,identity,20);
+    uint8_t terminal[CL1_TERMINAL_SIZE]{};
+    terminal[1]=15;le16(terminal+2,2);le32(terminal+4,7);
+    le32(terminal+8,4);le32(terminal+12,4);le32(terminal+24,125);
+    le32(terminal+28,60);terminal[32]=32;terminal[33]=16;
+    le16(terminal+64,2);le16(terminal+66,2);
+    record(&f,3,seq++,terminal,sizeof(terminal));assert(seq==9);
+    return f;
+}
 int main(void) {
     fixture f=complete();
     cl1_result result{};char error[256]={0};
@@ -109,6 +147,14 @@ int main(void) {
     assert(native_live_csv(projected).find("engine-rpm")!=std::string::npos);
     // Compare two independently replayed recordings, never user-edited
     // engineering data. Different evidence digests are required.
+    const auto cross=portable_fixture();
+    const auto cross_result=project_cl1_scalar({cross.bytes,cross.used},{0x7e0,0x7e8},vin,std::string(64,'a'));
+    assert(cross_result.complete);
+    const auto& cross_channels=cross_result.report.at("channels").array();
+    assert(cross_channels.size()==2&&cross_channels[0].at("mean").finite_number()==40.5);
+    assert(cross_channels[1].at("mean").finite_number()==1165.125);
+    assert(cross_channels[0].at("count").unsigned_integer()==2&&cross_channels[1].at("missing").unsigned_integer()==0);
+    assert(cross_result.report.at("samples").array().size()==4);
     const auto scalar=project_cl1_scalar({f.bytes,f.used},{0x7e0,0x7e8},vin,std::string(64,'a'));
     assert(scalar.complete&&scalar.report.at("schema").string()=="camarodiag-j1979-cl1-scalar-projection-v1");
     assert(scalar.report.at("samples").array()[0].at("number").finite_number()==1726);
