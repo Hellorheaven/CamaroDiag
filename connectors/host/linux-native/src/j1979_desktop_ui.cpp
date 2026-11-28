@@ -10,6 +10,8 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QFont>
+#include <QTextDocument>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -298,9 +300,12 @@ public:
 int main(int argc,char** argv){
     QApplication app(argc,argv);
     app.setApplicationName("CamaroDiag J1979");app.setOrganizationName("CamaroDiag");
-    if(geteuid()==0){
+    const bool smoke=argc==2&&std::string_view(argv[1])=="--self-test-ui";
+    if(geteuid()==0&&!smoke){
         QMessageBox::critical(nullptr,"Droits administrateur","Ne pas exécuter cette interface graphique en root. Configurez les droits locaux sur le connecteur.");
         return 2;
     }
-    Window window;window.show();return app.exec();
+    Window window;
+    if(smoke){QTimer::singleShot(0,&app,&QApplication::quit);return app.exec();}
+    window.show();return app.exec();
 }

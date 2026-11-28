@@ -24,7 +24,7 @@ Field source(){return f("source","Source legacy (hex, 2 chiffres)","--source",K:
 Field output(){return f("output","Nouveau fichier de sortie","--output",K::output_file,"");}
 Field report(){return f("report","Rapport source","--report",K::input_file,"");}
 Field capture(bool physical){return f("capture",physical?"Nouvelle capture":"Capture source","--capture",physical?K::output_file:K::input_file,"");}
-Field budget(){return f("budget","Budget (ms)","--budget-ms",K::decimal,"180000",false,1000,600000);}
+Field budget(unsigned initial=180000){return f("budget","Budget (ms)","--budget-ms",K::decimal,std::to_string(initial),false,1000,600000);}
 Field cycles(){return f("cycles","Nombre de cycles","--cycles",K::decimal,"30",false,1,1000);}
 Field interval(){return f("interval","Intervalle (ms)","--interval-ms",K::decimal,"1000",false,100,60000);}
 Field pids(){return f("pids","PID hex séparés par espaces","--pid",K::pids,"0C 0D");}
@@ -78,16 +78,17 @@ const std::vector<Operation>& operations(){
         op("can-scan","CAN — Lecture ECU","VIN, DTC, inventaires et services annoncés. Journal SCJ obligatoire dans l’interface.","--j1979-can",{interface(),tx(),rx(),vin(),budget(),journal(true),output()},physical),
         op("can-live","CAN — Mesures live","Acquisition brute bornée avec relecture d’identité ; projection numérique séparée.","--j1979-live",{interface(),tx(),rx(),vin(),pids(),cycles(),interval(),budget(),journal(true),output()},physical),
         op("can-network","CAN — Plusieurs ECU","Découverte puis campagne ordonnée des ECU explicitement choisis.","--j1979-can-network",{interface(),extended(),f("targets","RX sélectionnés (hex)","--rx",K::can_ids,"7E8 7E9"),vin(),window(),budget(),directory(true),output()},functional),
-        op("can-freeze","CAN — Trames figées","Lecture Mode 02 sur le calculateur choisi.","--j1979-freeze-can",{interface(),tx(),rx(),vin(),frames(),pids(),budget(),capture(true),output()},physical),
+        op("can-freeze","CAN — Trames figées","Lecture Mode 02 sur le calculateur choisi.","--j1979-freeze-can",{interface(),tx(),rx(),vin(),extended(),frames(),pids(),budget(60000),capture(true),output()},physical),
         op("elm-scan","ELM CAN — Lecture ECU","Profil ELM imposé, réponses ISO-TP, journal adaptateur facultatif.","--j1979-elm-can",{port(),profile(),tx(),rx(),vin(),budget(),adapter_journal(),campaign(),output()},physical),
+        op("elm-freeze","ELM CAN — Trames figées","Lecture Mode 02 sur un profil ELM fixé et un calculateur choisi.","--j1979-elm-can-freeze",{port(),profile(),tx(),rx(),vin(),extended(),frames(),pids(),budget(60000),capture(true),adapter_journal(),output()},physical),
         op("elm-live","ELM CAN — Mesures live","Acquisition CAN via adaptateur série, sélection physique.","--j1979-elm-live",{port(),profile(),tx(),rx(),vin(),pids(),cycles(),interval(),budget(),adapter_journal(),campaign(),output()},physical),
         op("legacy-discover","Legacy — Découverte","J1850, ISO 9141 ou KWP : un protocole sélectionné.","--j1979-legacy-discover",{port(),protocol(),f("baud","Vitesse série","--baud",K::decimal,"38400",false,1200,1000000),output()},physical),
         op("legacy-scan","Legacy — Lecture source","Source de réponse choisie ; pas d’adressage physique revendiqué.","--j1979-legacy",{port(),protocol(),source(),vin(),budget(),capture(true),output()},physical),
         op("legacy-live","Legacy — Mesures live","Mesures de la source sélectionnée, avec trace LLR.","--j1979-legacy-live",{port(),protocol(),source(),vin(),pids(),cycles(),interval(),budget(),raw(),capture(true),output()},physical),
         op("legacy-freeze","Legacy — Trames figées","Mode 02, source de réponse sélectionnée.","--j1979-legacy-freeze",{port(),protocol(),source(),vin(),frames(),pids(),budget(),capture(true),output()},physical),
-        op("usb-scan","USB natif — Lecture ECU","Capture CJ/1 via connecteur natif et clé locale.","--j1979-usb",{port(),key(),tx(),rx(),vin(),budget(),capture(true),output()},physical),
+        op("usb-scan","USB natif — Lecture ECU","Capture CJ/1 via connecteur natif et clé locale.","--j1979-usb",{port(),key(),tx(),rx(),vin(),extended(),budget(60000),capture(true),output()},physical),
         op("usb-freeze","USB natif — Trames figées","Capture CF/1 via connecteur natif.","--j1979-freeze-native",{port(),key(),tx(),rx(),vin(),frames(),pids(),budget(),capture(true),output()},physical),
-        op("usb-live","USB natif — Mesures live","Capture CL/1 via connecteur natif.","--j1979-live-usb-native",{port(),key(),tx(),rx(),vin(),pids(),cycles(),interval(),budget(),capture(true),output()},physical),
+        op("usb-live","USB natif — Mesures live","Capture CL/1 via connecteur natif.","--j1979-live-usb-native",{port(),key(),tx(),rx(),vin(),extended(),pids(),cycles(),interval(),budget(),capture(true),output()},physical),
         op("inspect-scj","Hors ligne — Inspection SCJ","Rejoue les callbacks sans connexion au véhicule.","inspect-socketcan-journal",{journal(false),tx(),rx(),vin(),output()}),
         op("recover-scj","Hors ligne — Récupération SCJ","Reconstruit un rapport seulement si le journal contient un terminal vérifié.","recover-socketcan-report",{journal(false),tx(),rx(),vin(),output()}),
         op("verify-scj","Hors ligne — Vérification SCJ","Compare le journal à son rapport exact.","verify-socketcan-journal",{journal(false),report(),tx(),rx(),vin(),output()}),
@@ -144,13 +145,14 @@ Invocation prepare(const Operation& supplied,const Values& values){
             for(const auto& token:tokens){
                 const auto n=parse(token,16,field.kind==K::pids?1:0,field.kind==K::can_ids?0x1fffffffu:255u,"Élément hexadécimal invalide");
                 require(seen.insert(n).second,"Élément dupliqué");
-                if(field.kind==K::pids)require(n%32!=0,"Un PID de données, pas un bitmap, est requis");
+                if(field.kind==K::pids)require(n%32!=0&&(!(op.id.find("freeze")!=std::string::npos)||n!=2),"Un PID de données est requis, sans bitmap ni déclencheur Mode 02");
                 if(field.kind==K::can_ids){
                     const bool ext=values.contains("extended")&&values.at("extended")=="true";
                     require(ext?(n&0x1fffff00u)==0x18daf100u&&(n&255u)!=255u:n>=0x7e8&&n<=0x7ef,
                         "Réponse CAN hors famille sélectionnée");
                 }
-                invocation.args.push_back(field.flag);invocation.args.push_back(token);
+                if(field.kind!=K::can_ids&&token.size()==1){invocation.args.push_back(field.flag);invocation.args.push_back("0"+token);}
+                else{invocation.args.push_back(field.flag);invocation.args.push_back(token);}
             }
             if(field.kind==K::pids)selected_count=static_cast<unsigned>(tokens.size());
             continue;
@@ -174,6 +176,10 @@ Invocation prepare(const Operation& supplied,const Values& values){
     if(ids.contains("tx")&&ids.contains("rx"))
         require(j1979_can_physical_pair(ids.at("tx"),ids.at("rx")),"Paire CAN physique invalide");
     require(selected_count*cycle_count<=10000,"Nombre total d’échantillons supérieur à 10 000");
+    if(ids.contains("tx")&&ids.contains("rx")&&std::any_of(op.fields.begin(),op.fields.end(),[](const Field& a){return a.key=="extended";})){
+        const bool extended=values.contains("extended")&&values.at("extended")=="true";
+        require(extended==(ids.at("tx")>0x7ff),"Adressage 11/29 bits incohérent");
+    }
     if(op.physical)invocation.args.push_back(op.confirmation);
     return invocation;
 }

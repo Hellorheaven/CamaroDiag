@@ -41,5 +41,14 @@ int main(){
     network["targets"]="7E8 18DAF110";rejects([&]{(void)prepare(find("can-network"),network);});
     Values offline{{"journal",directory+"/absent.scj"},{"tx","7E0"},{"rx","7E8"},{"vin",values["vin"]},{"output",directory+"/proof.json"}};
     rejects([&]{(void)prepare(find("inspect-scj"),offline);});
+    Values freeze{{"interface","can0"},{"tx","7E0"},{"rx","7E8"},{"vin",values["vin"]},
+        {"frames","0"},{"pids","C"},{"capture",directory+"/freeze.cf"},{"output",directory+"/freeze.json"}};
+    ready=prepare(find("can-freeze"),freeze);
+    assert(std::find(ready.args.begin(),ready.args.end(),"00")!=ready.args.end());
+    assert(std::find(ready.args.begin(),ready.args.end(),"0C")!=ready.args.end());
+    freeze["pids"]="02";rejects([&]{(void)prepare(find("can-freeze"),freeze);});
+    freeze["pids"]="0C";freeze["tx"]="18DA10F1";freeze["rx"]="18DAF110";
+    rejects([&]{(void)prepare(find("can-freeze"),freeze);});
+    freeze["extended"]="true";assert(prepare(find("can-freeze"),freeze).physical);
     assert(rmdir(name)==0);
 }

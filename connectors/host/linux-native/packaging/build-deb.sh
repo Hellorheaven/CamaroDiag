@@ -25,8 +25,9 @@ if [ -n "$desktop" ]; then
     test -f "$desktop" || { echo "Native desktop missing." >&2; exit 2; }
     name=camarodiag-native-j1979-desktop
 fi
-root=$(mktemp -d)
-trap 'rm -rf "$root"' EXIT HUP INT TERM
+work=$(mktemp -d)
+root="$work/package"
+trap 'rm -rf "$work"' EXIT HUP INT TERM
 mkdir -p "$root/DEBIAN" "$root/usr/bin" "$root/usr/share/doc/$name"
 install -m 0755 "$binary" "$root/usr/bin/camarodiag-native"
 install -m 0644 README.md "$root/usr/share/doc/$name/README.md"
@@ -40,12 +41,26 @@ fi
 # Debian 12, 13, Ubuntu and ARM family variants are not hardcoded.
 set -- -O -e"$root/usr/bin/camarodiag-native"
 if [ -n "$desktop" ]; then set -- "$@" -e"$root/usr/bin/camarodiag-j1979-desktop"; fi
-deps=$(dpkg-shlibdeps "$@" | sed -n 's/^shlibs:Depends=//p')
+mkdir -p "$work/debian"
+cat > "$work/debian/control" <<EOF
+Source: $name
+Section: utils
+Priority: optional
+Maintainer: CamaroDiag project
+Standards-Version: 4.6.2
+
+Package: $name
+Architecture: any
+Description: Native CamaroDiag J1979
+EOF
+deps=$(cd "$work" && dpkg-shlibdeps "$@" | sed -n 's/^shlibs:Depends=//p')
 if [ -z "$deps" ]; then
     echo "Could not resolve native shared-library dependencies." >&2
     exit 2
 fi
 
+other=camarodiag-native-j1979-desktop
+if [ -n "$desktop" ]; then other=camarodiag-native-j1979; fi
 cat > "$root/DEBIAN/control" <<EOF
 Package: $name
 Version: $version
@@ -54,6 +69,8 @@ Priority: optional
 Architecture: $arch
 Maintainer: CamaroDiag project
 Depends: $deps
+Conflicts: $other
+Replaces: $other
 Description: Native C++20 SAE J1979 connector and evidence inspection tools
  Native Linux diagnostics, explicitly scoped to SAE J1979.
  Hardware communication requires qualified connector and operator approval.

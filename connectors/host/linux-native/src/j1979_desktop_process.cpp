@@ -106,7 +106,7 @@ std::string Process::drain(){
     }
     if(physical_&&!approved_&&!cancelled_){
         prompt_tail_+=out;
-        if(prompt_tail_.find("Type yes: ")!=std::string::npos||prompt_tail_.find("Type yes:")!=std::string::npos)
+        if(prompt_tail_.find("Type yes: ")!=std::string::npos||prompt_tail_.find("Type yes:")!=std::string::npos||prompt_tail_.find("[yes/no] ")!=std::string::npos)
             prompt_seen_=true;
         if(prompt_tail_.size()>512)prompt_tail_.erase(0,prompt_tail_.size()-512);
     }
