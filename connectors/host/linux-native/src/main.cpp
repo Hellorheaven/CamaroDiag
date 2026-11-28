@@ -2552,7 +2552,7 @@ static int elm_can_cli(int argc,char** argv,bool live){
     } signals;
     std::unique_ptr<cd::legacy::Link> link;
     std::unique_ptr<cd::elmcan::Session> session;
-    std::string native_report,reason;
+    std::string native_report,reason,campaign_digest;
     AdapterJournalOutput journal;
     bool completed=false;
     try{
@@ -2584,6 +2584,7 @@ static int elm_can_cli(int argc,char** argv,bool live){
             const auto replay=cd::elmcan::replay_campaign(cd::elmcan::decode_campaign({persisted.bytes.get(),persisted.length}));
             if(replay.native_report!=result.native_report||!recheck_input(o.campaign_capture,cd::elmcan::campaign_max_bytes,persisted))
                 throw std::runtime_error("Persisted campaign replay differs");
+            campaign_digest=persisted.digest;
         }
         native_report=std::move(result.native_report);reason=std::move(result.stop);completed=result.completed;
     }catch(const std::exception& e){reason=e.what();completed=false;}
@@ -2608,8 +2609,13 @@ static int elm_can_cli(int argc,char** argv,bool live){
             if(native_report.empty())return error("No replayed ELM live report available");
             raw_output->persist(native_report);
             if(projection->requested()||csv->requested()){
-                const auto exported=cd::liveexport::publish(raw_output->descriptor(),raw_output->path(),native_report,
-                    {o.scope.tx,o.scope.rx},o.vin,*projection,*csv);
+                if(campaign_digest.empty())return error("No independently replayed ECP capture available");
+                File original{open(o.campaign_capture,O_RDONLY|O_NOFOLLOW|O_CLOEXEC)};
+                if(original.fd<0)return error("Persisted ECP capture unavailable");
+                const auto exported=cd::liveexport::publish_recorded(original.fd,o.campaign_capture,
+                    cd::network::history::LiveEvidenceKind::elm_campaign,campaign_digest,
+                    raw_output->descriptor(),raw_output->path(),native_report,
+                    {o.scope.tx,o.scope.rx},o.vin,o.scope.profile,*projection,*csv);
                 completed=completed&&exported.complete;
                 fprintf(stderr,"J1979 ELM live export: %zu samples, source SHA-256 %s, %s\n",
                     exported.samples,exported.source_sha256.c_str(),exported.complete?"complete":"incomplete");

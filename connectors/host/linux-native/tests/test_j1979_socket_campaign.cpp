@@ -173,6 +173,20 @@ int main(){
                 {0x7e0,0x7e8},vin,projection,table);});
         }
         assert(unlink(json.c_str())==0&&unlink(csv.c_str())==0);
+        {
+            cd::liveexport::Destination projection(json.c_str()),table(csv.c_str());
+            using cd::network::history::LiveEvidenceKind;
+            rejects([&]{(void)cd::liveexport::publish_recorded(file.fd,file.name.c_str(),
+                LiveEvidenceKind::socket_journal,std::string(64,'a'),raw.fd,raw.name.c_str(),result.report,
+                {0x7e0,0x7e8},vin,0,projection,table);});
+            projection.check_empty();table.check_empty();
+            const auto bound=cd::liveexport::publish_recorded(file.fd,file.name.c_str(),
+                LiveEvidenceKind::socket_journal,sha256(file.read()),raw.fd,raw.name.c_str(),result.report,
+                {0x7e0,0x7e8},vin,0,projection,table);
+            assert(bound.complete&&bound.source_sha256==sha256(file.read()));
+            assert(bound.source_sha256!=sha256(result.report));
+        }
+        assert(unlink(json.c_str())==0&&unlink(csv.c_str())==0);
         assert(symlink(raw.name.c_str(),json.c_str())==0);
         rejects([&]{cd::liveexport::Destination forbidden(json.c_str());});
         assert(unlink(json.c_str())==0);

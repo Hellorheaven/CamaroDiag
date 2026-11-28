@@ -45,6 +45,24 @@ void read_exact(int fd,std::string_view expected){
         offset+=static_cast<std::size_t>(n);
     }
 }
+std::string read_source(int fd,const char* path){
+    const auto before=private_file(fd,path);
+    require(before.st_size>0,"Empty sealed live evidence");
+    std::string raw(static_cast<std::size_t>(before.st_size),'\0');
+    std::size_t offset=0;
+    while(offset<raw.size()){
+        const auto n=pread(fd,raw.data()+offset,raw.size()-offset,static_cast<off_t>(offset));
+        if(n<0&&errno==EINTR)continue;
+        require(n>0,"Incomplete sealed live evidence read");
+        offset+=static_cast<std::size_t>(n);
+    }
+    const auto after=private_file(fd,path);
+    require(same(before,after)&&before.st_size==after.st_size&&
+        before.st_mtim.tv_sec==after.st_mtim.tv_sec&&before.st_mtim.tv_nsec==after.st_mtim.tv_nsec&&
+        before.st_ctim.tv_sec==after.st_ctim.tv_sec&&before.st_ctim.tv_nsec==after.st_ctim.tv_nsec,
+        "Sealed live evidence changed during read");
+    return raw;
+}
 void check_source(int fd,const char* path,std::string_view expected){
     require(!expected.empty()&&expected.size()<=limit,"Invalid bounded source report");
     const auto before=private_file(fd,path);
@@ -107,5 +125,32 @@ Result publish(int source_fd,const char* source_path,std::string_view expected_r
     projection.persist(json);csv.persist(table);
     check_source(source_fd,source_path,expected_report);
     return {rebuilt.complete,digest,rebuilt.report.at("samples").array().size()};
+}
+Result publish_recorded(int capture_fd,const char* capture_path,
+    cd::network::history::LiveEvidenceKind kind,std::string_view expected_capture_digest,
+    int report_fd,const char* report_path,std::string_view expected_report,
+    cd::network::Pair pair,std::string_view vin,unsigned elm_profile,Destination& projection,Destination& csv){
+    using namespace cd::network::history;
+    require(kind==LiveEvidenceKind::socket_journal||kind==LiveEvidenceKind::elm_campaign,
+        "Sealed transport recording required");
+    require(projection.requested()||csv.requested(),"No live export requested");
+    require(!same(private_file(capture_fd,capture_path),private_file(report_fd,report_path)),
+        "Journal and report must be independent files");
+    projection.check_empty();csv.check_empty();
+    const auto captured=read_source(capture_fd,capture_path);
+    const auto evidence=project_live_evidence(kind,
+        {reinterpret_cast<const std::uint8_t*>(captured.data()),captured.size()},pair,vin,elm_profile);
+    require(expected_capture_digest.empty()||expected_capture_digest==evidence.source_sha256,
+        "Sealed campaign digest differs from initial readback");
+    require(evidence.raw_report_sha256==cd::socketcampaign::sha256(expected_report),
+        "Transport replay does not match the report");
+    check_source(report_fd,report_path,expected_report);
+    const auto json=projection.requested()?cd::json::serialize(evidence.projection.report)+"\n":std::string{};
+    const auto table=csv.requested()?native_live_csv(evidence.projection):std::string{};
+    check_source(capture_fd,capture_path,captured);check_source(report_fd,report_path,expected_report);
+    projection.check_empty();csv.check_empty();
+    projection.persist(json);csv.persist(table);
+    check_source(capture_fd,capture_path,captured);check_source(report_fd,report_path,expected_report);
+    return {evidence.projection.complete,evidence.source_sha256,evidence.projection.report.at("samples").array().size()};
 }
 }

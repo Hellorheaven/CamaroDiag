@@ -232,8 +232,9 @@ int j1979_can_cli(int argc, char **argv) {
             cd::socketcampaign::finish(*journal,result);
             complete=result.completed;
             if(projection->requested()||csv->requested()){
-                const auto exported=cd::liveexport::publish(fd,o.output,result.report,
-                    {o.tx,o.rx},o.vin,*projection,*csv);
+                const auto exported=cd::liveexport::publish_recorded(journal_fd.value,o.journal,
+                    cd::network::history::LiveEvidenceKind::socket_journal,{},fd,o.output,result.report,
+                    {o.tx,o.rx},o.vin,0,*projection,*csv);
                 complete=complete&&exported.complete;
                 fprintf(stderr,"J1979 live export: %zu samples, source SHA-256 %s, %s\n",
                     exported.samples,exported.source_sha256.c_str(),exported.complete?"complete":"incomplete");

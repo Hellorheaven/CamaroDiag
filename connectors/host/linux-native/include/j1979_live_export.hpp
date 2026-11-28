@@ -1,5 +1,5 @@
 #pragma once
-#include "j1979_can_network.hpp"
+#include "j1979_live_evidence.hpp"
 #include <string>
 #include <string_view>
 
@@ -31,4 +31,10 @@ struct Result {
 // caller retains its descriptor and must close the vehicle transport first.
 Result publish(int source_fd,const char* source_path,std::string_view expected_report,
     cd::network::Pair pair,std::string_view vin,Destination& projection,Destination& csv);
+// Replay a sealed original journal/campaign, match the durable raw report,
+// and bind exports to the capture digest instead of just the JSON digest.
+Result publish_recorded(int capture_fd,const char* capture_path,
+    cd::network::history::LiveEvidenceKind kind,std::string_view expected_capture_digest,
+    int report_fd,const char* report_path,std::string_view expected_report,
+    cd::network::Pair pair,std::string_view vin,unsigned elm_profile,Destination& projection,Destination& csv);
 }
