@@ -65,7 +65,7 @@ test-j1979-host-freeze: build/test_j1979_host_freeze.o build/j1979_host_freeze.o
 test-j1979-elm-can: build/test_j1979_elm_can.o build/j1979_elm_can_decode.o build/j1979_elm_can_session.o build/j1979_elm_can_report.o build/j1979_legacy.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_elm.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-host-maintenance: build/test_j1979_host_maintenance.o build/j1979_host_maintenance_storage.o build/j1979_host_maintenance_socket.o build/j1979_host_maintenance_report.o build/j1979_cm1.o build/j1979_isotp.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
+test-j1979-host-maintenance: build/test_j1979_host_maintenance.o build/j1979_host_maintenance_elm.o build/j1979_elm_can_session.o build/j1979_elm_can_decode.o build/j1979_legacy.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_elm.o build/j1979_host_maintenance_storage.o build/j1979_host_maintenance_socket.o build/j1979_host_maintenance_report.o build/j1979_cm1.o build/j1979_isotp.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-j1979-catalogue: build/test_j1979_catalogue.o build/native_json.o build/j1979_catalogue.o build/j1979_catalogue_exact.o build/j1979_catalogue_projection.o build/j1979_catalogue_report.o build/cf1.o build/cf1_complete.o build/cl1.o build/j1979_legacy_live_wire.o build/j1979_legacy_live.o build/j1979_legacy_live_plan.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_legacy.o build/j1979_elm.o $(DECODER_OBJECTS) build/j1979_policy.o
