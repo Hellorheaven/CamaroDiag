@@ -1,6 +1,7 @@
 #include "native_json.hpp"
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <limits>
 #include <utility>
 namespace cd::json {
@@ -45,6 +46,7 @@ bool ws(unsigned v){
 class Parser{
     std::string_view s_;
     std::size_t p_{},nodes_{};
+    bool decimals_{};
     static constexpr std::size_t max_nodes=1000000,max_string=1024*1024;
     void space(){
         while(p_<s_.size()&&(s_[p_]==' '||s_[p_]=='\t'||s_[p_]=='\r'||s_[p_]=='\n'))++p_;
@@ -100,13 +102,34 @@ class Parser{
     Value integer(){
         const auto begin=p_;
         if(s_[p_]=='-')++p_;
-        require(p_<s_.size()&&s_[p_]>='0'&&s_[p_]<='9',"Invalid JSON integer");
+        require(p_<s_.size()&&s_[p_]>='0'&&s_[p_]<='9',"Invalid JSON number");
         if(s_[p_]=='0')++p_;
         else while(p_<s_.size()&&s_[p_]>='0'&&s_[p_]<='9')++p_;
         require(p_-begin<=21,"JSON integer width exceeded");
-        if(p_<s_.size())require(s_[p_]!='.'&&s_[p_]!='e'&&s_[p_]!='E'&&!(s_[p_]>='0'&&s_[p_]<='9'),
-            "Only exact JSON integer fields supported");
-        return Value{Integer{std::string(s_.substr(begin,p_-begin))}};
+        require(p_==s_.size()||!(s_[p_]>='0'&&s_[p_]<='9'),"Leading zero in JSON number");
+        bool decimal=false;
+        auto digits=[&](){
+            const auto first=p_;
+            while(p_<s_.size()&&s_[p_]>='0'&&s_[p_]<='9')++p_;
+            require(p_>first,"Missing JSON number digits");
+        };
+        if(p_<s_.size()&&s_[p_]=='.'){
+            require(decimals_,"Only exact JSON integer fields supported");
+            decimal=true;++p_;digits();
+        }
+        if(p_<s_.size()&&(s_[p_]=='e'||s_[p_]=='E')){
+            require(decimals_,"Only exact JSON integer fields supported");
+            decimal=true;++p_;
+            if(p_<s_.size()&&(s_[p_]=='+'||s_[p_]=='-'))++p_;
+            digits();
+        }
+        require(p_-begin<=128,"JSON decimal width exceeded");
+        const std::string text(s_.substr(begin,p_-begin));
+        if(!decimal)return Value{Integer{text}};
+        double n{};
+        const auto [end,err]=std::from_chars(text.data(),text.data()+text.size(),n,std::chars_format::general);
+        require(err==std::errc{}&&end==text.data()+text.size()&&std::isfinite(n),"Nonfinite or unrepresentable JSON number");
+        return Value{Decimal{text}};
     }
     Value literal(std::string_view word,Value result){
         require(s_.substr(p_,word.size())==word,"Invalid JSON literal");p_+=word.size();return result;
@@ -138,7 +161,7 @@ class Parser{
         throw std::invalid_argument("Unsupported JSON token");
     }
 public:
-    explicit Parser(std::string_view s):s_(s){}
+    explicit Parser(std::string_view s,bool decimals=false):s_(s),decimals_(decimals){}
     Value parse(){auto result=parse_value(0);space();require(p_==s_.size(),"Trailing JSON data");return result;}
 };
 }
@@ -156,6 +179,16 @@ std::int64_t Value::signed_integer()const{
     const auto [end,error]=std::from_chars(text.data(),text.data()+text.size(),n);
     require(error==std::errc{}&&end==text.data()+text.size(),"Invalid signed integer");return n;
 }
+double Value::finite_number()const{
+    const auto* integer=std::get_if<Integer>(&data);
+    const auto* decimal=std::get_if<Decimal>(&data);
+    require(integer||decimal,"JSON numeric type required");
+    const auto& text=integer?integer->text:decimal->text;
+    double n{};
+    const auto [end,err]=std::from_chars(text.data(),text.data()+text.size(),n,std::chars_format::general);
+    require(err==std::errc{}&&end==text.data()+text.size()&&std::isfinite(n),"Invalid finite JSON number");
+    return n;
+}
 const Value* Value::find(std::string_view key)const{
     const auto& o=object();const auto it=o.find(key);return it==o.end()?nullptr:&it->second;
 }
@@ -165,6 +198,10 @@ const Value& Value::at(std::string_view key)const{
 Value parse(std::string_view text,std::size_t max_bytes){
     require(!text.empty()&&text.size()<=max_bytes,"JSON input limit");
     return Parser(text).parse();
+}
+Value parse_report(std::string_view text,std::size_t max_bytes){
+    require(!text.empty()&&text.size()<=max_bytes,"JSON input limit");
+    return Parser(text,true).parse();
 }
 void fields(const Value& v,std::initializer_list<std::string_view> required,std::initializer_list<std::string_view> optional){
     const auto& o=v.object();
