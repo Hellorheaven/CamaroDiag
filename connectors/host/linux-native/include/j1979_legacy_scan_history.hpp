@@ -25,6 +25,7 @@ struct HistoricalScan {
     std::optional<bool> freeze_present;
     std::optional<std::string> freeze_dtc;
     std::vector<std::string> checked_summary_fields;
+    json::Value derived; // independently reconstructed historical views
 };
 // Historical J2534 evidence has no link checksum; only headers and bytes.
 Frame inspect_driver_frame(const json::Value&,Protocol,unsigned source);

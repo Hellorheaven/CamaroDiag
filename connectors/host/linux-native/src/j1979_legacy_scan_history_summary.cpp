@@ -197,6 +197,88 @@ Value monitor_rows(const HistoricalScan& s){
     }
     return Value{std::move(rows)};
 }
+Value number(std::uint64_t n){return Value{json::Integer{std::to_string(n)}};}
+Value str(std::string_view s){return Value{std::string(s)};}
+Value flag(bool b){return Value{b};}
+Value text(const std::optional<std::string>& s){return s?str(*s):Value{};}
+Value array(Value::Array a){return Value{std::move(a)};}
+Value object(Value::Object o){return Value{std::move(o)};}
+Value identity_rows(const HistoricalScan& s){
+    Value::Array rows;
+    for(const auto& id:s.identification){
+        Value::Object fields{{"info_type",number(id.kind)}};
+        if(id.counters){
+            const auto& info=*id.counters;
+            fields.emplace("counter_count",number(info.counter_count));
+            fields.emplace("general_denominator",number(info.general_denominator));
+            fields.emplace("ignition_cycles",number(info.ignition_cycles));
+            fields.emplace("regulatory_verdict",Value{});
+            Value::Array monitors;
+            for(unsigned i=0;i<info.monitor_count;++i){
+                const auto& m=info.monitors[i];
+                Value ratio;
+                if(m.ratio_valid){
+                    std::ostringstream n;n.imbue(std::locale::classic());n<<std::scientific<<std::setprecision(16)<<m.ratio;
+                    ratio=Value{json::Decimal{n.str()}};
+                }
+                monitors.push_back(object({{"monitor",str(m.name)},{"numerator",number(m.numerator)},
+                    {"denominator",number(m.denominator)},{"ratio",std::move(ratio)}}));
+            }
+            fields.emplace("monitors",array(std::move(monitors)));
+        }else{
+            Value::Array values;
+            for(const auto& v:id.values)values.push_back(str(v));
+            fields.emplace("values",array(std::move(values)));
+        }
+        rows.push_back(object(std::move(fields)));
+    }
+    return array(std::move(rows));
+}
+Value inventory_rows(const HistoricalScan& s){
+    Value::Array rows;
+    for(const auto& i:s.inventories){
+        Value::Array advertised;
+        for(auto p:i.advertised)advertised.push_back(number(p));
+        rows.push_back(object({{"mode",number(i.mode)},{"sensor_mask",i.sensor?number(i.sensor):Value{}},
+            {"state",str(i.complete?"COMPLETE":i.pages?"PARTIAL":"UNAVAILABLE")},
+            {"verified_pages",number(i.pages)},{"advertised_ids",array(std::move(advertised))}}));
+    }
+    return array(std::move(rows));
+}
+Value dtc_rows(const HistoricalScan& s){
+    Value::Array rows;
+    for(auto mode:{3u,7u,10u}){
+        Value value;
+        const auto found=s.dtcs.find(mode);
+        if(found!=s.dtcs.end()){
+            Value::Array codes;for(const auto& c:found->second)codes.push_back(str(c));
+            value=array(std::move(codes));
+        }
+        rows.push_back(object({{"mode",number(mode)},{"codes",std::move(value)}}));
+    }
+    return array(std::move(rows));
+}
+Value raw_monitors(const HistoricalScan& s){
+    Value::Array records;
+    for(const auto& step:s.steps){
+        if(step.request.size()<2||step.request[1]%32||(step.request[0]!=5&&step.request[0]!=6))continue;
+        for(std::size_t i=0;i<step.accepted.size();++i){
+            const auto value=decode_monitor(step.request,step.accepted[i]);
+            require(value.has_value(),"Invalid historical monitor record");
+            const auto& m=*value;
+            Value::Object fields{{"mode",number(m.mode)},{"test_id",number(m.test_id)},
+                {"sensor_mask",m.mode==5?number(m.sensor_mask):Value{}},{"response_index",number(i)},
+                {"request_hex",str(hex(step.request))},{"encoded_data_hex",str(hex(m.encoded))}};
+            if(m.mode==6){
+                fields.emplace("component_and_limit_encoded",number(m.component));
+                fields.emplace("value_encoded",number(m.value));
+                fields.emplace("limit_encoded",number(*m.limit));
+            }
+            records.push_back(object(std::move(fields)));
+        }
+    }
+    return array(std::move(records));
+}
 void verify_projections(const Value& body,HistoricalScan& s){
     std::vector<cd::j1979::Observation> observations;
     observations.reserve(s.steps.size());
@@ -205,6 +287,18 @@ void verify_projections(const Value& body,HistoricalScan& s){
         observations.push_back({r.request,accepted?cd::j1979::Bytes(r.accepted.front()):cd::j1979::Bytes{},accepted,true});
     }
     const auto p=cd::network::history::historical_projections(observations);
+    s.derived=object({{"measurements",json::parse_report(scalar_rows(s))},{"multi_signal_records",json::parse_report(p.multi)},
+        {"status_records",json::parse_report(p.status)},{"contextual_measurements",json::parse_report(p.context)},
+        {"operating_context",json::parse_report(p.operating)},{"readiness",json::parse_report(readiness(s))},
+        {"legacy_monitor_results",monitor_rows(s)},{"monitor_records",raw_monitors(s)},{"identification",identity_rows(s)},
+        {"inventory",inventory_rows(s)},{"dtc_modes",dtc_rows(s)},
+        {"freeze_trigger",s.freeze_present?object({{"present",flag(*s.freeze_present)},{"dtc",text(s.freeze_dtc)}}):Value{}}});
+    if(const auto* v=claim(body,"identification")){
+        check(normalize(*v),s.derived.at("identification"));s.checked_summary_fields.emplace_back("identification");
+    }
+    if(const auto* v=claim(body,"monitor_records")){
+        check(normalize(*v),s.derived.at("monitor_records"));s.checked_summary_fields.emplace_back("monitor_records");
+    }
     if(const auto* v=claim(body,"measurements")){
         check(reduce(*v,{"mode","pid","name","number","unit"},s.source),json::parse_report(scalar_rows(s)));
         s.checked_summary_fields.emplace_back("measurements");
