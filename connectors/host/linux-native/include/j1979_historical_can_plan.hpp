@@ -39,6 +39,7 @@ struct PlanInspection {
     std::vector<Scalar> measurements;
     std::array<DtcMode,3> dtcs{};
     bool basic_summary_checked{};
+    unsigned application_evidence_checked{};
 };
 // Verifies read-only request order and the historical application envelope.
 // Derived report projections are intentionally not certified by this API.
