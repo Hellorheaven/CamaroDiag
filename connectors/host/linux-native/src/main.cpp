@@ -31,6 +31,7 @@
 #include "j1979_historical_can_plan.hpp"
 #include "j1979_legacy_discovery_history.hpp"
 #include "j1979_legacy_scan_history.hpp"
+#include "j1979_legacy_mutation_history.hpp"
 #include "j1979_legacy_freeze_history.hpp"
 #include "j1979_can_freeze_history.hpp"
 #include "j1979_live_history.hpp"
@@ -2829,6 +2830,53 @@ static int historical_can_mutation_cli(int argc,char** argv){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+static int historical_maintenance_compat_cli(int argc,char** argv,bool can){
+    const char* path=nullptr;const char* baseline=nullptr;const char* output=nullptr;
+    std::optional<std::string> vin;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing historical maintenance option value");
+        const char* value=argv[i++];
+        if(key=="--report"&&!path)path=value;
+        else if(key=="--baseline"&&!baseline)baseline=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else return error("Unexpected or duplicate historical maintenance option");
+    }
+    if(!path||!output)return error("Historical maintenance report and output required");
+    try{
+        constexpr std::size_t maximum=8u*1024u*1024u;
+        input original{},base{};
+        if(!load_regular(path,maximum,&original)||(baseline&&(!load_regular(baseline,maximum,&base)||!separate(&original,&base))))
+            return error("Historical maintenance inputs must be distinct bounded files");
+        const auto view=[](const input& f){return f.length?std::string_view(reinterpret_cast<const char*>(f.bytes.get()),f.length):std::string_view{};};
+        const auto root=cd::json::parse_report(view(original),maximum);
+        std::string proof;
+        if(can){
+            // Historical CAN inspection requires a VIN in scope, not
+            // necessarily a separately supplied VIN; never attest provenance.
+            if(!vin){
+                const auto* v=root.find("expected_vin");if(!v)v=root.find("expectedVin");
+                if(!v)v=root.find("selected_vin");if(!v)v=root.find("selectedVin");
+                if(!v)return error("Historical CAN report lacks declared VIN");
+                vin=v->string();
+            }
+            if(!cf1_valid_vin(vin->c_str()))return error("Invalid historical CAN VIN");
+            const auto checked=cd::canhistory::inspect(view(original),view(base),*vin);
+            proof=cd::canhistory::report(checked,original.digest,baseline?base.digest:"");
+        }else{
+            const auto b=baseline?std::optional{cd::json::parse_report(view(base),maximum)}:std::nullopt;
+            const auto checked=cd::legacy::history::inspect_historical_maintenance(root,b?&*b:nullptr,vin,
+                original.digest,baseline?base.digest:"");
+            proof=cd::network::history::encode_historical_json(checked.proof)+"\n";
+        }
+        if(!recheck_input(path,maximum,original)||(baseline&&!recheck_input(baseline,maximum,base)))
+            return error("Historical maintenance input changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Historical maintenance proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
@@ -2889,6 +2937,8 @@ static void usage(FILE *stream) {
         "  camarodiag-native compare-live --report A.json --report B.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-native-freeze --capture CAPTURE.cf --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-j1979-capture --capture CAPTURE.cj1 --report REPORT.json [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-can-mutation --report REPORT.json [--baseline BASE.json] [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-legacy-mutation --report REPORT.json [--baseline BASE.json] [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-live --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-freeze --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-legacy-freeze --report REPORT.json [--vin VIN] --output PROOF.json\n"
@@ -3108,6 +3158,8 @@ int main(int argc, char **argv) {
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-live"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-can-plan"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
     if(argc>=2&&!strcmp(argv[1],"compare-live"))return compare_live_compat_cli(argc,argv);
+    if(argc>=2&&!strcmp(argv[1],"verify-can-mutation"))return historical_maintenance_compat_cli(argc,argv,true);
+    if(argc>=2&&!strcmp(argv[1],"verify-legacy-mutation"))return historical_maintenance_compat_cli(argc,argv,false);
     if(argc>=2&&!strcmp(argv[1],"verify-live"))return verify_legacy_compat_cli(argc,argv,false,false,true);
     if(argc>=2&&!strcmp(argv[1],"verify-freeze"))return verify_legacy_compat_cli(argc,argv,false,true);
     if(argc>=2&&!strcmp(argv[1],"verify-legacy-freeze"))return verify_legacy_compat_cli(argc,argv,true);
