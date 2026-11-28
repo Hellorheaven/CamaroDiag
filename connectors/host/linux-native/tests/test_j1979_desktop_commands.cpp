@@ -77,6 +77,12 @@ int main(){
     ready=prepare(find("verify-native-live"),verify);
     assert(!ready.physical&&ready.confirmation.empty());
     assert((ready.args==std::vector<std::string>{"--verify-j1979-live-native",capture,report,proof,values["vin"]}));
+    Values usb_live{{"port","/dev/ttyACM0"},{"key",report},{"tx","7E0"},{"rx","7E8"},{"vin",values["vin"]},
+        {"pids","0C"},{"capture",directory+"/new.cl"},{"output",directory+"/usb.json"},
+        {"numeric-output",directory+"/usb-numeric.json"},{"csv-output",directory+"/usb.csv"}};
+    assert(prepare(find("usb-live"),usb_live).physical);
+    usb_live["csv-output"]=usb_live["key"];
+    rejects([&]{(void)prepare(find("usb-live"),usb_live);});
     Values usb_numeric{{"capture",capture},{"tx","7E0"},{"rx","7E8"},{"vin",values["vin"]},{"output",proof}};
     auto usb_inv=prepare(find("project-cl1"),usb_numeric);
     assert(!usb_inv.physical&&usb_inv.args.front()=="project-cl1-live");

@@ -834,7 +834,7 @@ static int cl1_verify_cli(const char *capture_path, const char *report_path,
 
 typedef struct {
     cl1_plan plan;
-    const char *port,*credential,*capture,*output;
+    const char *port,*credential,*capture,*output,*projection,*csv;
     bool approved,tx_set,rx_set,vin_set,budget_set,cycles_set,interval_set,extended_set;
 } cl1_capture_options;
 static bool parse_cl1_capture(int argc,char **argv,cl1_capture_options *o) {
@@ -869,6 +869,12 @@ static bool parse_cl1_capture(int argc,char **argv,cl1_capture_options *o) {
         } else if (!strcmp(flag,"--output")) {
             if (o->output) return false;
             o->output=value;
+        } else if (!strcmp(flag,"--projection-output")) {
+            if(o->projection||!*value)return false;
+            o->projection=value;
+        } else if (!strcmp(flag,"--csv")) {
+            if(o->csv||!*value)return false;
+            o->csv=value;
         } else if (!strcmp(flag,"--tx")) {
             if (o->tx_set || !hex_uint32(value,&o->plan.tx)) return false;
             o->tx_set=true;
@@ -902,6 +908,10 @@ static bool parse_cl1_capture(int argc,char **argv,cl1_capture_options *o) {
             o->plan.pids[o->plan.pid_count++]=(uint8_t)n;
         } else return false;
     }
+    const std::array<const char*,5> destinations{o->credential,o->capture,o->output,o->projection,o->csv};
+    for(std::size_t a=0;a<destinations.size();++a)
+        for(std::size_t b=a+1;b<destinations.size();++b)
+            if(destinations[a]&&destinations[b]&&!strcmp(destinations[a],destinations[b]))return false;
     return o->approved && o->tx_set && o->rx_set && o->vin_set &&
         o->port && o->credential && o->capture && o->output &&
         strcmp(o->capture,o->output) && strcmp(o->capture,o->credential) &&
@@ -928,9 +938,12 @@ static int capture_cl1_native(int argc,char **argv) {
         return error("CU/3 requires a private provisioned 32-byte key, no fallback");
     // Reserve the independent report before the USB handshake. A destination
     // collision must never trigger an otherwise unnecessary vehicle read.
-    std::unique_ptr<cd::liveexport::Destination> output;
-    try{output=std::make_unique<cd::liveexport::Destination>(o.output);}
-    catch(const std::exception& e){return error(e.what());}
+    std::unique_ptr<cd::liveexport::Destination> output,projection,csv;
+    try{
+        output=std::make_unique<cd::liveexport::Destination>(o.output);
+        projection=std::make_unique<cd::liveexport::Destination>(o.projection);
+        csv=std::make_unique<cd::liveexport::Destination>(o.csv);
+    }catch(const std::exception& e){return error(e.what());}
     struct sigaction action{},oldint{},oldterm{};
     action.sa_handler=cancel_handler;
     sigemptyset(&action.sa_mask);
@@ -960,6 +973,7 @@ static int capture_cl1_native(int argc,char **argv) {
     cl1_result replay{};
     bool complete=received==0 &&
         load_regular(o.capture,CL1_MAX_CAPTURE,&capture);
+    const bool captured=complete;
     if (complete) complete=cl1_project(&capture,o.plan.vin,false,
                                       &report,&size,&replay) &&
                            replay.completed && replay.initial_vin &&
@@ -1003,9 +1017,33 @@ static int capture_cl1_native(int argc,char **argv) {
         fprintf(stderr,"CU/3: no qualified complete report; raw capture retained when created (%s)\n",
                 failure[0]?failure:"independent replay failed or output unavailable");
     }
+    // Transport has closed. A valid negative terminal may still yield a
+    // useful incomplete projection; torn captures require separate inspection.
+    bool exports_complete=true;
+    if(projection->requested()||csv->requested()){
+        exports_complete=false;
+        if(captured){
+            try{
+                const auto projected=cd::network::history::bind_native_live_projection(
+                    cd::network::history::project_cl1_live({capture.bytes.get(),capture.length},
+                        {o.plan.tx,o.plan.rx},o.plan.vin),capture.digest);
+                const auto numeric=projection->requested()?cd::json::serialize(projected.report)+"\n":std::string{};
+                const auto table=csv->requested()?cd::network::history::native_live_csv(projected):std::string{};
+                input checked{};
+                if(!load_regular(o.capture,CL1_MAX_CAPTURE,&checked)||!same_input(&capture,&checked))
+                    return error("CL/1 source changed before export");
+                projection->check_empty();csv->check_empty();
+                projection->persist(numeric);csv->persist(table);
+                input final{};
+                if(!load_regular(o.capture,CL1_MAX_CAPTURE,&final)||!same_input(&capture,&final))
+                    return error("CL/1 source changed after export");
+                exports_complete=projected.complete;
+            }catch(const std::exception& e){return error(e.what());}
+        }
+    }
     report.reset();
     free_input(&capture);free_input(&again);
-    return complete?0:2;
+    return complete&&exports_complete?0:2;
 }
 
 static int cj1_inspect_cli(const char* capture_path,const char* vin,const char* output) {
@@ -2978,7 +3016,7 @@ static void usage(FILE *stream) {
         "    Numeric ELM exports require --native-report-output, --campaign-capture and --adapter-journal.\n"
         "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended] [--journal-directory NEW_DIR]\n"
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel [--journal capture.scj]\n"
-        "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel\n"
+        "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel [--projection-output NUMERIC.json] [--csv SAMPLES.csv]\n"
         "  camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --output live.json --confirm-physical-channel [--journal capture.scj] [--projection-output NUMERIC.json] [--csv SAMPLES.csv]\n"
         "    Numeric SocketCAN exports require --journal. Raw evidence is never overwritten.\n"
         "  camarodiag-native --inspect-j1979-live-native-prefix CAPTURE.cl VIN PREFIX.json\n"

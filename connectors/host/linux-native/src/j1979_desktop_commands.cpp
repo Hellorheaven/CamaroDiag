@@ -101,7 +101,7 @@ const std::vector<Operation>& operations(){
         op("legacy-freeze","Legacy — Trames figées","Mode 02, source de réponse sélectionnée.","--j1979-legacy-freeze",{port(),baud(),protocol(),source(),vin(),frames(),pids(),budget(),capture(true),output()},physical),
         op("usb-scan","USB natif — Lecture ECU","Capture CJ/1 via connecteur natif et clé locale.","--j1979-usb",{port(),key(),tx(),rx(),vin(),extended(),budget(60000),capture(true),output()},physical),
         op("usb-freeze","USB natif — Trames figées","Capture CF/1 via connecteur natif.","--j1979-freeze-native",{port(),key(),tx(),rx(),vin(),frames(),pids(),budget(),capture(true),output()},physical),
-        op("usb-live","USB natif — Mesures live","Capture CL/1 via connecteur natif.","--j1979-live-usb-native",{port(),key(),tx(),rx(),vin(),extended(),pids(),cycles(),interval(),budget(),capture(true),output()},physical),
+        op("usb-live","USB natif — Mesures live","Capture CL/1 via connecteur natif.","--j1979-live-usb-native",{port(),key(),tx(),rx(),vin(),extended(),pids(),cycles(),interval(),budget(),capture(true),numeric_output(),csv_output(),output()},physical),
         op("inspect-scj","Hors ligne — Inspection SCJ","Rejoue les callbacks sans connexion au véhicule.","inspect-socketcan-journal",{journal(false),tx(),rx(),vin(),output()}),
         op("recover-scj","Hors ligne — Récupération SCJ","Reconstruit un rapport seulement si le journal contient un terminal vérifié.","recover-socketcan-report",{journal(false),tx(),rx(),vin(),output()}),
         op("verify-scj","Hors ligne — Vérification SCJ","Compare le journal à son rapport exact.","verify-socketcan-journal",{journal(false),report(),tx(),rx(),vin(),output()}),
