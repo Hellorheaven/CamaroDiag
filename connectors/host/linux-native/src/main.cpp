@@ -7,6 +7,7 @@
 #include "j1979_can_cli.h"
 #include "j1979_can_network.hpp"
 #include "j1979_elm_can.hpp"
+#include "j1979_elm_can_trace.hpp"
 #include "j1979_catalogue_projection.hpp"
 #include "j1979_isotp.h"
 #include "j1979_cm1.hpp"
@@ -2086,7 +2087,7 @@ static int catalogue_projection_cli(int argc,char** argv,bool verify){
 
 struct DirectMaintenanceOptions {
     cd::hostmaint::Scope scope{};
-    const char* interface{},*directory{},*journal{},*output{};
+    const char* interface{},*directory{},*journal{},*output{},*adapter_capture{};
     unsigned profile{},baud{38400};
     bool profile_set{},baud_set{};
     bool operation{},tx{},rx{},budget{},extended{},vin{},confirmed{},warning{};
@@ -2129,6 +2130,7 @@ static bool parse_direct_maintenance(int argc,char** argv,DirectMaintenanceOptio
             else if(flag=="--journal-directory")slot=&o.directory;
             else if(flag=="--journal-name")slot=&o.journal;
             else if(flag=="--output")slot=&o.output;
+            else if(elm&&flag=="--adapter-capture")slot=&o.adapter_capture;
             if(!slot||*slot)return false;
             *slot=value;
         }
@@ -2153,6 +2155,8 @@ static int direct_maintenance_cli(int argc,char** argv,bool elm=false){
     struct Output{int fd;~Output(){if(fd>=0)close(fd);}} out{
         open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
     if(out.fd<0)return error("Report destination unavailable");
+    Output trace_out{o.adapter_capture?open(o.adapter_capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600):-1};
+    if(o.adapter_capture&&(trace_out.fd<0||!sync_parent(o.adapter_capture)))return error("Adapter trace destination unavailable");
     legacy_cancelled=0;
     struct Signals{
         struct sigaction oldint{},oldterm{};
@@ -2178,6 +2182,12 @@ static int direct_maintenance_cli(int argc,char** argv,bool elm=false){
     }catch(const std::exception& e){r.error=e.what();}
     try{
         std::string digest,replay;
+        const std::string vin_text(reinterpret_cast<const char*>(o.scope.vin),17);
+        const cd::elmcan::Trace trace{{o.profile,o.scope.tx,o.scope.rx},vin_text,cd::elmcan::TraceOperation::maintenance,adapter};
+        if(o.adapter_capture){
+            const auto bytes=cd::elmcan::encode_trace(trace);
+            if(!write_owned_file(trace_out.fd,bytes.data(),bytes.size()))return error("Adapter trace persistence failed; recovery marker retained");
+        }
         if(r.journal_created){
             const auto path=std::string(o.directory)+"/"+o.journal;
             const std::string vin(reinterpret_cast<const char*>(o.scope.vin),17);
@@ -2196,6 +2206,8 @@ static int direct_maintenance_cli(int argc,char** argv,bool elm=false){
                             evidence.terminal->count!=r.evidence.count)
                             throw std::runtime_error("LIVE_AND_REPLAY_OUTCOME_DIFFER");
                     }
+                    if(elm&&evidence.terminal&&r.evidence.summary.acknowledged)
+                        (void)cd::elmcan::correlate_maintenance(trace,evidence);
                     replay=cd::cm1::report(evidence,digest);
                 }catch(const std::exception& e){r.recovery_latched=true;r.error=e.what();}
             }else{r.recovery_latched=true;r.error="JOURNAL_MISSING_OR_EMPTY";}
@@ -2203,7 +2215,8 @@ static int direct_maintenance_cli(int argc,char** argv,bool elm=false){
         auto json=cd::hostmaint::report(r,digest,replay);
         if(elm)json=cd::elmcan::report({o.profile,o.scope.tx,o.scope.rx},
             {reinterpret_cast<const char*>(o.scope.vin),17},"MAINTENANCE",json,adapter,r.error,
-            r.error.empty()&&!r.recovery_latched&&r.evidence.terminalPersisted&&!replay.empty());
+            r.error.empty()&&!r.recovery_latched&&r.evidence.terminalPersisted&&!replay.empty()&&r.evidence.summary.acknowledged&&
+            r.evidence.summary.reason==cd::hostmaint::Campaign::Reason::None);
         if(!write_owned_file(out.fd,json.data(),json.size())||!sync_parent(o.output))
             return error("Report persistence failed; recovery marker retained");
         using Outcome=cd::hostmaint::Campaign::Outcome;
@@ -2397,11 +2410,16 @@ static int elm_freeze_cli(int argc,char** argv){
     capture_options o{};
     unsigned profile=0,baud=38400;
     bool profile_set=false,baud_set=false;
+    const char* adapter_path=nullptr;
     std::vector<char*> args{argv[0],argv[1]};
     // Consume the two adapter options; the common parser handles all
     // physical scope and capture options without replacing the serial path.
     for(int i=2;i<argc;++i){
         const std::string_view flag=argv[i];
+        if(flag=="--adapter-capture"){
+            if(adapter_path||i+1>=argc||!*argv[i+1]||argv[i+1][0]=='-')return error("Invalid adapter capture destination");
+            adapter_path=argv[++i];continue;
+        }
         if(flag=="--profile"||flag=="--baud"){
             auto& seen=flag=="--profile"?profile_set:baud_set;
             auto& dest=flag=="--profile"?profile:baud;
@@ -2428,6 +2446,8 @@ static int elm_freeze_cli(int argc,char** argv){
     if(capture.fd<0)return error("Capture destination unavailable");
     File report{open(o.report,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
     if(report.fd<0)return error("Report destination unavailable");
+    File adapter{adapter_path?open(adapter_path,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600):-1};
+    if(adapter_path&&(adapter.fd<0||!sync_parent(adapter_path)))return error("Adapter transcript destination unavailable");
     if(!sync_parent(o.capture)||!sync_parent(o.report))return error("Output reservation not durable");
     legacy_cancelled=0;
     struct Signals{
@@ -2447,6 +2467,11 @@ static int elm_freeze_cli(int argc,char** argv){
         const auto acquired=cd::hostfreeze::run_elm(o.plan,target,*serial,current,capture.fd);
         serial.reset();
         const auto& result=acquired.capture;
+        const cd::elmcan::Trace trace{target,o.plan.vin,cd::elmcan::TraceOperation::freeze,acquired.observations};
+        if(adapter_path){
+            const auto bytes=cd::elmcan::encode_trace(trace);
+            if(!write_owned_file(adapter.fd,bytes.data(),bytes.size()))return error("Adapter transcript persistence failed");
+        }
         const bool synced=fsync(capture.fd)==0;
         const bool closed=close(capture.fd)==0;capture.fd=-1;
         if(!synced||!closed||!result.capture_started)return error("CF/1 capture incomplete or unavailable");
@@ -2458,6 +2483,7 @@ static int elm_freeze_cli(int argc,char** argv){
             cf1_inspect_complete(raw.bytes.get(),raw.length,o.plan.vin,&e.value,failure,sizeof(failure)):
             cf1_inspect_prefix(raw.bytes.get(),raw.length,o.plan.vin,&e.value,failure,sizeof(failure));
         if(status)return error(failure);
+        if(result.terminal_written&&e.value.execution_completed)(void)cd::elmcan::correlate_freeze(trace,e.value);
         const auto& p=e.value.plan;
         if(p.tx!=o.plan.tx||p.rx!=o.plan.rx||p.extended!=o.plan.extended||p.budget_ms!=o.plan.budget_ms||
             p.frame_count!=o.plan.frame_count||p.pid_count!=o.plan.pid_count||
@@ -2513,12 +2539,63 @@ static int legacy_journal_cli(const char* protocol,const char* source,const char
     }catch(const std::exception& e){return error(e.what());}
 }
 
+static int elm_trace_cli(int argc,char** argv,bool correlate){
+    if((!correlate&&argc!=8)||(correlate&&argc!=9))
+        return error("Independent ELM profile, TX, RX, VIN, ECR/1 and output required; correlation also takes CF/1 or CM/1");
+    uint32_t profile=0,tx=0,rx=0;
+    if(!decimal_uint32(argv[2],&profile)||!hex_uint32(argv[3],&tx)||!hex_uint32(argv[4],&rx)||
+        !cf1_valid_vin(argv[5]))return error("Invalid independent ELM scope");
+    const cd::elmcan::Scope target{profile,tx,rx};
+    if(!target.valid())return error("Invalid ELM CAN physical profile");
+    input raw{},capture{};
+    try{
+        if(!load_regular(argv[6],cd::elmcan::trace_max_bytes,&raw))return error("Invalid bounded ECR/1 transcript");
+        const auto trace=cd::elmcan::decode_trace({raw.bytes.get(),raw.length});
+        if(trace.target.profile!=profile||trace.target.tx!=tx||trace.target.rx!=rx||trace.vin!=argv[5])
+            return error("ECR/1 differs from independently selected target");
+        auto replay=cd::elmcan::replay_trace(trace);
+        std::string capture_digest;
+        if(correlate){
+            if(trace.operation==cd::elmcan::TraceOperation::freeze){
+                if(!load_regular(argv[7],CF1_MAX_BYTES,&capture)||!separate(&raw,&capture))return error("Distinct CF/1 capture required");
+                struct Evidence{cf1_evidence value{};~Evidence(){cf1_evidence_free(&value);}} e;
+                char failure[256]{};
+                if(cf1_inspect_complete(capture.bytes.get(),capture.length,argv[5],&e.value,failure,sizeof(failure)))
+                    return error(failure);
+                replay=cd::elmcan::correlate_freeze(trace,e.value);
+            }else if(trace.operation==cd::elmcan::TraceOperation::maintenance){
+                if(!load_regular(argv[7],cd::cm1::max_journal,&capture)||!separate(&raw,&capture))
+                    return error("Distinct CM/1 journal required");
+                const auto e=cd::cm1::inspect({capture.bytes.get(),capture.length},argv[5],false);
+                if(!e.terminal)return error("Complete CM/1 terminal required for correlation");
+                replay=cd::elmcan::correlate_maintenance(trace,e);
+            }else return error("Independent recipe correlation currently supports CF/1 and CM/1");
+            if(!recheck_input(argv[7],trace.operation==cd::elmcan::TraceOperation::freeze?
+                static_cast<size_t>(CF1_MAX_BYTES):cd::cm1::max_journal,capture))return error("Original capture changed");
+            capture_digest=capture.digest;
+        }
+        if(!recheck_input(argv[6],cd::elmcan::trace_max_bytes,raw))return error("ECR/1 changed during replay");
+        const auto json=std::string("{\"schema\":\"camarodiag-j1979-elm-adapter-replay-v1\",\"transcript_consistent\":true,")+
+            "\"physical_vehicle_verified\":false,\"evidence_authenticated\":false,\"permits_programming\":false,"
+            "\"permits_automatic_retry\":false,\"adapter_configuration_replayed\":"+(replay.configured?"true":"false")+
+            ",\"recipe_correlated\":"+(correlate?"true":"false")+",\"setup_rows\":"+std::to_string(replay.setup_rows)+
+            ",\"diagnostic_rows\":"+std::to_string(replay.diagnostic_rows)+",\"positive\":"+std::to_string(replay.positive)+
+            ",\"negative\":"+std::to_string(replay.negative)+",\"no_data\":"+std::to_string(replay.no_data)+
+            ",\"faults\":"+std::to_string(replay.faults)+",\"transcript_sha256\":\""+raw.digest+
+            "\",\"capture_sha256\":"+(capture_digest.empty()?std::string("null"):"\""+capture_digest+"\"")+"}\n";
+        if(!atomic_create(argv[correlate?8:7],json.data(),json.size()))return error("Replay proof destination unavailable");
+        return replay.configured&&!replay.terminal_fault?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
         "Usage:\n"
         "  camarodiag-native --j1979-can-discover --interface can0 --window-ms 1500 --output responders.json --confirm-functional-scope [--extended]\n"
-        "  camarodiag-native --j1979-elm-can-freeze --port /dev/ttyUSB0 --profile 6 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture freeze.cf --output freeze.json --confirm-physical-channel [--extended]\n"
+        "  camarodiag-native --inspect-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr PROOF.json\n"
+        "  camarodiag-native --verify-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr CAPTURE PROOF.json\n"
+        "  camarodiag-native --j1979-elm-can-freeze --port /dev/ttyUSB0 --profile 6 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture freeze.cf --output freeze.json --confirm-physical-channel [--extended] [--adapter-capture trace.ecr]\n"
         "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel\n"
         "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel\n"
         "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended]\n"
@@ -2609,6 +2686,8 @@ int main(int argc, char **argv) {
         return cm1_cli(argv[2],argv[3],argv[4],argv[5],true);
     if (argc >= 3 && !strcmp(argv[1], "--j1979-live-usb-native"))
         return capture_cl1_native(argc,argv);
+    if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-elm-trace"))return elm_trace_cli(argc,argv,false);
+    if (argc>=3 && !strcmp(argv[1],"--verify-j1979-elm-trace"))return elm_trace_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--j1979-elm-can-freeze"))return elm_freeze_cli(argc,argv);
     if (argc>=3 && !strcmp(argv[1],"--j1979-elm-can"))return elm_can_cli(argc,argv,false);
     if (argc>=3 && !strcmp(argv[1],"--j1979-elm-live"))return elm_can_cli(argc,argv,true);
