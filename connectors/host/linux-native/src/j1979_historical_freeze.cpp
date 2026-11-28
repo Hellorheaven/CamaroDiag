@@ -261,21 +261,7 @@ public:
             {"whole_vehicle_coverage_verified",flag(false)},{"permits_programming",flag(false)},{"duration_ms",integer(duration)}});
     }
 };
-void encode(std::ostream& o,const Value& v){
-    if(v.null())o<<"null";
-    else if(const auto* b=std::get_if<bool>(&v.data))o<<(*b?"true":"false");
-    else if(const auto* n=std::get_if<json::Integer>(&v.data))o<<n->text;
-    else if(const auto* n=std::get_if<json::Decimal>(&v.data))o<<n->text;
-    else if(const auto* s=std::get_if<std::string>(&v.data))o<<json::quote(*s);
-    else if(const auto* a=std::get_if<Array>(&v.data)){
-        o<<'[';bool first=true;for(const auto& x:*a){if(!first)o<<',';first=false;encode(o,x);}o<<']';
-    }else{
-        o<<'{';bool first=true;for(const auto& [k,x]:v.object()){
-            if(!first)o<<',';
-            first=false;o<<json::quote(k)<<':';encode(o,x);
-        }o<<'}';
-    }
-}
+
 }
 HistoricalFreeze replay_historical_freeze(const Value& root,std::optional<std::string> expected){
     auto p=plan(root.at("plan"));
@@ -295,6 +281,6 @@ HistoricalFreeze rebuild_historical_freeze(const Value& plan_value,const Value::
     return {std::move(p),std::move(replayed),complete,stable};
 }
 std::string encode_historical_json(const Value& v){
-    std::ostringstream o;o.imbue(std::locale::classic());encode(o,v);return o.str();
+    return json::serialize(v);
 }
 }

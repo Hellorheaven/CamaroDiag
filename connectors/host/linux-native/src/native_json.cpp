@@ -235,4 +235,51 @@ bool valid_text(std::string_view text,std::size_t max){
         return !ws(first)&&!ws(last);
     }catch(const std::invalid_argument&){return false;}
 }
+namespace {
+class Encoder {
+    std::string out_;
+    std::size_t limit_;
+    void append(std::string_view s){
+        require(s.size()<=limit_-out_.size(),"JSON output exceeds limit");out_.append(s);
+    }
+    void append(char c){require(out_.size()<limit_,"JSON output exceeds limit");out_+=c;}
+    void number(std::string_view s,bool decimal){
+        // Programmatically constructed values must obey the same grammar as
+        // parsed documents, not inject additional JSON tokens.
+        const auto checked=decimal?parse_report(s,256):parse(s,256);
+        require(decimal?std::holds_alternative<Decimal>(checked.data):
+            std::holds_alternative<Integer>(checked.data),"Invalid encoded JSON number");
+        append(s);
+    }
+    void value(const Value& v,unsigned depth){
+        require(depth<=64,"JSON output nesting limit");
+        if(v.null())append("null");
+        else if(const auto* b=std::get_if<bool>(&v.data))append(*b?"true":"false");
+        else if(const auto* n=std::get_if<Integer>(&v.data))number(n->text,false);
+        else if(const auto* n=std::get_if<Decimal>(&v.data))number(n->text,true);
+        else if(const auto* s=std::get_if<std::string>(&v.data)){
+            require(s->size()<=limit_-out_.size(),"JSON string exceeds output limit");append(quote(*s));
+        }else if(const auto* a=std::get_if<Value::Array>(&v.data)){
+            append('[');bool first=true;
+            for(const auto& x:*a){if(!first)append(',');first=false;value(x,depth+1);}
+            append(']');
+        }else{
+            append('{');bool first=true;
+            for(const auto& [k,x]:v.object()){
+                if(!first)append(',');
+                first=false;require(k.size()<=limit_-out_.size(),"JSON key exceeds output limit");
+                append(quote(k));append(':');value(x,depth+1);
+            }
+            append('}');
+        }
+    }
+public:
+    explicit Encoder(std::size_t limit):limit_(limit){}
+    std::string run(const Value& v){value(v,0);return std::move(out_);}
+};
+}
+std::string serialize(const Value& v,std::size_t max_bytes){
+    require(max_bytes>0&&max_bytes<=64u*1024u*1024u,"Invalid JSON output bound");
+    return Encoder(max_bytes).run(v);
+}
 }

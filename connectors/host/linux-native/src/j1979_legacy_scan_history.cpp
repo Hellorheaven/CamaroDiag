@@ -1,5 +1,4 @@
 #include "j1979_legacy_scan_history.hpp"
-#include "j1979_historical_freeze.hpp"
 #include "j1979_legacy_shape.hpp"
 #include "j1979_policy.h"
 #include "j1979_native_report_detail.hpp"
@@ -340,7 +339,7 @@ std::string historical_scan_report(const HistoricalScan& s,std::string_view dige
     }
     o<<"],\"checked_summary_fields\":[";first=true;
     for(const auto& k:s.checked_summary_fields){if(!first)o<<',';first=false;o<<json::quote(k);}
-    o<<"],\"derived\":"<<cd::network::history::encode_historical_json(s.derived)<<",\"source_sha256\":"<<(digest.empty()?"null":json::quote(digest))
+    o<<"],\"derived\":"<<json::serialize(s.derived)<<",\"source_sha256\":"<<(digest.empty()?"null":json::quote(digest))
         <<",\"physical_vehicle_verified\":false,\"physically_addressed\":false,"
           "\"evidence_authenticated\":false,\"whole_vehicle_coverage_verified\":false,"
           "\"current_authorization_verified\":false,\"permits_programming\":false}\n";

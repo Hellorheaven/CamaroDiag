@@ -31,5 +31,6 @@ Value parse_report(std::string_view,std::size_t max_bytes=4*1024*1024);
 void fields(const Value&,std::initializer_list<std::string_view> required,
     std::initializer_list<std::string_view> optional={});
 std::string quote(std::string_view);
+std::string serialize(const Value&,std::size_t max_bytes=64u*1024u*1024u);
 bool valid_text(std::string_view,std::size_t maximum);
 }
