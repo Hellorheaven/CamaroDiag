@@ -424,3 +424,11 @@ Use the independently known 17-character VIN instead of `VIN17`. The command rep
 camarodiag-native verify-legacy --report ARCHIVE.json --vin VIN17 --output PROOF.json
 ``
 The original report is read-only and the output must be new. Historical J1850 PWM/VPW, ISO 9141 and KWP slow/fast ELM, Android and J2534 source reports are inspected from application requests, raw frames, selected-source payloads and advertised inventory. Optional numeric, readiness, monitor and scaling claims are recomputed where supported. J2534 driver frames cannot establish the omitted link checksum. Historical completion is not native current identity recheck, hardware qualification or permission to transmit. Some historical schemas and extensions still require parity review before retiring Python.
+
+### Historical Mode 02 evidence
+
+```sh
+camarodiag-native verify-freeze --report CAN-FREEZE.json --vin VIN17 --output PROOF.json
+camarodiag-native verify-legacy-freeze --report LEGACY-FREEZE.json --vin VIN17 --output PROOF.json
+```
+The commands independently reconstruct each requested frame, support page, initial/final trigger, attempted read, stop condition and identity from saved responses. Android ISO-TP and headered ELM transcripts are replayed; J2534 header evidence does not prove driver-managed link checksums. Additional manufacturer-specific frame numbers remain raw except for the defined trigger and support inventory. Both commands require a new output file, recheck the original input and retain its SHA-256. These are offline consistency inspections, not authenticated physical tests.
