@@ -9,6 +9,7 @@
 #include "j1979_elm_can.hpp"
 #include "j1979_elm_can_trace.hpp"
 #include "j1979_elm_can_journal.hpp"
+#include "j1979_elm_can_campaign.hpp"
 #include "j1979_catalogue_projection.hpp"
 #include "j1979_isotp.h"
 #include "j1979_cm1.hpp"
@@ -2268,7 +2269,7 @@ static int direct_maintenance_cli(int argc,char** argv,bool elm=false){
 
 struct ElmCanOptions{
     cd::elmcan::Scope scope;
-    const char* port{},*vin{},*output{},*adapter_capture{},*adapter_journal{};
+    const char* port{},*vin{},*output{},*adapter_capture{},*adapter_journal{},*campaign_capture{};
     unsigned baud{38400},budget{180000},cycles{30},interval{1000};
     std::vector<uint8_t> pids;
     bool profile{},tx{},rx{},confirmed{},baud_set{},budget_set{},cycles_set{},interval_set{};
@@ -2309,6 +2310,7 @@ static bool parse_elm_can(int argc,char** argv,ElmCanOptions& o,bool live){
             else if(flag=="--output")dest=&o.output;
             else if(flag=="--adapter-capture")dest=&o.adapter_capture;
             else if(flag=="--adapter-journal")dest=&o.adapter_journal;
+            else if(flag=="--campaign-capture")dest=&o.campaign_capture;
             if(!dest||*dest)return false;
             *dest=value;
         }
@@ -2328,6 +2330,8 @@ static int elm_can_cli(int argc,char** argv,bool live){
     if(out.fd<0)return error("ELM CAN report destination unavailable");
     File trace_out{o.adapter_capture?open(o.adapter_capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600):-1};
     if(o.adapter_capture&&(trace_out.fd<0||!sync_parent(o.adapter_capture)))return error("Adapter transcript destination unavailable");
+    File campaign_out{o.campaign_capture?open(o.campaign_capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600):-1};
+    if(o.campaign_capture&&(campaign_out.fd<0||!sync_parent(o.campaign_capture)))return error("Campaign capture destination unavailable");
     legacy_cancelled=0;
     struct Signals{
         struct sigaction oldint{},oldterm{};
@@ -2351,37 +2355,30 @@ static int elm_can_cli(int argc,char** argv,bool live){
         link=cd::legacy::serial_link(o.port,o.baud,current);
         session=std::make_unique<cd::elmcan::Session>(*link,o.scope,current,journal.sink());
         session->configure();
-        j1979_can_plan plan{cd::elmcan::Session::exchange_callback,nullptr,cd::elmcan::Session::current_callback,
-            session.get(),o.scope.tx,o.scope.rx,o.budget,o.vin};
-        char* buffer=nullptr;size_t size=0;
-        FILE* stream=open_memstream(&buffer,&size);
-        if(!stream)throw std::runtime_error("REPORT_ALLOCATION_FAILED");
-        bool serialized=false;
-        if(live){
-            struct Result{j1979_live_result value{};~Result(){j1979_live_free(&value);}} r;
-            j1979_live_plan lp{};lp.channel=plan;lp.pid_count=static_cast<unsigned>(o.pids.size());
-            lp.cycles=o.cycles;lp.interval_ms=o.interval;std::copy(o.pids.begin(),o.pids.end(),lp.pids);
-            const int status=j1979_live_record(&lp,&r.value);
-            if(status==0&&r.value.steps){
-                serialized=j1979_live_write_json_transport(stream,&lp,&r.value,o.port,"ELM_SERIAL_CLASSIC_ISOTP");
-                completed=r.value.completed&&r.value.initial_vin_valid&&r.value.final_vin_valid;
-                if(!completed)reason=r.value.stop_reason;
+        const cd::elmcan::CampaignPlan plan{o.scope,o.vin,o.port,
+            live?cd::elmcan::TraceOperation::live:cd::elmcan::TraceOperation::scan,
+            o.budget,live?o.cycles:0,live?o.interval:0,live?o.pids:cd::elmcan::Data{}};
+        cd::elmcan::CampaignCapture captured;
+        auto result=cd::elmcan::record_campaign(*session,plan,cd::legacy::monotonic_ms,[&](unsigned ms){
+            timespec delay{static_cast<time_t>(ms/1000),static_cast<long>((ms%1000)*1000000)};
+            while(nanosleep(&delay,&delay)){
+                if(errno!=EINTR||!current())return false;
             }
-        }else{
-            struct Result{j1979_can_result value{};~Result(){j1979_can_result_free(&value);}} r;
-            const int status=j1979_can_scan(&plan,&r.value);
-            if(status==0&&r.value.steps){
-                serialized=j1979_can_write_json_transport(stream,&plan,&r.value,o.port,"ELM_SERIAL_CLASSIC_ISOTP");
-                completed=r.value.completed&&r.value.vin_valid&&r.value.final_vin_valid;
-                if(!completed)reason=r.value.stop_reason;
-            }
+            return current();
+        },captured);
+        if(o.campaign_capture){
+            const auto bytes=cd::elmcan::encode_campaign(captured);
+            if(!write_owned_file(campaign_out.fd,bytes.data(),bytes.size()))
+                throw std::runtime_error("Campaign capture persistence failed");
+            input persisted{};
+            if(!load_regular(o.campaign_capture,cd::elmcan::campaign_max_bytes,&persisted)||
+                persisted.length!=bytes.size()||memcmp(persisted.bytes.get(),bytes.data(),bytes.size()))
+                throw std::runtime_error("Campaign capture readback differs");
+            const auto replay=cd::elmcan::replay_campaign(cd::elmcan::decode_campaign({persisted.bytes.get(),persisted.length}));
+            if(replay.native_report!=result.native_report||!recheck_input(o.campaign_capture,cd::elmcan::campaign_max_bytes,persisted))
+                throw std::runtime_error("Persisted campaign replay differs");
         }
-        const bool closed=fclose(stream)==0;
-        std::unique_ptr<char,decltype(&std::free)> owned(buffer,&std::free);
-        if(!serialized||!closed||!buffer||!size||size>64*1024*1024){
-            completed=false;throw std::runtime_error("NATIVE_REPORT_UNAVAILABLE");
-        }
-        native_report.assign(buffer,size);
+        native_report=std::move(result.native_report);reason=std::move(result.stop);completed=result.completed;
     }catch(const std::exception& e){reason=e.what();completed=false;}
     if(legacy_cancelled){completed=false;reason="CANCELLED";}
     try{
@@ -2687,18 +2684,52 @@ static int elm_journal_cli(int argc,char** argv,bool recover){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+static int elm_campaign_cli(int argc,char** argv,bool verify){
+    if(argc!=(verify?9:8))return error("Independent ELM profile, TX, RX, VIN, ECP/1 and output required");
+    uint32_t profile=0,tx=0,rx=0;
+    if(!decimal_uint32(argv[2],&profile)||!hex_uint32(argv[3],&tx)||!hex_uint32(argv[4],&rx)||
+        !cf1_valid_vin(argv[5])||!cd::elmcan::Scope{profile,tx,rx}.valid())return error("Invalid independent ELM target");
+    try{
+        input raw{},stored{};
+        if(!load_regular(argv[6],cd::elmcan::campaign_max_bytes,&raw))
+            return error("Invalid ECP/1 campaign");
+        const auto capture=cd::elmcan::decode_campaign({raw.bytes.get(),raw.length});
+        if(capture.plan.target.profile!=profile||capture.plan.target.tx!=tx||capture.plan.target.rx!=rx||capture.plan.vin!=argv[5])
+            return error("ECP/1 differs from independently selected target");
+        const auto result=cd::elmcan::replay_campaign(capture);
+        if(verify){
+            if(!load_regular(argv[7],64*1024*1024,&stored)||!separate(&stored,&raw)||
+                stored.length!=result.native_report.size()||memcmp(stored.bytes.get(),result.native_report.data(),stored.length)||
+                !recheck_input(argv[7],64*1024*1024,stored))return error("Stored native report differs from replay");
+        }
+        if(!recheck_input(argv[6],cd::elmcan::campaign_max_bytes,raw))return error("Campaign capture changed during replay");
+        if(verify){
+            const auto proof=std::string("{\"schema\":\"camarodiag-j1979-elm-campaign-replay-v1\","
+                "\"recipe_replayed\":true,\"physical_vehicle_verified\":false,\"evidence_authenticated\":false,"
+                "\"permits_programming\":false,\"completed\":")+(result.completed?"true":"false")+
+                ",\"steps\":"+std::to_string(result.steps)+",\"capture_sha256\":\""+raw.digest+
+                "\",\"report_sha256\":\""+stored.digest+"\"}\n";
+            if(!atomic_create(argv[8],proof.data(),proof.size()))return error("Campaign proof destination unavailable");
+        }else if(!atomic_create(argv[7],result.native_report.data(),result.native_report.size()))
+            return error("Campaign report destination unavailable");
+        return result.completed?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
         "Usage:\n"
         "  camarodiag-native --j1979-can-discover --interface can0 --window-ms 1500 --output responders.json --confirm-functional-scope [--extended]\n"
+        "  camarodiag-native --inspect-j1979-elm-campaign PROFILE TX RX VIN CAPTURE.ecp REPORT.json\n"
+        "  camarodiag-native --verify-j1979-elm-campaign PROFILE TX RX VIN CAPTURE.ecp REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-elm-journal PROFILE TX RX VIN TRACE.ejr PROOF.json\n"
         "  camarodiag-native --recover-j1979-elm-journal PROFILE TX RX VIN TRACE.ejr TRACE.ecr\n"
         "  camarodiag-native --inspect-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr PROOF.json\n"
         "  camarodiag-native --verify-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr CAPTURE PROOF.json\n"
         "  camarodiag-native --j1979-elm-can-freeze --port /dev/ttyUSB0 --profile 6 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture freeze.cf --output freeze.json --confirm-physical-channel [--extended] [--adapter-capture trace.ecr] [--adapter-journal trace.ejr]\n"
-        "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr]\n"
-        "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr]\n"
+        "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr] [--campaign-capture capture.ecp]\n"
+        "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr] [--campaign-capture capture.ecp]\n"
         "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended]\n"
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel\n"
         "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel\n"
@@ -2787,6 +2818,8 @@ int main(int argc, char **argv) {
         return cm1_cli(argv[2],argv[3],argv[4],argv[5],true);
     if (argc >= 3 && !strcmp(argv[1], "--j1979-live-usb-native"))
         return capture_cl1_native(argc,argv);
+    if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-elm-campaign"))return elm_campaign_cli(argc,argv,false);
+    if (argc>=3 && !strcmp(argv[1],"--verify-j1979-elm-campaign"))return elm_campaign_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-elm-journal"))return elm_journal_cli(argc,argv,false);
     if (argc>=3 && !strcmp(argv[1],"--recover-j1979-elm-journal"))return elm_journal_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-elm-trace"))return elm_trace_cli(argc,argv,false);
