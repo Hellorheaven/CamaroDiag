@@ -920,9 +920,17 @@ static int capture_cl1_native(int argc,char **argv) {
     if (!fgets(confirmation,sizeof(confirmation),stdin) ||
         strcmp(confirmation,"yes\n"))
         return error("CU/3 physical consent refused, no bytes transmitted");
-    uint8_t key[32]={0};
-    if (!read_key_file(o.credential,key))
+    struct Key {
+        uint8_t bytes[32]{};
+        ~Key(){OPENSSL_cleanse(bytes,sizeof(bytes));}
+    } key;
+    if (!read_key_file(o.credential,key.bytes))
         return error("CU/3 requires a private provisioned 32-byte key, no fallback");
+    // Reserve the independent report before the USB handshake. A destination
+    // collision must never trigger an otherwise unnecessary vehicle read.
+    std::unique_ptr<cd::liveexport::Destination> output;
+    try{output=std::make_unique<cd::liveexport::Destination>(o.output);}
+    catch(const std::exception& e){return error(e.what());}
     struct sigaction action{},oldint{},oldterm{};
     action.sa_handler=cancel_handler;
     sigemptyset(&action.sa_mask);
@@ -934,7 +942,7 @@ static int capture_cl1_native(int argc,char **argv) {
     cf1_usb_capture_result transport{};
     char failure[256]={0};
     int received=registered ?
-        cl1_usb_capture(o.port,&o.plan,key,o.capture,
+        cl1_usb_capture(o.port,&o.plan,key.bytes,o.capture,
                          &transport,failure,sizeof(failure)) : -1;
     if (!registered)
         snprintf(failure,sizeof(failure),"Cannot register cancellation handlers");
@@ -942,7 +950,7 @@ static int capture_cl1_native(int argc,char **argv) {
         sigaction(SIGINT,&oldint,NULL);
         sigaction(SIGTERM,&oldterm,NULL);
     }
-    OPENSSL_cleanse(key,sizeof(key));
+    OPENSSL_cleanse(key.bytes,sizeof(key.bytes));
     /* Live credential proof is not an offline hardware attestation.
      * The published schema records only independently replayed CL/1 bytes.
      */
@@ -958,7 +966,13 @@ static int capture_cl1_native(int argc,char **argv) {
                            replay.final_vin && replay.inventory_complete;
     if (complete) complete=load_regular(o.capture,CL1_MAX_CAPTURE,&again) &&
                            same_input(&capture,&again);
-    if (complete) complete=atomic_create(o.output,report.get(),size);
+    if (complete) {
+        try{output->persist(std::string_view(report.get(),size));}
+        catch(const std::exception& e){
+            // Do not replace a partial report or retry the physical operation.
+            return error(e.what());
+        }
+    }
     if (!complete) {
         /* A failed live capture is still a valuable forensic prefix.
          * Never turn its incomplete/unsafe status into a successful report.
@@ -981,8 +995,10 @@ static int capture_cl1_native(int argc,char **argv) {
                                "INDEPENDENT_CL1_REPLAY_FAILED";
             int written=snprintf(failed_report+position,
                 sizeof(failed_report)-position,"\"%s\"}\n",reason);
-            if (written>0 && (size_t)written<sizeof(failed_report)-position)
-                atomic_create(o.output,failed_report,position+(size_t)written);
+            if (written>0 && (size_t)written<sizeof(failed_report)-position){
+                try{output->persist(std::string_view(failed_report,position+(size_t)written));}
+                catch(const std::exception& e){return error(e.what());}
+            }
         }
         fprintf(stderr,"CU/3: no qualified complete report; raw capture retained when created (%s)\n",
                 failure[0]?failure:"independent replay failed or output unavailable");

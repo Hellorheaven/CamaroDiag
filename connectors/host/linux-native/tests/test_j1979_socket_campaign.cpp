@@ -182,6 +182,27 @@ int main(){
         }
         assert(unlink(json.c_str())==0);
     }
+    // A reserved report whose path or permissions change cannot be
+    // silently replaced. This is also the CU/3 report publication path.
+    {
+        File raw;
+        const auto report=raw.name+".report";
+        const auto moved=report+".moved";
+        {
+            cd::liveexport::Destination destination(report.c_str());
+            assert(rename(report.c_str(),moved.c_str())==0);
+            assert(symlink(raw.name.c_str(),report.c_str())==0);
+            rejects([&]{destination.persist("report");});
+            assert(std::filesystem::file_size(raw.name)==0);
+            assert(unlink(report.c_str())==0&&rename(moved.c_str(),report.c_str())==0);
+            assert(chmod(report.c_str(),0644)==0);
+            rejects([&]{destination.persist("report");});
+            assert(chmod(report.c_str(),0600)==0);
+            destination.persist("report");
+            rejects([&]{destination.persist("replacement");});
+        }
+        assert(std::filesystem::file_size(report)==6&&unlink(report.c_str())==0);
+    }
     auto p=plan(true);p.pids={12,12};assert(!p.valid());
     p=plan(true);p.tx=0x7df;assert(!p.valid());
     p=plan(true);p.vin="INVALID";assert(!p.valid());
