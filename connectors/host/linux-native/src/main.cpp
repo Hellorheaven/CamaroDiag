@@ -492,7 +492,7 @@ static bool decimal_uint32(const char *value, uint32_t *out) {
     if (errno || *end || n > UINT32_MAX) return false;
     *out = (uint32_t)n; return true;
 }
-static bool parse_capture_options(int argc, char **argv, capture_options *o,bool socketcan=false) {
+static bool parse_capture_options(int argc, char **argv, capture_options *o,bool socketcan=false,bool elm=false) {
     memset(o, 0, sizeof(*o));
     o->plan.budget_ms = 180000;
     bool tx = false, rx = false, budget = false, vin = false, extended = false;
@@ -509,10 +509,10 @@ static bool parse_capture_options(int argc, char **argv, capture_options *o,bool
         }
         if (i + 1 >= argc || argv[i+1][0] == '-') return false;
         const char *value = argv[++i];
-        if (!strcmp(name, socketcan?"--interface":"--port")) {
+        if (!strcmp(name, socketcan&&!elm?"--interface":"--port")) {
             if (o->port) return false;
             o->port = value;
-        } else if (!socketcan&&!strcmp(name, "--key-file")) {
+        } else if (!socketcan&&!elm&&!strcmp(name, "--key-file")) {
             if (o->credential) return false;
             o->credential = value;
         } else if (!strcmp(name, "--capture")) {
@@ -548,7 +548,7 @@ static bool parse_capture_options(int argc, char **argv, capture_options *o,bool
         } else return false;
     }
     return o->approved && tx && rx && vin &&
-           o->port && (socketcan?j1979_isotp_valid_interface(o->port):o->credential!=nullptr) && o->capture && o->report &&
+           o->port && (elm||(socketcan?j1979_isotp_valid_interface(o->port):o->credential!=nullptr)) && o->capture && o->report &&
            strcmp(o->capture, o->report) &&
            (socketcan||(strcmp(o->credential, o->report) && strcmp(o->credential, o->capture))) &&
            cf1_valid_plan(&o->plan);
@@ -2378,9 +2378,8 @@ static int elm_freeze_cli(int argc,char** argv){
     unsigned profile=0,baud=38400;
     bool profile_set=false,baud_set=false;
     std::vector<char*> args{argv[0],argv[1]};
-    // Reuse the existing immutable freeze plan parser; adapter-specific
-    // options are consumed once, not interpreted as CAN diagnostic data.
-    char interface_option[]="--interface";
+    // Consume the two adapter options; the common parser handles all
+    // physical scope and capture options without replacing the serial path.
     for(int i=2;i<argc;++i){
         const std::string_view flag=argv[i];
         if(flag=="--profile"||flag=="--baud"){
@@ -2389,21 +2388,15 @@ static int elm_freeze_cli(int argc,char** argv){
             if(seen||i+1>=argc||!decimal_uint32(argv[++i],&dest))return error("Invalid fixed ELM profile or baud");
             seen=true;continue;
         }
-        if(flag=="--port"){
-            if(i+1>=argc||!argv[i+1][0])return error("Serial port required");
-            // The plan parser validates an interface string, so pass a
-            // fixed placeholder and preserve the actual port separately.
-            if(o.port)return error("Duplicate port");
-            o.port=argv[++i];
-            args.push_back(interface_option);
-            static char placeholder[]="can0";args.push_back(placeholder);continue;
-        }
-        if(flag=="--interface"||flag=="--key-file")return error("ELM serial port only");
         args.push_back(argv[i]);
+        if(flag!="--extended"&&flag!="--confirm-physical-channel"){
+            if(i+1>=argc)return error("Missing freeze option value");
+            args.push_back(argv[++i]);
+        }
     }
-    const char* port=o.port;
-    if(!port||!profile_set||!parse_capture_options(static_cast<int>(args.size()),args.data(),&o,true))
+    if(!profile_set||!parse_capture_options(static_cast<int>(args.size()),args.data(),&o,true,true))
         return error("Explicit fixed ELM profile, serial port, VIN, frames and output required");
+    const char* port=o.port;
     const cd::elmcan::Scope target{profile,o.plan.tx,o.plan.rx};
     if(!target.valid()||target.extended()!=o.plan.extended)return error("CAN profile and addressing disagree");
     if(!isatty(STDIN_FILENO))return error("Interactive local consent required");

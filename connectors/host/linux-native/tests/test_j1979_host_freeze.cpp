@@ -10,6 +10,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
+#include <deque>
+#include <string>
 namespace {
 struct Temporary{
     char path[48]="/tmp/camarodiag-freeze-XXXXXX";
@@ -56,6 +58,70 @@ void no_hardware(){
     rejects([&]{cd::hostfreeze::run_socket(p,missing,file.fd,nullptr);});
     assert(file.data()==bytes);
 }
+struct ElmFixture:cd::legacy::Link{
+    std::deque<std::pair<std::string,std::string>> rows;
+    unsigned count{};
+    void add(std::string q,std::string r){rows.emplace_back(std::move(q),std::move(r));}
+    std::string command(std::string_view q,unsigned timeout)override{
+        assert(timeout&&timeout<=4000&&!rows.empty()&&rows.front().first==q);
+        ++count;auto r=std::move(rows.front().second);rows.pop_front();return r;
+    }
+    void configure(unsigned profile){
+        const bool extended=profile==7||profile==9;
+        add("ATZ","ELM327");
+        for(auto cmd:{"ATE0","ATL0","ATH1","ATS1","ATD0"})add(cmd,"OK");
+        add("ATSP"+std::to_string(profile),"OK");add("ATCAF0","OK");
+        add(extended?"ATSH18DA10F1":"ATSH7E0","OK");
+        add(extended?"ATCRA18DAF110":"ATCRA7E8","OK");
+        add(extended?"ATFCSH18DA10F1":"ATFCSH7E0","OK");
+        for(auto cmd:{"ATFCSD300000","ATFCSM1","ATCFC1"})add(cmd,"OK");
+        add("ATDPN",std::to_string(profile));
+    }
+    void identity(std::string header){
+        add("020902",header+"10 14 49 02 01 31 47 31\r"+
+            header+"21 46 41 31 52 58 58 52\r"+
+            header+"22 30 31 32 33 34 35 36");
+    }
+    void capture(std::string header,bool changed=false){
+        identity(header);
+        add("03020000",header+"07 42 00 00 40 10 00 00");
+        add("03020200",header+"05 42 02 00 01 33");
+        add("03020C00",header+"05 42 0C 00 1F 40");
+        add("03020200",header+(changed?"05 42 02 00 01 34":"05 42 02 00 01 33"));
+        add("03020007",header+"07 42 00 07 40 00 00 00");
+        add("03020207",header+"05 42 02 07 00 00");
+        identity(header);
+    }
+};
+void elm_capture(){
+    for(unsigned profile=6;profile<=9;++profile){
+        const bool ext=profile==7||profile==9;
+        auto p=plan();
+        if(ext){p.tx=0x18da10f1;p.rx=0x18daf110;p.extended=true;}
+        const cd::elmcan::Scope target{profile,p.tx,p.rx};
+        const std::string header=ext?"18 DA F1 10 ":"7E8 ";
+        for(bool changed:{false,true}){
+            Temporary out;ElmFixture fake;fake.configure(profile);fake.capture(header,changed);
+            auto result=cd::hostfreeze::run_elm(p,target,fake,[]{return true;},out.fd);
+            assert(result.capture.capture_started&&result.capture.terminal_written&&result.capture.summary.completed);
+            assert(result.capture.summary.allFramesStable==!changed&&fake.rows.empty());
+            assert(result.observations.size()==fake.count);
+            assert(!result.capture.local_socket_closed);
+            const auto raw=out.data();cf1_evidence evidence{};char failure[256]{};
+            assert(cf1_inspect_complete(raw.data(),raw.size(),p.vin,&evidence,failure,sizeof(failure))==0);
+            assert(evidence.execution_completed&&evidence.observation_count==8);
+            cf1_evidence_free(&evidence);
+        }
+        Temporary out;ElmFixture wrong;wrong.configure(profile);
+        wrong.rows.back().second="A"+std::to_string(profile);
+        auto result=cd::hostfreeze::run_elm(p,target,wrong,[]{return true;},out.fd);
+        assert(result.capture.capture_started&&!result.capture.terminal_written&&!result.error.empty());
+        assert(out.data().size()==CF1_PLAN_SIZE+12);
+        Temporary refused;ElmFixture unused;
+        rejects([&]{cd::hostfreeze::run_elm(p,target,unused,[]{return false;},refused.fd);});
+        assert(refused.data().empty()&&unused.count==0);
+    }
+}
 void scoped_requests(){
     cd::J1979FreezeScope scope{};
     const auto p=plan();
@@ -75,4 +141,4 @@ void scoped_requests(){
     assert(j1979_isotp_exchange(&link,blocked,3,response,&size,100)<0&&size==0);
 }
 }
-int main(){no_hardware();scoped_requests();}
+int main(){no_hardware();scoped_requests();elm_capture();}
