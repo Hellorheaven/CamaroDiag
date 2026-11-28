@@ -111,6 +111,8 @@ int main(){
     cat["protocol"]="2";cat["source"]="10";
     const auto legacy=prepare(find("verify-catalogue"),cat);
     assert(legacy.args[legacy.args.size()-2]=="2"&&legacy.args.back()=="10"&&!legacy.physical);
+    cat["catalogue-kind"]="lj1";
+    assert(prepare(find("verify-catalogue"),cat).args[1]=="lj1");
     cat["catalogue-kind"]="cf1";rejects([&]{(void)prepare(find("verify-catalogue"),cat);});
     cat.erase("protocol");cat.erase("source");cat["pin"]=std::string(64,'G');
     rejects([&]{(void)prepare(find("verify-catalogue"),cat);});

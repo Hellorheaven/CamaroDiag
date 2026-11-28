@@ -1,4 +1,10 @@
 #include "j1979_catalogue_projection.hpp"
+#include "j1979_legacy_journal.hpp"
+#include <openssl/evp.h>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <cstdlib>
 #include "native_json.hpp"
 #include "j1979_legacy_live_wire.hpp"
 #include <array>
@@ -122,6 +128,28 @@ void replay_projection(){
     const auto p=project_llr1(capture,vin,2,0x10,c,source,catalogue_sha);
     assert(p.completed&&p.identity_rechecked&&p.rows.size()==1&&p.rows[0].status=="PROJECTED");
     assert(p.rows[0].signals[0].value->numerator=="2000");
+    // Recreate the same capture from an independently recorded LJ journal.
+    char name[]="/tmp/camarodiag-catalogue-XXXXXX";
+    assert(mkdtemp(name));
+    struct Cleanup{std::filesystem::path path;~Cleanup(){std::error_code ec;std::filesystem::remove_all(path,ec);}} cleanup{name};
+    const auto path=(cleanup.path/"session.lj").string();
+    {legacy::CaptureJournal writer(path.c_str(),legacy::LiveCapture{legacy::Protocol::vpw,0x10,plan,{}});
+        for(const auto& row:trace)writer.append(row);writer.finish();}
+    std::ifstream input(path,std::ios::binary);
+    const legacy::Data journal(std::istreambuf_iterator<char>(input),{});
+    std::array<unsigned char,32> digest{};unsigned digest_size{};
+    assert(EVP_Digest(journal.data(),journal.size(),digest.data(),&digest_size,EVP_sha256(),nullptr)==1&&digest_size==32);
+    std::string journal_sha;constexpr char digits[]="0123456789abcdef";
+    for(auto byte:digest){journal_sha+=digits[byte>>4];journal_sha+=digits[byte&15];}
+    const auto from_journal=project_lj1(journal,vin,2,0x10,c,journal_sha,catalogue_sha);
+    assert(from_journal.completed&&from_journal.rows.size()==p.rows.size());
+    assert(from_journal.rows[0].signals[0].value->numerator=="2000");
+    assert(from_journal.source_sha256==journal_sha&&valid_digest(from_journal.reconstructed_capture_sha256));
+    assert(report(c,from_journal).find("\"journal_terminal_verified\":true")!=std::string::npos);
+    assert(projection_csv(c,from_journal).find(from_journal.reconstructed_capture_sha256)!=std::string::npos);
+    rejects([&]{project_lj1(journal,vin,2,0x10,c,source,catalogue_sha);});
+    auto incomplete=journal;incomplete.pop_back();
+    rejects([&]{project_lj1(incomplete,vin,2,0x10,c,journal_sha,catalogue_sha);});
     const auto output=report(c,p);
     const auto csv=projection_csv(c,p);
     assert(csv.starts_with("pid_hex,frame,step_index,cycle,elapsed_ms,"));

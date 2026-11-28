@@ -2,6 +2,9 @@
 #include "cl1.h"
 #include "cf1.h"
 #include "j1979_legacy_live_wire.hpp"
+#include "j1979_legacy_journal.hpp"
+#include <openssl/evp.h>
+#include <array>
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
@@ -133,4 +136,28 @@ Projection project_llr1(Bytes bytes,std::string_view vin,unsigned protocol,unsig
     }
     return p;
 }
+
+Projection project_lj1(Bytes bytes,std::string_view vin,unsigned protocol,unsigned source,const Catalogue& c,
+                       std::string_view journal_sha,std::string_view catalogue_sha){
+    require(protocol>=1&&protocol<=5,"Explicit legacy protocol required");
+    const auto e=cd::legacy::inspect_journal(bytes,static_cast<cd::legacy::Protocol>(protocol),source,vin);
+    require(e.kind==cd::legacy::JournalKind::live&&e.terminal&&!e.torn_bytes&&!e.capture.empty(),
+        "Sealed original live LJ/1 journal required");
+    const auto digest=[](Bytes raw){
+        std::array<unsigned char,32> hash{};unsigned size{};
+        require(EVP_Digest(raw.data(),raw.size(),hash.data(),&size,EVP_sha256(),nullptr)==1&&size==hash.size(),
+            "Catalogue journal SHA-256 unavailable");
+        constexpr char digits[]="0123456789abcdef";
+        std::string hex;hex.reserve(64);
+        for(auto n:hash){hex+=digits[n>>4];hex+=digits[n&15];}
+        return hex;
+    };
+    require(digest(bytes)==journal_sha,"Original journal digest differs");
+    const auto capture_sha=digest(e.capture);
+    auto p=project_llr1(e.capture,vin,protocol,source,c,capture_sha,catalogue_sha);
+    p.source_sha256=std::string(journal_sha);
+    p.reconstructed_capture_sha256=capture_sha;
+    return p;
+}
+
 }

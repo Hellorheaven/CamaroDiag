@@ -68,7 +68,9 @@ std::string inventory(const Catalogue& c,std::string_view sha){
     o<<"}\n";return bounded(o);
 }
 std::string report(const Catalogue& c,const Projection& p){
-    if(c.mode!=p.mode||!valid_digest(p.catalogue_sha256)||!valid_digest(p.source_sha256))
+    if(c.mode!=p.mode||!valid_digest(p.catalogue_sha256)||!valid_digest(p.source_sha256)||
+        (!p.reconstructed_capture_sha256.empty()&&(!valid_digest(p.reconstructed_capture_sha256)||
+            p.transport!=Transport::legacy||p.mode!=Mode::live)))
         throw std::invalid_argument("Projection provenance mismatch");
     std::ostringstream o;o.imbue(std::locale::classic());
     o<<"{\"schema\":"<<quote(p.mode==Mode::freeze?"camarodiag-j1979-native-freeze-catalogue-projection-linux-v1":
@@ -85,6 +87,10 @@ std::string report(const Catalogue& c,const Projection& p){
     if(p.transport==Transport::can)
         o<<"{\"kind\":\"can\",\"tx\":"<<p.tx<<",\"rx\":"<<p.rx<<",\"extended\":"<<tf(p.extended)<<'}';
     else o<<"{\"kind\":\"legacy\",\"protocol\":"<<p.legacy_protocol<<",\"source\":"<<p.legacy_source<<'}';
+    if(!p.reconstructed_capture_sha256.empty())
+        o<<",\"source_journal_sha256\":"<<quote(p.source_sha256)
+         <<",\"reconstructed_capture_sha256\":"<<quote(p.reconstructed_capture_sha256)
+         <<",\"journal_terminal_verified\":true";
     std::map<std::string,unsigned> counts;
     for(const auto& row:p.rows)++counts[row.status];
     o<<",\"counts\":{";
@@ -150,7 +156,9 @@ std::string projection_csv(const Catalogue& c,const Projection& p){
     o<<"pid_hex,frame,step_index,cycle,elapsed_ms,source_status,response_hex,projection_status,"
         "definition_reference,signal_name,unit,signal_reference,signal_status,raw,enumeration,numerator,denominator,"
         "vin,transport,tx,rx,legacy_protocol,legacy_source,source_capture_sha256,catalogue_sha256,reference_sha256,"
-        "source_completed,final_identity_verified,normative_compliance_verified,physical_vehicle_verified\r\n";
+        "source_completed,final_identity_verified,normative_compliance_verified,physical_vehicle_verified";
+    if(!p.reconstructed_capture_sha256.empty())o<<",source_journal_sha256,reconstructed_capture_sha256,journal_terminal_verified";
+    o<<"\r\n";
     for(const auto& row:p.rows){
         if(!p.identity_rechecked&&!row.signals.empty())throw std::invalid_argument("Unverified identity carries catalogue values");
         const auto emit=[&](const SignalResult* signal){
@@ -177,6 +185,9 @@ std::string projection_csv(const Catalogue& c,const Projection& p){
             else{blank();blank();integer(p.legacy_protocol);integer(p.legacy_source);}
             field(p.source_sha256);field(p.catalogue_sha256);field(c.reference_sha256);
             field(tf(p.completed));field(tf(p.identity_rechecked));field("false");field("false");
+            if(!p.reconstructed_capture_sha256.empty()){
+                field(p.source_sha256);field(p.reconstructed_capture_sha256);field("true");
+            }
             o<<"\r\n";
             if(!o||o.tellp()>static_cast<std::streamoff>(max_projection))
                 throw std::invalid_argument("Catalogue CSV byte limit");

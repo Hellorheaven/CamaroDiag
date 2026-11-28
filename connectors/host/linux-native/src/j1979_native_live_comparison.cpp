@@ -148,7 +148,7 @@ json::Value compare_native_live(std::span<const NativeLiveProjection> runs,std::
             {"source_completed",root.at("source_completed")},{"identity_rechecked",flag(idx.identity)},
             {"numeric_projection_complete",flag(idx.complete)},{"completed_cycles",root.at("completed_cycles")},
             {"requested_cycles",root.at("requested_cycles")}};
-        if(const auto* kind=root.find("evidence_kind")){
+        if(root.find("evidence_kind")){
             require(root.at("source_sha256").string()==digests[i],"Comparison evidence digest mismatch");
             for(auto key:{"evidence_kind","raw_report_sha256","original_capture_replayed","transport_recipe_replayed"})
                 source.emplace(key,root.at(key));

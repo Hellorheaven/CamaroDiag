@@ -2238,9 +2238,9 @@ static int catalogue_projection_cli(int argc,char** argv,bool verify,bool csv=fa
     const int required=verify?10:9;
     if(argc!=required&&argc!=required+2)return error("Invalid catalogue projection arguments");
     const std::string_view kind=argv[2];
-    const bool legacy=kind=="llr1";
+    const bool legacy=kind=="llr1"||kind=="lj1";
     if((kind!="cl1"&&kind!="cf1"&&!legacy)||legacy!=(argc==required+2))
-        return error("Explicit cl1, cf1 or llr1 source type required");
+        return error("Explicit cl1, cf1, llr1 or lj1 source type required");
     const char* catalogue_path=argv[3],*reference_path=argv[4],*pin=argv[5],*capture_path=argv[6],
         *vin=argv[7],*output=argv[8],*proof=verify?argv[9]:nullptr;
     unsigned protocol=0,source=0;
@@ -2253,7 +2253,8 @@ static int catalogue_projection_cli(int argc,char** argv,bool verify,bool csv=fa
     try{
         input catalogue{},capture{},stored{};
         const std::size_t capture_max=kind=="cf1"?static_cast<std::size_t>(CF1_MAX_BYTES):
-            kind=="cl1"?static_cast<std::size_t>(CL1_MAX_CAPTURE):cd::legacy::live_max_capture;
+            kind=="cl1"?static_cast<std::size_t>(CL1_MAX_CAPTURE):
+            kind=="lj1"?cd::legacy::journal_max_bytes:cd::legacy::live_max_capture;
         if(!load_regular(catalogue_path,cd::catalogue::max_catalogue,&catalogue)||
             !load_regular(capture_path,capture_max,&capture)||!separate(&catalogue,&capture))
             return error("Separate bounded catalogue and original capture required");
@@ -2265,6 +2266,7 @@ static int catalogue_projection_cli(int argc,char** argv,bool verify,bool csv=fa
             kind=="cf1"?cd::catalogue::Mode::freeze:cd::catalogue::Mode::live,pin);
         const cd::catalogue::Bytes raw{capture.bytes.get(),capture.length};
         const auto projected=kind=="cf1"?cd::catalogue::project_cf1(raw,vin,parsed,capture.digest,catalogue.digest):
+            kind=="lj1"?cd::catalogue::project_lj1(raw,vin,protocol,source,parsed,capture.digest,catalogue.digest):
             legacy?cd::catalogue::project_llr1(raw,vin,protocol,source,parsed,capture.digest,catalogue.digest):
             cd::catalogue::project_cl1(raw,vin,parsed,capture.digest,catalogue.digest);
         const auto canonical=csv?cd::catalogue::projection_csv(parsed,projected):cd::catalogue::report(parsed,projected);
@@ -3186,10 +3188,10 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-historical-legacy-discovery REPORT.json PROOF.json\n"
         "  camarodiag-native --bind-j1979-historical-legacy-discovery PROTOCOL SOURCE VIN DISCOVERY.json CAPTURE.lsr PROOF.json\n"
         "  camarodiag-native --inspect-j1979-catalogue live|freeze CATALOGUE REFERENCE SHA256 OUTPUT\n"
-        "  camarodiag-native --project-j1979-catalogue cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN OUTPUT [PROTOCOL SOURCE]\n"
-        "  camarodiag-native --verify-j1979-catalogue cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN PROJECTION PROOF [PROTOCOL SOURCE]\n"
-        "  camarodiag-native --export-j1979-catalogue-csv cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN OUTPUT [PROTOCOL SOURCE]\n"
-        "  camarodiag-native --verify-j1979-catalogue-csv cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN CSV PROOF [PROTOCOL SOURCE]\n"
+        "  camarodiag-native --project-j1979-catalogue cl1|cf1|llr1|lj1 CATALOGUE REFERENCE SHA256 CAPTURE VIN OUTPUT [PROTOCOL SOURCE]\n"
+        "  camarodiag-native --verify-j1979-catalogue cl1|cf1|llr1|lj1 CATALOGUE REFERENCE SHA256 CAPTURE VIN PROJECTION PROOF [PROTOCOL SOURCE]\n"
+        "  camarodiag-native --export-j1979-catalogue-csv cl1|cf1|llr1|lj1 CATALOGUE REFERENCE SHA256 CAPTURE VIN OUTPUT [PROTOCOL SOURCE]\n"
+        "  camarodiag-native --verify-j1979-catalogue-csv cl1|cf1|llr1|lj1 CATALOGUE REFERENCE SHA256 CAPTURE VIN CSV PROOF [PROTOCOL SOURCE]\n"
         "  camarodiag-native --help\n"
         "Examples:\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix incomplete.cf 2G1FA1E30D7654321 partial.json\n"

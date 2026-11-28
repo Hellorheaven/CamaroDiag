@@ -46,7 +46,7 @@ Field csv_output(){return f("csv-output","Nouvel export CSV","--csv",K::output_f
 Field native_output(){return f("native-output","Nouveau rapport brut natif","--native-report-output",K::output_file,"",false);}
 Field positional(Field field){field.flag.clear();return field;}
 Field catalogue_kind(bool inventory){
-    return positional(f("catalogue-kind",inventory?"Mode live ou freeze":"Source cl1, cf1 ou llr1","",K::text,inventory?"live":"cl1"));
+    return positional(f("catalogue-kind",inventory?"Mode live ou freeze":"Source cl1, cf1, llr1 ou lj1","",K::text,inventory?"live":"cl1"));
 }
 Field catalogue_file(){return positional(f("catalogue","Catalogue JSON local","",K::input_file));}
 Field reference_file(){return positional(f("reference","Référence normative locale","",K::input_file));}
@@ -233,7 +233,7 @@ Invocation prepare(const Operation& supplied,const Values& values){
             if(field.key=="interface")require(j1979_isotp_valid_interface(value.c_str()),"Interface SocketCAN invalide");
             if(field.key=="port")require(value.starts_with("/dev/"),"Port série local /dev requis");
             if(field.key=="catalogue-kind")require(op.id=="inspect-catalogue"?
-                (value=="live"||value=="freeze"):(value=="cl1"||value=="cf1"||value=="llr1"),"Type de catalogue ou capture invalide");
+                (value=="live"||value=="freeze"):(value=="cl1"||value=="cf1"||value=="llr1"||value=="lj1"),"Type de catalogue ou capture invalide");
             if(field.key=="pin")require(value.size()==64&&std::all_of(value.begin(),value.end(),[](char c){
                 return (c>='0'&&c<='9')||(c>='a'&&c<='f');
             }),"SHA-256 indépendant requis");
@@ -317,9 +317,9 @@ Invocation prepare(const Operation& supplied,const Values& values){
         const auto present=[&](std::string_view key){
             const auto it=values.find(key);return it!=values.end()&&!it->second.empty();
         };
-        const bool legacy=values.at("catalogue-kind")=="llr1";
+        const bool legacy=values.at("catalogue-kind")=="llr1"||values.at("catalogue-kind")=="lj1";
         require(present("protocol")==legacy&&present("source")==legacy,
-            "Protocole et source legacy requis uniquement pour LLR/1");
+            "Protocole et source legacy requis uniquement pour LLR/1 ou LJ/1");
     }
     if(op.id=="compare-native-live"){
         unsigned sources=0;
