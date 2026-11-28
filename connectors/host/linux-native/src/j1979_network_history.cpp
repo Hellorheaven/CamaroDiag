@@ -1,4 +1,5 @@
 #include "j1979_network_history.hpp"
+#include "j1979_policy.h"
 #include <algorithm>
 #include <charconv>
 #include <map>
@@ -179,7 +180,7 @@ bool contains_schema(const Value& v,std::string_view s){
     const auto* p=v.find("schema");return p&&p->string()==s;
 }
 }
-Inspection inspect_discovery(const Value& root){
+static Inspection inspect_admission(const Value& root,bool campaign){
     no_claims(root);
     // A discovery-only inspection is deliberately not a physical campaign
     // verification; never silently accept or claim verified ECU scan rows.
@@ -190,18 +191,23 @@ Inspection inspect_discovery(const Value& root){
         android=true;result.platform="ANDROID";
         const auto p=bounded_int(required(root,"protocol"),9);
         require(p>=6,"Invalid Android fixed CAN profile");result.profile=p;extended=p==7||p==9;
-        require(array(required(root,"ecus"),max_targets).empty()&&
+        if(!campaign)require(array(required(root,"ecus"),max_targets).empty()&&
             array(required(root,"selected_response_ids"),max_targets).empty(),"Use discovery-only Android report");
         d=&required(root,"discovery");
-    }else if(contains_schema(root,"camarodiag-functional-j1979-can-discovery-v1")&&root.find("profile")){
+    }else if(contains_schema(root,campaign?"camarodiag-functional-j1979-can-network-v1":
+        "camarodiag-functional-j1979-can-discovery-v1")&&root.find("profile")){
         result.platform="J2534";const auto p=bounded_int(required(root,"profile"),36);
         require(p>=33,"Invalid J2534 CAN profile");result.profile=p;extended=p==34||p==36;
         d=&required(root,"discovery");
-        require(!root.find("network")||root.at("network").null(),"Use discovery-only J2534 report");
+        if(!campaign)require(!root.find("network")||root.at("network").null(),"Use discovery-only J2534 report");
+        if(const auto* baud=root.find("baud"))
+            require(baud->unsigned_integer()==(p<=34?500000u:250000u),"J2534 baud differs from profile");
     }else{
-        require(contains_schema(root,"camarodiag-functional-j1979-can-discovery-v1")||
-            contains_schema(root,"camarodiag-j1979-can-discovery-linux-v1"),"Unsupported discovery-only CAN schema");
+        require(contains_schema(root,campaign?"camarodiag-functional-j1979-can-network-v1":
+            "camarodiag-functional-j1979-can-discovery-v1")||
+            (!campaign&&contains_schema(root,"camarodiag-j1979-can-discovery-linux-v1")),"Unsupported CAN schema");
         result.platform="SOCKETCAN";extended=addressing(required(root,"addressing"));
+        if(campaign)d=&required(root,"discovery");
     }
     no_claims(*d);
     if(const auto* p=property(*d,"extended"))require(p->boolean()==extended,"Discovery addressing flag differs");
@@ -217,7 +223,7 @@ Inspection inspect_discovery(const Value& root){
             }),"Invalid discovery stop reason");
     }
     require(out.completed==out.stop.empty()&&(!out.completed||out.sent),"Inconsistent discovery completion");
-    if(d!=&root)require(required(root,"completed").boolean()==out.completed,"Outer discovery completion differs");
+    if(!campaign&&d!=&root)require(required(root,"completed").boolean()==out.completed,"Outer discovery completion differs");
     if(android&&out.completed){
         const auto p=bounded_int(required(*d,"observed_protocol"),9);
         require(result.profile==p&&probe(required(*d,"raw_protocol").string())==p,"Android fixed CAN probe differs");
@@ -226,6 +232,7 @@ Inspection inspect_discovery(const Value& root){
     if(const auto* q=d->find("request"))(void)frame(*q,extended,false,true);
     if(const auto* p=property(*d,"duration_ms"))out.duration_ms=bounded_int(*p,3600000);
     if(const auto* p=property(*d,"ignored_frame_count"))out.ignored=bounded_int(*p,1000000);
+    else if(const auto* ignored=property(*d,"ignored_frames"))out.ignored=bounded_int(*ignored,1000000);
     const auto* raw=property(*d,"raw_frames");
     if(!raw)raw=d->find("frames");
     require(raw,"Missing CAN discovery bytes");
@@ -257,6 +264,124 @@ Inspection inspect_discovery(const Value& root){
         for(std::size_t i=0;i<ids.size();++i)require(address(ids[i])==out.eligible[i],"Eligible CAN identifier differs");
     }
     return result;
+}
+Inspection inspect_discovery(const Value& root){return inspect_admission(root,false);}
+namespace {
+bool equal_value(const Value& a,const Value& b){
+    if(a.data.index()!=b.data.index())return false;
+    if(a.null())return true;
+    if(const auto* p=std::get_if<bool>(&a.data))return *p==b.boolean();
+    if(const auto* p=std::get_if<json::Integer>(&a.data))return p->text==std::get<json::Integer>(b.data).text;
+    if(const auto* p=std::get_if<json::Decimal>(&a.data))return p->text==std::get<json::Decimal>(b.data).text;
+    if(const auto* p=std::get_if<std::string>(&a.data))return *p==b.string();
+    if(const auto* p=std::get_if<Value::Array>(&a.data)){
+        const auto& q=b.array();if(p->size()!=q.size())return false;
+        for(std::size_t i=0;i<p->size();++i)if(!equal_value(p->at(i),q[i]))return false;
+        return true;
+    }
+    const auto& x=a.object();const auto& y=b.object();
+    if(x.size()!=y.size())return false;
+    for(const auto& [k,v]:x){
+        const auto j=y.find(k);if(j==y.end()||!equal_value(v,j->second))return false;
+    }
+    return true;
+}
+std::string optional_text(const Value& v,std::string_view key){
+    const auto& p=optional(v,key);
+    if(p.null())return {};
+    const auto& s=p.string();require(s.size()<=256,"Physical error exceeds bound");return s;
+}
+std::optional<std::string> vin_value(const Value& v){
+    if(v.null())return {};
+    const auto& s=v.string();require(cd_j1979_native_vin(s.data(),s.size()),"Invalid network VIN");return s;
+}
+bool terminal_error(std::string_view error){
+    return error=="CANCELLED"||error=="BUDGET_EXHAUSTED"||error=="VIN_MISMATCH"||
+        error=="VIN_UNVERIFIED"||error=="TRANSPORT_ERROR"||error=="VIN_CHANGED"||
+        error=="FINAL_VIN_UNVERIFIED"||error=="OSError"||error=="ConnectionError"||
+        error=="BrokenPipeError"||error=="ConnectionResetError";
+}
+}
+NetworkInspection inspect_network(const Value& root,std::optional<std::string> expected_vin){
+    NetworkInspection out{};
+    out.admission=inspect_admission(root,true);
+    const bool android=out.admission.platform=="ANDROID",windows=out.admission.platform=="J2534";
+    const auto& d=out.admission.discovery;
+    const Value* body=&root;
+    if(windows){
+        body=&required(root,"network");
+        require(!body->null(),"Missing Windows physical network body");
+        require(equal_value(required(root,"discovery"),required(*body,"discovery")),"Duplicated discovery differs");
+    }
+    no_claims(*body);
+    out.vin=vin_value(optional(*body,"declared_vin"));
+    if(expected_vin)require(out.vin==expected_vin,"Network VIN differs from independent target");
+    if(android)require(out.vin.has_value(),"Android network VIN missing");
+    out.completed=required(root,"completed").boolean();
+    require(required(*body,"completed").boolean()==out.completed,"Outer network completion differs");
+    out.stop=optional_text(*body,"stop_reason");
+    require(!out.completed||out.stop.empty(),"Completed network has stop reason");
+    const auto& ids=array(required(*body,"selected_response_ids"),max_targets);
+    std::set<std::uint32_t> seen;
+    for(const auto& id:ids){
+        const auto n=address(id);
+        require(response_pair(n,d.extended)&&seen.insert(n).second,"Invalid or duplicate network selection");
+        out.selected.push_back(n);
+    }
+    require(!out.selected.empty(),"Use discovery inspection for an empty selection");
+    const bool all_eligible=d.completed&&std::all_of(out.selected.begin(),out.selected.end(),[&](auto rx){
+        return std::find(d.eligible.begin(),d.eligible.end(),rx)!=d.eligible.end();
+    });
+    const auto& rows=array(required(*body,android?"ecus":"ecu_reports"),max_targets);
+    require(rows.size()<=out.selected.size(),"Unselected physical ECU");
+    if(out.completed)require(all_eligible&&rows.size()==out.selected.size(),"Completed network lacks selected ECU");
+    bool terminal=false;
+    for(std::size_t i=0;i<rows.size();++i){
+        const auto& v=rows[i];no_claims(v);
+        PhysicalRow row{};
+        row.pair={address(required(v,android?"request_id":"tx_can_id")),
+            address(required(v,android?"response_id":"rx_can_id"))};
+        require(row.pair.rx==out.selected[i]&&response_pair(row.pair.rx,d.extended)==row.pair,
+            "Physical CAN pair differs from ordered selection");
+        row.status=required(v,"status").string();
+        require(row.status=="PASSED"||row.status=="FAILED"||row.status=="NOT_TESTED","Invalid ECU result status");
+        row.error=optional_text(v,android?"stop_reason":"error");
+        const auto& evidence=android?v:optional(v,"report");
+        if(!evidence.null()){
+            row.plan=inspect_plan(evidence,android?PlanOrder::android:PlanOrder::historical,out.vin);
+            if(!row.plan->steps.empty())require(all_eligible&&!terminal,"Read attempted after unverified or terminal target");
+            require(row.status!="PASSED"||row.plan->completed,"Successful ECU lacks complete physical plan");
+            if(!row.plan->completed&&(android||windows||terminal_error(row.error)||terminal_error(row.plan->stop_reason)))terminal=true;
+        }else{
+            require(row.status!="PASSED","Successful ECU has no physical report");
+            if(android||windows||terminal_error(row.error))terminal=true;
+        }
+        if(out.completed)require(row.status=="PASSED"&&row.plan&&row.plan->completed,"Completed network contains failed ECU");
+        out.rows.push_back(std::move(row));
+    }
+    return out;
+}
+std::string report(const NetworkInspection& r,std::string_view digest){
+    std::ostringstream o;
+    o<<"{\"schema\":\"camarodiag-j1979-historical-can-network-inspection-linux-v1\","
+        "\"verification_scope\":\"DISCOVERY_SELECTION_READ_PLAN_BASIC_SUMMARY\","
+        "\"consistent\":true,\"completed\":"<<(r.completed?"true":"false")
+        <<",\"declared_vin\":"<<(r.vin?json::quote(*r.vin):"null")
+        <<",\"stop_reason\":"<<(r.stop.empty()?"null":json::quote(r.stop))
+        <<",\"admission\":"<<report(r.admission)<<",\"selected_response_ids\":[";
+    for(std::size_t i=0;i<r.selected.size();++i){if(i)o<<',';o<<json::quote(hex(r.selected[i]));}
+    o<<"],\"ecu_reports\":[";
+    for(std::size_t i=0;i<r.rows.size();++i){
+        if(i)o<<',';
+        const auto& row=r.rows[i];
+        o<<"{\"request_id\":"<<json::quote(hex(row.pair.tx))<<",\"response_id\":"<<json::quote(hex(row.pair.rx))
+            <<",\"status\":"<<json::quote(row.status)<<",\"error\":"<<(row.error.empty()?"null":json::quote(row.error))
+            <<",\"plan\":"<<(row.plan?plan_report(*row.plan):"null")<<'}';
+    }
+    o<<"],\"source_sha256\":"<<(digest.empty()?"null":json::quote(digest))
+        <<",\"derived_projections_verified\":false,\"authenticated\":false,\"physical_vehicle_verified\":false,"
+          "\"whole_vehicle_coverage_verified\":false,\"current_authorization_verified\":false,"
+          "\"permits_programming\":false}\n";return o.str();
 }
 std::string report(const Inspection& r,std::string_view digest){
     auto discovery=cd::network::report(r.discovery);

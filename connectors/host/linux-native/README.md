@@ -402,3 +402,9 @@ Offline replay of native SocketCAN, historical Python, J2534 and Android discove
 Use `android` for interleaved inventory and final VIN read. Historical Python/J2534 order is separate from the native SocketCAN recipe. Validates read-only scope, raw response envelopes, negative codes, inventory order, terminal cutoffs and raw VIN. The result explicitly does not attest derived projections, transport provenance or whole-network verification. Input JSON may contain finite measured decimals; integer fields remain exact. No live channel is opened.
 
 The historical plan inspector additionally recomputes the scalar arithmetic, DTC lists and availability inventories and compares any saved basic summaries. These historical values are not a claim that current ECU-specific scaling has been established. Complex multi-signal, monitor, categorical and operating-context projections still require migration.
+
+### Historical multi-ECU network plan verification
+
+`camarodiag-native --inspect-j1979-historical-can-network VIN network.json proof.json`
+
+Reconstructs admission, validates the exact ordered selected responder set, matches physical CAN pairs, and replays each ECU's read plan and basic summaries. A failed selection cannot carry physical read observations; terminal failures cannot be followed by new ECU reads. Windows duplicated discovery must match. Does not certify the complete derived catalogue or current hardware identity and does not operate any channel. Use discovery-only verification for an empty selection.

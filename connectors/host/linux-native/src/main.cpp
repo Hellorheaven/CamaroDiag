@@ -2819,6 +2819,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-legacy-maintenance VIN FINAL.json BASELINE.json INTENT.json PROOF.json\n"
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
+        "  camarodiag-native --inspect-j1979-historical-can-network VIN|- REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-can-plan historical|android VIN|- REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-can-discovery-report REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-legacy-discovery REPORT.json PROOF.json\n"
@@ -2904,7 +2905,23 @@ static int historical_can_plan_cli(const char* order,const char* vin,const char*
         return 0;
     }catch(const std::exception& e){return error(e.what());}
 }
+static int historical_can_network_cli(const char* vin,const char* path,const char* output){
+    try{
+        std::optional<std::string> expected;
+        if(std::string_view(vin)!="-")expected=vin;
+        constexpr std::size_t maximum=32*1024*1024;
+        input original{},again{};
+        if(!load_regular(path,maximum,&original))return error("Bounded CAN network report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const auto result=cd::network::history::inspect_network(cd::json::parse_report(raw,maximum),expected);
+        const auto proof=cd::network::history::report(result,original.digest);
+        if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Network report changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Network proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
 int main(int argc, char **argv) {
+    if(argc==5&&!strcmp(argv[1],"--inspect-j1979-historical-can-network"))return historical_can_network_cli(argv[2],argv[3],argv[4]);
     if(argc==6&&!strcmp(argv[1],"--inspect-j1979-historical-can-plan"))return historical_can_plan_cli(argv[2],argv[3],argv[4],argv[5]);
     if(argc==4&&!strcmp(argv[1],"--inspect-j1979-can-discovery-report"))return historical_can_discovery_cli(argv[2],argv[3]);
     if(argc==8&&!strcmp(argv[1],"--bind-j1979-historical-legacy-discovery"))return bind_legacy_discovery_cli(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
