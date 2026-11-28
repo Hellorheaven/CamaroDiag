@@ -2,6 +2,7 @@
 #include "j1979_elm.hpp"
 #include "j1979_can.h"
 #include "j1979_live.h"
+#include "j1979_freeze_scope.h"
 namespace cd::elmcan {
 using legacy::Bytes;
 using legacy::Data;
@@ -36,6 +37,7 @@ class Session{
     std::vector<Observation> evidence_;
     std::string setup(std::string_view,unsigned);
     void record(Observation);
+    int exchange_admitted(Bytes,std::span<uint8_t>,std::size_t&,unsigned,bool);
 public:
     Session(legacy::Link&,Scope,legacy::Current);
     Session(const Session&)=delete;
@@ -45,6 +47,7 @@ public:
     const Scope& scope()const{return scope_;}
     const std::vector<Observation>& evidence()const{return evidence_;}
     int exchange(Bytes,std::span<uint8_t>,std::size_t&,unsigned);
+    int exchange_freeze(const J1979FreezeScope&,Bytes,std::span<uint8_t>,std::size_t&,unsigned);
     static bool current_callback(void*);
     static int exchange_callback(void*,const uint8_t*,size_t,uint8_t*,size_t*,unsigned);
 };

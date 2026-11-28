@@ -61,6 +61,27 @@ struct Fake:cd::legacy::Link{
         ++writes;auto result=std::move(rows.front().second);rows.pop_front();return result;
     }
 };
+void freeze_scope(){
+    const Scope scope{6,0x7e0,0x7e8};
+    cd::J1979FreezeScope plan{};
+    constexpr std::string_view vin="1G1FA1RXXR0123456";
+    std::copy(vin.begin(),vin.end(),plan.vin);
+    plan.frameCount=1;plan.frames[0]=7;plan.pidCount=1;plan.pids[0]=12;
+    assert(plan.valid());
+    Fake fake;fake.setup(6);
+    fake.add("03020C07","7E8 05 42 0C 07 1F 40");
+    Session session(fake,scope,[]{return true;});session.configure();
+    std::array<uint8_t,32> response{};size_t size=response.size();
+    const auto prior=fake.writes;
+    assert(session.exchange(Data{2,12,7},response,size,1000)==-1&&fake.writes==prior);
+    for(const Data& q:{Data{2,12,8},Data{2,13,7},Data{4},Data{8,1}}){
+        size=response.size();
+        assert(session.exchange_freeze(plan,q,response,size,1000)==-1&&size==0&&fake.writes==prior);
+    }
+    size=response.size();
+    assert(session.exchange_freeze(plan,Data{2,12,7},response,size,1000)==0&&size==5);
+    assert(response[0]==0x42&&response[2]==7&&response[4]==0x40&&fake.rows.empty());
+}
 void sessions(){
     for(unsigned profile=6;profile<=9;++profile){
         const bool ext=profile==7||profile==9;
@@ -90,4 +111,4 @@ void sessions(){
     }
 }
 }
-int main(){decoding();sessions();}
+int main(){decoding();sessions();freeze_scope();}

@@ -76,8 +76,14 @@ void Session::configure(){
     }catch(...){retired_=true;throw;}
 }
 int Session::exchange(Bytes request,std::span<uint8_t> response,std::size_t& size,unsigned timeout){
+    return exchange_admitted(request,response,size,timeout,j1979_can_allowed_read(request.data(),request.size()));
+}
+int Session::exchange_freeze(const J1979FreezeScope& plan,Bytes request,std::span<uint8_t> response,std::size_t& size,unsigned timeout){
+    return exchange_admitted(request,response,size,timeout,plan.valid()&&plan.allows(request.data(),request.size()));
+}
+int Session::exchange_admitted(Bytes request,std::span<uint8_t> response,std::size_t& size,unsigned timeout,bool allowed){
     const auto capacity=std::min(size,response.size());size=0;
-    if(!current()||!j1979_can_allowed_read(request.data(),request.size())||request.size()>7||
+    if(!current()||!allowed||request.empty()||request.size()>7||
         !capacity||timeout<1||timeout>2500||evidence_.size()>=max_rows||max_raw-total_raw_<32768)return -1;
     Observation row{};row.request.assign(request.begin(),request.end());
     Data frame{static_cast<uint8_t>(request.size())};frame.insert(frame.end(),request.begin(),request.end());
