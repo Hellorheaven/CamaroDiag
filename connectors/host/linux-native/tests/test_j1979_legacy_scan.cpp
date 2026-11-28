@@ -71,6 +71,9 @@ int main(){
     assert(report.find("P0133")!=std::string::npos);
     assert(report.find("\"identity_rechecked\":true")!=std::string::npos);
     assert(report.find("\"number\":2000")!=std::string::npos);
+    assert(report.find("\"operating_context\":{\"identity_rechecked\":true")!=std::string::npos);
+    assert(report.find("\"scaling_context\":")!=std::string::npos);
+    assert(report.find("\"trim_layout\":")!=std::string::npos);
     const auto capture=encode_scan_capture({s.protocol,s.source,s.budget_ms,s.expected_vin,s.trace});
     const auto parsed=decode_scan_capture(capture);
     assert(parsed.trace==s.trace&&parsed.vin==vin);
@@ -96,6 +99,7 @@ int main(){
     const auto invalid=run(changed);
     assert(!invalid.completed&&!invalid.identity_rechecked&&changed.script.empty());
     assert(scan_report(invalid).find("\"number\":2000")==std::string::npos);
+    assert(scan_report(invalid).find("\"operating_context\":{\"identity_rechecked\":false")!=std::string::npos);
     Fake duplicate;duplicate.config();
     const auto p=wire({0x41,0,0,0,0,0});
     duplicate.add("0100",p+p);

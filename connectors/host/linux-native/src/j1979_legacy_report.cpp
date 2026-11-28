@@ -8,6 +8,10 @@
 #include "j1979_measurement.h"
 #include "j1979_multi.hpp"
 #include "j1979_status.hpp"
+#include "j1979_context.hpp"
+#include <cstdlib>
+#include <memory>
+#include <stdexcept>
 #include <iomanip>
 #include <locale>
 #include <sstream>
@@ -35,6 +39,23 @@ template<class T,class F> void array(std::ostream& o,const T& rows,F f){
     o<<'[';bool first=true;
     for(const auto& row:rows){if(!first)o<<',';first=false;f(row);}
     o<<']';
+}
+void context_json(std::ostream& o,std::span<const cd::j1979::Observation> rows,bool verified){
+    char* buffer=nullptr;
+    std::size_t size=0;
+    auto* stream=open_memstream(&buffer,&size);
+    if(!stream)throw std::runtime_error("Cannot allocate legacy context JSON");
+    bool written=false;
+    try {
+        written=cd::j1979::write_context_json(stream,rows,verified);
+    }catch(...){
+        std::fclose(stream);std::free(buffer);throw;
+    }
+    const int closed=std::fclose(stream);
+    const std::unique_ptr<char,decltype(&std::free)> owned(buffer,&std::free);
+    if(!written||closed!=0||!owned||size==0||size>32*1024*1024)
+        throw std::runtime_error("Cannot serialize bounded legacy context JSON");
+    o.write(owned.get(),static_cast<std::streamsize>(size));
 }
 void measurement(std::ostream& o,const ScanStep& step,bool verified){
     if(step.selected.size()!=1||!verified||step.status!="PASSED"){o<<"null";return;}
@@ -167,6 +188,12 @@ std::string scan_report(const Scan& s){
     const auto context=cd::j1979::derive_context(rows);
     o<<",\"multi_signal_records\":";cd::j1979::write_multi_json(o,rows,&context.scaling);
     o<<",\"status_records\":";cd::j1979::write_status_json(o,rows);
+    // Context derives only from current Mode 01 records. Frozen data must not
+    // inherit range configuration or sensor layout observed at a different time.
+    std::vector<cd::j1979::Observation> current_rows;
+    for(const auto& row:rows)
+        if(row.request.size()==2&&row.request[0]==1)current_rows.push_back(row);
+    o<<",\"operating_context\":";context_json(o,current_rows,s.identity_rechecked);
     o<<",\"not_executed\":[\"MODE_04_CLEAR\",\"MODE_08_CONTROL\"]}\n";
     return o.str();
 }
