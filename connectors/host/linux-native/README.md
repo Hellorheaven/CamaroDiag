@@ -444,3 +444,11 @@ Replays chronological identity admission, selected PID inventory, configuration 
 camarodiag-native compare-live --report RUN1.json --report RUN2.json --vin VIN17 --output COMPARISON.json
 ```
 Compares two to sixteen independently replayed recordings of the same VIN, ECU channel and numeric/raw mode. Duplicate inputs are rejected by SHA-256. Only shared PIDs are compared; missing channels remain null, not zero. A comparison does not synchronize vehicle time or infer diagnostic conclusions.
+
+### Historical embedded evidence verification
+
+```sh
+camarodiag-native verify-j1979-capture --capture CAPTURE.cj1 --report HOST.json --vin VIN17 --output PROOF.json
+camarodiag-native verify-native-freeze --capture CAPTURE.cf --report HOST.json --vin VIN17 --output PROOF.json
+```
+Historical Android, Windows and Python CJ/1 and CF/1 JSON reports are compared with the binary records. The CF/1 verifier independently reconstructs the full historical recipe and checks it against the native binary replay; partial captures cannot establish completion. Both commands preserve source SHA-256 and do not independently validate the declared live credentials or actual physical ECU. They require distinct inputs and a new proof path.

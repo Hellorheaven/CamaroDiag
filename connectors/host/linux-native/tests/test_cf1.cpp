@@ -1,4 +1,7 @@
 #include "cf1.h"
+#include "j1979_cf1_history.hpp"
+#include <stdexcept>
+#include <string>
 
 #include <assert.h>
 #include <stdint.h>
@@ -190,7 +193,52 @@ static void checks(void) {
     refused(data, just_plan - 1, vin);
     refused(data, 0, vin);
 }
+
+static void historical_checks(){
+    using cd::json::Value;
+    make_capture();
+    const auto prefix=position;
+    uint8_t terminal[20]={};
+    terminal[1]=1;terminal[2]=7;
+    put32(terminal+4,6);put32(terminal+8,100);terminal[12]=2;
+    append(3,terminal,sizeof(terminal));
+    const std::string digest(64,'a'),report_digest(64,'b');
+    const auto bytes=std::span<const uint8_t>(data,position);
+    const auto decoded=cd::cfhistory::decode(bytes);
+    assert(decoded.at("capture_integrity_verified").boolean());
+    assert(decoded.at("result").at("all_frames_stable").boolean());
+    const auto& step=decoded.at("result").at("steps").array()[3];
+    assert(step.at("evidence").at("measurement").at("number").finite_number()==1024);
+    const auto checked=cd::cfhistory::verify(bytes,decoded,digest,report_digest,std::string(vin));
+    assert(checked.verified&&checked.completed&&!checked.proof.at("credential_independently_verified").boolean());
+    auto denied=[&](const Value& host){
+        bool bad=false;try{(void)cd::cfhistory::verify(bytes,host,digest,report_digest,std::string(vin));}
+        catch(const std::invalid_argument&){bad=true;}assert(bad);
+    };
+    auto fields=decoded.object();fields["physical_vehicle_verified"]=Value{true};denied(Value{fields});
+    fields=decoded.object();fields["capture_sha256"]=Value{std::string(64,'c')};denied(Value{fields});
+    fields=decoded.object();fields["source"]=Value{std::string("LIVE_USB_CU2")};
+    fields["device_credential_authenticated"]=Value{true};fields["client_proof_sent"]=Value{true};fields["cancelled"]=Value{false};
+    auto live=cd::cfhistory::verify(bytes,Value{fields},digest,report_digest,std::string(vin));
+    assert(live.verified&&live.proof.at("declared_live_credential_authenticated").boolean());
+    assert(!live.proof.at("credential_independently_verified").boolean());
+    fields["client_proof_sent"]=Value{false};denied(Value{fields});
+    const auto partial=cd::cfhistory::decode(bytes.first(prefix));
+    assert(!partial.at("capture_integrity_verified").boolean()&&partial.at("result").null());
+    assert(partial.at("observations_received").unsigned_integer()==6);
+    const auto partial_check=cd::cfhistory::verify(bytes.first(prefix),partial,digest,report_digest,std::string(vin));
+    assert(!partial_check.verified&&!partial_check.completed);
+    // Corrupt the terminal, then recompute CRC. The independently replayed
+    // final state must reject the fabricated completion, not merely its CRC.
+    data[prefix+8+2]^=4;
+    put32(data+prefix+8+sizeof(terminal),cf1_crc32(data+prefix,8+sizeof(terminal)));
+    assert(!cd::cfhistory::decode(bytes).at("capture_integrity_verified").boolean());
+    data[prefix+8+2]^=4;
+    put32(data+prefix+8+sizeof(terminal),cf1_crc32(data+prefix,8+sizeof(terminal)));
+}
+
 int main(void) {
+    historical_checks();
     checks();
     puts("CF/1 native C++ fixture assertions passed (offline simulation only)");
     return 0;

@@ -1,4 +1,6 @@
 #include "j1979_cj1.hpp"
+#include "j1979_cj1_history.hpp"
+#include "j1979_native_report_detail.hpp"
 #include <cassert>
 #include <cstdint>
 #include <initializer_list>
@@ -65,8 +67,63 @@ Data complete(unsigned flags=231,bool swap=false,bool wrong_width=false){
     terminal(d,10,1,flags,9,9);
     return d;
 }
+cd::json::Value historic_report(const cd::cj1::Evidence& e,bool live=false){
+    using cd::json::Value;
+    auto root=cd::json::parse_report(cd::cj1::report(e,vin,std::string(64,'a'))).object();
+    const auto profile=root.at("profile").object();
+    for(const auto& [k,v]:profile)root[k]=v;
+    root.erase("profile");
+    root["schema"]=Value{std::string(live?"camarodiag-functional-j1979-native-usb-v1":"camarodiag-functional-j1979-embedded-evidence-v1")};
+    root["source"]=Value{std::string(live?"LIVE_USB_CU1":"OFFLINE_CAPTURE")};
+    root["device_credential_authenticated"]=Value{live};
+    root["frame_integrity_verified"]=Value{live};
+    root["records"]=Value{cd::json::Integer{std::to_string(e.steps.size()+2)}};
+    root["cancelled"]=Value{false};
+    // The complete fixture has no scalar or monitor rows; older exports omit
+    // optional projection families and only carry the core replayed claims.
+    for(auto key:{"multi_signal_records","status_records","extended_vehicle_info"})root.erase(key);
+    return Value{std::move(root)};
+}
+void historical_checks(){
+    using cd::json::Value;
+    auto raw=complete();const auto e=cd::cj1::inspect(raw);
+    const std::string a(64,'a'),b(64,'b');
+    for(bool live:{false,true}){
+        auto saved=historic_report(e,live);
+        auto checked=cd::cj1::verify_historical(raw,saved,a,b,vin);
+        assert(checked.consistent&&checked.verified);
+        assert(checked.proof.at("vin_match").string()=="MATCH");
+        assert(!checked.proof.at("device_credential_independently_verified").boolean());
+        auto fields=saved.object();
+        fields["observed_vin"]=Value{std::string("1G1FA1RXXR0123456")};
+        checked=cd::cj1::verify_historical(raw,Value{fields},a,b,vin);
+        assert(!checked.consistent&&!checked.verified);
+        fields=saved.object();fields["cancelled"]=Value{true};
+        checked=cd::cj1::verify_historical(raw,Value{fields},a,b,vin);
+        assert(!checked.verified);
+        fields=saved.object();fields["physical_vehicle_verified"]=Value{true};
+        assert(!cd::cj1::verify_historical(raw,Value{fields},a,b,vin).consistent);
+        fields=saved.object();
+        auto rows=fields.at("steps").array();auto row=rows[1].object();row["duration_ms"]=Value{cd::json::Integer{"999"}};
+        rows[1]=Value{row};fields["steps"]=Value{rows};
+        checked=cd::cj1::verify_historical(raw,Value{fields},a,b,vin);
+        assert(!checked.consistent);
+        bool found=false;
+        for(const auto& reason:checked.proof.at("differences").array())if(reason.string()=="steps[1].duration_ms")found=true;
+        assert(found);
+        fields=saved.object();fields["scaled_monitor_records"]=cd::json::parse_report("[{}]");
+        assert(!cd::cj1::verify_historical(raw,Value{fields},a,b,vin).consistent);
+    }
+    auto saved=historic_report(e);
+    auto different=cd::cj1::verify_historical(raw,saved,a,b,std::string("1G1FA1RXXR0123456"));
+    assert(!different.verified&&different.proof.at("vin_match").string()=="MISMATCH");
+    raw.pop_back();
+    assert(!cd::cj1::verify_historical(raw,saved,a,b,vin).verified);
+}
+
 }
 int main(){
+    historical_checks();
     assert(cd::cj1::valid_profile({0x7e0,0x7e8,10000,false}));
     assert(!cd::cj1::valid_profile({0x7df,0x7e8,10000,false}));
     assert(!cd::cj1::valid_profile({0x7e0,0x7e8,0,false}));
