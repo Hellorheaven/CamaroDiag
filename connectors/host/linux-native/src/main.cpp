@@ -2934,6 +2934,8 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
         "  camarodiag-native --inspect-j1979-native-live TX RX VIN REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-native-can-plan TX RX VIN REPORT.json PROOF.json\n"
+        "  camarodiag-native verify-legacy-discovery --report REPORT.json --output PROOF.json\n"
+        "  camarodiag-native compare-legacy-discovery-scan --discovery DISCOVERY.json --scan SCAN.json --output PROOF.json\n"
         "  camarodiag-native compare-live --report A.json --report B.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-native-freeze --capture CAPTURE.cf --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-j1979-capture --capture CAPTURE.cj1 --report REPORT.json [--vin VIN] --output PROOF.json\n"
@@ -3154,7 +3156,40 @@ static int verify_network_compat_cli(int argc,char** argv){
     if(vin_seen&&std::string_view(vin)=="-")return error("Explicit VIN must be a VIN");
     return historical_can_network_cli(vin,path,output);
 }
+static int historical_discovery_compat_cli(int argc,char** argv,bool bind){
+    const char* discovery=nullptr;const char* scan=nullptr;const char* output=nullptr;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing discovery option value");
+        const char* value=argv[i++];
+        if(key==(bind?"--discovery":"--report")&&!discovery)discovery=value;
+        else if(bind&&key=="--scan"&&!scan)scan=value;
+        else if(key=="--output"&&!output)output=value;
+        else return error("Unexpected or duplicate discovery option");
+    }
+    if(!discovery||!output||(bind&&!scan))return error("Discovery input and distinct proof destination required");
+    if(!bind)return historical_legacy_discovery_cli(discovery,output);
+    try{
+        constexpr std::size_t discovery_limit=4u*1024u*1024u,scan_limit=64u*1024u*1024u;
+        input d{},s{},da{},sa{};
+        if(!load_regular(discovery,discovery_limit,&d)||!load_regular(scan,scan_limit,&s))
+            return error("Bounded discovery and historical scan inputs required");
+        const auto dv=cd::legacy::history::inspect(cd::json::parse_report(
+            std::string_view(reinterpret_cast<const char*>(d.bytes.get()),d.length)));
+        const auto sv=cd::legacy::history::inspect_historical_scan(cd::json::parse_report(
+            std::string_view(reinterpret_cast<const char*>(s.bytes.get()),s.length)));
+        const auto result=cd::legacy::history::compare_historical_discovery_scan(dv,sv,d.digest,s.digest);
+        const auto proof=cd::network::history::encode_historical_json(result)+"\n";
+        if(!load_regular(discovery,discovery_limit,&da)||!same_input(&d,&da)||
+            !load_regular(scan,scan_limit,&sa)||!same_input(&s,&sa))return error("Historical discovery or scan changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Binding proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 int main(int argc, char **argv) {
+    if(argc>=2&&!strcmp(argv[1],"verify-legacy-discovery"))return historical_discovery_compat_cli(argc,argv,false);
+    if(argc>=2&&!strcmp(argv[1],"compare-legacy-discovery-scan"))return historical_discovery_compat_cli(argc,argv,true);
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-live"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-can-plan"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
     if(argc>=2&&!strcmp(argv[1],"compare-live"))return compare_live_compat_cli(argc,argv);

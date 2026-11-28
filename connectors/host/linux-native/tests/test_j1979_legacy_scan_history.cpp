@@ -124,6 +124,18 @@ int main(){
         assert(inspected.dtcs.at(3)==std::set<std::string>{"P0123"});
         assert(inspected.dtcs.at(7).empty()&&!inspected.dtcs.contains(10));
         assert(inspected.checked_summary_fields.size()==7);
+        DiscoveryInspection discovery{};discovery.protocol=p;discovery.completed=true;discovery.eligible={0x10};
+        Responder responder{};responder.source=0x10;responder.status="PASSED";
+        responder.bitmap=std::array<std::uint8_t,4>{0x88,0x10,0,0};discovery.responders={responder};
+        const auto binding=compare_historical_discovery_scan(discovery,inspected,"discovery-digest","scan-digest");
+        assert(binding.at("bitmap_unchanged").boolean()&&binding.at("scan_completed").boolean());
+        assert(!binding.at("current_authorization_verified").boolean());
+        assert(binding.at("scan_sha256").string()=="scan-digest");
+        discovery.responders[0].bitmap=std::array<std::uint8_t,4>{0x80,0,0,0};
+        assert(!compare_historical_discovery_scan(discovery,inspected).at("bitmap_unchanged").boolean());
+        discovery.eligible.clear();bool denied=false;
+        try{(void)compare_historical_discovery_scan(discovery,inspected);}catch(const std::invalid_argument&){denied=true;}
+        assert(denied);
         if(!driver)assert(inspected.other_sources==std::set<unsigned>{0x11});
         const auto proof=cd::json::parse_report(historical_scan_report(inspected));
         assert(proof.at("link_checksum_verified").boolean()!=driver&&!proof.at("physical_vehicle_verified").boolean());

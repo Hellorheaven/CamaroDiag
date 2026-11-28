@@ -1,5 +1,6 @@
 #pragma once
 #include "j1979_legacy_scan.hpp"
+#include "j1979_legacy_discovery_history.hpp"
 #include "j1979_legacy_info.hpp"
 #include "native_json.hpp"
 #include <map>
@@ -30,5 +31,7 @@ Frame inspect_driver_frame(const json::Value&,Protocol,unsigned source);
 Data driver_request_frame(Protocol,Bytes request);
 HistoricalScan inspect_historical_scan(const json::Value&,std::optional<std::string> expected_vin={});
 std::string historical_scan_report(const HistoricalScan&,std::string_view digest={});
+json::Value compare_historical_discovery_scan(const DiscoveryInspection&,const HistoricalScan&,
+    std::string_view discovery_digest={},std::string_view scan_digest={});
 void verify_historical_scan_summary(const json::Value&,HistoricalScan&);
 }
