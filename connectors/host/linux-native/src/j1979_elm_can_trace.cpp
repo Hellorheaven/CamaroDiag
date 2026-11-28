@@ -95,6 +95,7 @@ Replay replay_trace(const Trace& t){
         ++result.diagnostic_rows;
         if(row.status==-1){result.terminal_fault=true;++result.faults;continue;}
         const auto decoded=decode(row.raw,t.target,row.request);
+        require(t.operation!=TraceOperation::maintenance||!decoded.other_frames,"Unexpected CAN responder in maintenance evidence");
         if(row.status==1){
             require(decoded.status==DecodeStatus::no_data&&row.response.empty(),"Forged ELM NO DATA result");
             ++result.no_data;
@@ -106,6 +107,8 @@ Replay replay_trace(const Trace& t){
     return result;
 }
 Replay correlate_freeze(const Trace& t,const cf1_evidence& e){
+    require(cf1_valid_plan(&e.plan)&&e.observation_count<=CF1_MAX_STEPS&&
+        (!e.observation_count||e.observations),"Invalid CF1 evidence bounds");
     require(t.operation==TraceOperation::freeze&&t.vin==e.plan.vin&&t.target.tx==e.plan.tx&&
         t.target.rx==e.plan.rx&&t.target.extended()==e.plan.extended,"ELM/CF1 scope mismatch");
     const auto r=replay_trace(t);
@@ -117,6 +120,8 @@ Replay correlate_freeze(const Trace& t,const cf1_evidence& e){
     size_t next=r.setup_rows;
     for(size_t i=0;i<e.observation_count;++i){
         const auto& x=e.observations[i];
+        require(x.request_length>=1&&x.request_length<=3&&x.response_length<=CF1_MAX_RESPONSE&&
+            (!x.response_length||x.response),"Invalid CF1 observation bounds");
         if(!x.attempted)continue;
         require(next<t.rows.size(),"Missing ELM evidence for attempted CF1 observation");
         const auto& row=t.rows[next++];

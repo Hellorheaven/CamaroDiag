@@ -39,7 +39,7 @@ class Session{
     std::vector<Observation> evidence_;
     std::string setup(std::string_view,unsigned);
     void record(Observation);
-    int exchange_admitted(Bytes,std::span<uint8_t>,std::size_t&,unsigned,bool);
+    int exchange_admitted(Bytes,std::span<uint8_t>,std::size_t&,unsigned,bool,bool exclusive_response=false);
 public:
     Session(legacy::Link&,Scope,legacy::Current);
     Session(const Session&)=delete;

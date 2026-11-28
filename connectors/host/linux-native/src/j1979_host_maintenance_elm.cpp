@@ -31,7 +31,7 @@ class ElmOwner final:public Campaign::Owner,public Campaign::Link {
         // This private entry point is not accessible through generic scan,
         // live, freeze or raw commands. The shared recipe controls every call.
         const int rc=session_.exchange_admitted({q,n},result.response,size,
-            timeout-static_cast<unsigned>(ready-started),true);
+            timeout-static_cast<unsigned>(ready-started),true,true);
         const auto ended=legacy::monotonic_ms();
         if(ended<started||ended-started>timeout||!active())return;
         result.elapsedMs=static_cast<uint32_t>(ended-started);

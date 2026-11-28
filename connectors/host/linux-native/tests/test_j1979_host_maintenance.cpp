@@ -206,6 +206,25 @@ void elm_failures(){
         assert(!r.result.evidence.summary.attempted&&fake.mutations==0&&fake.closed);
     }
     {
+        Directory d;ElmFixture fake(d.path);fake.setup(6);fake.identity(header);
+        fake.add("020800",header+"06 48 00 80 00 00 00\r7E9 06 48 00 80 00 00 00");
+        auto r=run_elm(p,target,fake,[]{return true;},d.path.c_str(),"session.cm",true,true);
+        assert(!r.result.evidence.summary.attempted&&fake.mutations==0&&fake.closed);
+        assert(r.observations.back().status==-1);
+        assert(r.observations.back().error=="Unexpected CAN responder in maintenance session");
+    }
+    {
+        Directory d;ElmFixture fake(d.path);fake.setup(6);fake.admission(header,false);fake.recheck(header,false);
+        fake.add("020801",header+"02 48 01\r7E9 02 48 01");
+        auto r=run_elm(p,target,fake,[]{return true;},d.path.c_str(),"session.cm",true,true);
+        assert(r.result.evidence.summary.attempted&&!r.result.evidence.summary.acknowledged);
+        assert(r.result.recovery_latched&&fake.mutations==1&&fake.closed);
+        cd::elmcan::Trace trace{target,"1G1FA1RXXR0123456",cd::elmcan::TraceOperation::maintenance,r.observations};
+        assert(cd::elmcan::replay_trace(trace).terminal_fault);
+        trace.rows.back().status=0;trace.rows.back().error.clear();trace.rows.back().response={0x48,1};
+        rejected([&]{cd::elmcan::replay_trace(trace);});
+    }
+    {
         Directory d;ElmFixture fake(d.path);fake.setup(6);fake.admission(header,false);fake.recheck(header,false);
         fake.add("020801",header+"02 48 01");fake.disconnect=true;
         const auto r=run_elm(p,target,fake,[]{return true;},d.path.c_str(),"session.cm",true,true);

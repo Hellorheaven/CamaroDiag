@@ -81,7 +81,7 @@ int Session::exchange(Bytes request,std::span<uint8_t> response,std::size_t& siz
 int Session::exchange_freeze(const J1979FreezeScope& plan,Bytes request,std::span<uint8_t> response,std::size_t& size,unsigned timeout){
     return exchange_admitted(request,response,size,timeout,plan.valid()&&plan.allows(request.data(),request.size()));
 }
-int Session::exchange_admitted(Bytes request,std::span<uint8_t> response,std::size_t& size,unsigned timeout,bool allowed){
+int Session::exchange_admitted(Bytes request,std::span<uint8_t> response,std::size_t& size,unsigned timeout,bool allowed,bool exclusive_response){
     const auto capacity=std::min(size,response.size());size=0;
     if(!current()||!allowed||request.empty()||request.size()>7||
         !capacity||timeout<1||timeout>2500||evidence_.size()>=max_rows||max_raw-total_raw_<32768)return -1;
@@ -94,6 +94,7 @@ int Session::exchange_admitted(Bytes request,std::span<uint8_t> response,std::si
         row.raw=link_.command(row.command,timeout);row.duration_ms=elapsed(start);
         if(row.duration_ms>=timeout||!current())throw legacy::TransportError("ELM CAN exchange context or deadline changed");
         const auto decoded=decode(row.raw,scope_,request);
+        if(exclusive_response&&decoded.other_frames)throw legacy::TransportError("Unexpected CAN responder in maintenance session");
         if(decoded.status==DecodeStatus::no_data)status=1;
         else{
             if(decoded.payload.size()>capacity)throw legacy::TransportError("ELM CAN output buffer too small");
