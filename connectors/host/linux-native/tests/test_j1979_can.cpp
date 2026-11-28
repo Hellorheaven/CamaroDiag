@@ -120,6 +120,24 @@ int main(void) {
     assert(!j1979_can_allowed_read(bad3,3));
     assert(j1979_can_allowed_read(good,3));
 
+    // The application classifier never opens a transport or upgrades a
+    // malformed Mode 06/41/50 record to a successful raw observation.
+    j1979_can_step check{};
+    const uint8_t q6[]{6,1}, r6[]{0x46,1,1,7,0,1,0,0,0,2};
+    assert(j1979_can_classify_read(q6,2,r6,sizeof(r6),&check));
+    assert(!strcmp(check.status,"RAW"));
+    assert(!j1979_can_classify_read(q6,2,r6,sizeof(r6)-1,&check));
+    assert(!strcmp(check.status,"FAILED")&&!strcmp(check.detail,"INVALID_MODE06_RECORDS"));
+    const uint8_t q50[]{1,0x50},r50[]{0x41,0x50,1,0,0,1};
+    assert(!j1979_can_classify_read(q50,2,r50,sizeof(r50),&check));
+    assert(!strcmp(check.detail,"INVALID_PID50_CONFIGURATION"));
+    assert(!j1979_can_classify_read(q50,2,r50,3,&check));
+    const uint8_t q41[]{1,0x41},r41[]{0x41,0x41,1,0,0,0};
+    assert(!j1979_can_classify_read(q41,2,r41,sizeof(r41),&check));
+    assert(!strcmp(check.detail,"INVALID_DRIVE_CYCLE_RECORD"));
+    assert(!j1979_can_classify_read(bad1,1,r6,sizeof(r6),&check));
+    assert(!strcmp(check.detail,"UNSAFE_SERVICE_REJECTED"));
+
     stub s{}; s.current=true;
     j1979_can_plan p=plan(&s);
     j1979_can_result refused{};

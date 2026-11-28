@@ -64,10 +64,17 @@ static int pid_width(unsigned service, uint8_t pid) {
         default: return -1; /* undecoded RAW, never invented width */
     }
 }
-static bool valid_response(const uint8_t *request, size_t count,
-                           const uint8_t *response, size_t n,
-                           j1979_can_step *step) {
-    if (n == 0 || n > J1979_CAN_MAX_PAYLOAD) {
+bool j1979_can_classify_read(const uint8_t *request, size_t count,
+                            const uint8_t *response, size_t n,
+                            j1979_can_step *step) {
+    if (!step) return false;
+    snprintf(step->status,sizeof(step->status),"FAILED");
+    step->detail[0]='\0';
+    if (!j1979_can_allowed_read(request,count)) {
+        snprintf(step->detail,sizeof(step->detail),"UNSAFE_SERVICE_REJECTED");
+        return false;
+    }
+    if (!response || n == 0 || n > J1979_CAN_MAX_PAYLOAD) {
         snprintf(step->detail, sizeof(step->detail), "INVALID_LENGTH");
         return false;
     }
@@ -107,6 +114,21 @@ static bool valid_response(const uint8_t *request, size_t count,
             snprintf(step->detail, sizeof(step->detail), "INVALID_PID_WIDTH");
             return false;
         }
+    }
+    if (request[0]==6 && request[1]%32u!=0 &&
+        !j1979_monitor_count(request,response,n)) {
+        snprintf(step->detail,sizeof(step->detail),"INVALID_MODE06_RECORDS");
+        return false;
+    }
+    if (request[0]==1 && request[1]==0x50 &&
+        (response[3]||response[4]||response[5])) {
+        snprintf(step->detail,sizeof(step->detail),"INVALID_PID50_CONFIGURATION");
+        return false;
+    }
+    if (request[0]==1 && request[1]==0x41 &&
+        !cd::j1979::drive_cycle({response+2,n-2},std::nullopt)) {
+        snprintf(step->detail,sizeof(step->detail),"INVALID_DRIVE_CYCLE_RECORD");
+        return false;
     }
     if (request[0]==9 &&
         (request[1]==8 || request[1]==11 ||
@@ -196,7 +218,7 @@ static j1979_can_step *read_one(const j1979_can_plan *p, j1979_can_result *r,
         snprintf(step->detail, sizeof(step->detail), "TRANSPORT_ERROR");
         stop(r, "TRANSPORT_ERROR"); return step;
     }
-    if (!valid_response(request, count, answer.data(), capacity, step)) {
+    if (!j1979_can_classify_read(request, count, answer.data(), capacity, step)) {
         snprintf(step->status, sizeof(step->status), "FAILED");
     }
     return step;

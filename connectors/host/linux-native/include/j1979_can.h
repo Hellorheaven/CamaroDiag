@@ -64,6 +64,11 @@ typedef struct {
 bool j1979_can_physical_pair(uint32_t tx, uint32_t rx);
 bool j1979_can_allowed_read(const uint8_t *request, size_t size);
 bool j1979_can_valid_vin(const char *vin);
+/* Pure response classification shared by acquisition and offline replay.
+ * Writes only status/detail; does not allocate response storage or exchange frames.
+ * Inventory/VIN/freeze promotion remains the caller's plan-specific responsibility. */
+bool j1979_can_classify_read(const uint8_t *request,size_t request_size,
+    const uint8_t *response,size_t response_size,j1979_can_step *step);
 int j1979_can_scan(const j1979_can_plan *plan, j1979_can_result *result);
 void j1979_can_result_free(j1979_can_result *result);
 /* Distinct schema: a raw observation is not a decoded/attested ECU value. */
