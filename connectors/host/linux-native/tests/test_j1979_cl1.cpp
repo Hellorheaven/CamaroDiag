@@ -116,6 +116,17 @@ int main(void) {
     assert(verify_cl1_scalar(scalar,cd::json::parse_report(cd::json::serialize(scalar.report))));
     auto changed=scalar.report.object();changed["capture_sha256"]=cd::json::Value{std::string(64,'b')};
     assert(!verify_cl1_scalar(scalar,cd::json::Value{changed}));
+    auto portable=scalar.report.object();
+    auto samples_portable=portable.at("samples").array();
+    auto sample_portable=samples_portable[0].object();
+    sample_portable["number"]=cd::json::Value{cd::json::Integer{"1726"}};
+    samples_portable[0]=cd::json::Value{sample_portable};
+    portable["samples"]=cd::json::Value{samples_portable};
+    assert(verify_cl1_scalar(scalar,cd::json::Value{portable}));
+    sample_portable["number"]=cd::json::Value{cd::json::Integer{"1727"}};
+    samples_portable[0]=cd::json::Value{sample_portable};
+    portable["samples"]=cd::json::Value{samples_portable};
+    assert(!verify_cl1_scalar(scalar,cd::json::Value{portable}));
     assert(cl1_scalar_csv(scalar).find("DOCUMENTED_SCALAR")!=std::string::npos);
     const std::array runs{projected,projected};
     const std::array hashes{std::string(64,'a'),std::string(64,'b')};

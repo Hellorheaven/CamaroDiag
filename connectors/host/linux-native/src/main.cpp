@@ -3093,6 +3093,10 @@ static void usage(FILE *stream) {
         "  camarodiag-native project-cl1-live --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output NUMERIC.json\n"
         "  camarodiag-native export-cl1-live-csv --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native verify-cl1-live-projection --capture CAPTURE.cl --projection NUMERIC.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "  camarodiag-native project-cl1-scalar --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output SCALAR.json\n"
+        "  camarodiag-native export-cl1-scalar-csv --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output SCALAR.csv\n"
+        "  camarodiag-native verify-cl1-scalar --capture CAPTURE.cl --projection SCALAR.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "    Scalar JSON is the portable Android/Windows contract. The enriched native projection is separate.\n"
         "  camarodiag-native export-native-live-csv --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native export-legacy-live-csv --capture CAPTURE.llr --protocol 2 --source 10 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native compare-native-live --report A.json --report B.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
@@ -3319,7 +3323,10 @@ static int socket_campaign_cli(int argc,char** argv,std::string_view command){
 }
 static int cl1_numeric_cli(int argc,char** argv,std::string_view operation){
     const char *capture=nullptr,*vin=nullptr,*tx=nullptr,*rx=nullptr,*output=nullptr,*projection=nullptr;
-    const bool verify=operation=="verify-cl1-live-projection",csv=operation=="export-cl1-live-csv";
+    const bool scalar=operation=="project-cl1-scalar"||operation=="export-cl1-scalar-csv"||
+        operation=="verify-cl1-scalar";
+    const bool verify=operation=="verify-cl1-live-projection"||operation=="verify-cl1-scalar";
+    const bool csv=operation=="export-cl1-live-csv"||operation=="export-cl1-scalar-csv";
     for(int i=2;i<argc;){
         const std::string_view key(argv[i++]);
         if(i>=argc||!*argv[i]||std::string_view(argv[i]).starts_with("--"))
@@ -3348,15 +3355,18 @@ static int cl1_numeric_cli(int argc,char** argv,std::string_view operation){
         constexpr std::size_t max_report=64u*1024u*1024u;
         input raw{},stored{};
         if(!load_regular(capture,CL1_MAX_CAPTURE,&raw))return error("Invalid bounded CL/1 capture");
-        auto result=cd::network::history::bind_native_live_projection(
-            cd::network::history::project_cl1_live({raw.bytes.get(),raw.length},{address(tx),address(rx)},vin),
-            raw.digest);
+        const cd::network::Pair pair{address(tx),address(rx)};
+        const std::span<const std::uint8_t> original{raw.bytes.get(),raw.length};
+        auto result=scalar?cd::network::history::project_cl1_scalar(original,pair,vin,raw.digest):
+            cd::network::history::bind_native_live_projection(
+                cd::network::history::project_cl1_live(original,pair,vin),raw.digest);
         const auto canonical=cd::json::serialize(result.report)+"\n";
         if(verify){
             if(!load_regular(projection,max_report,&stored)||!separate(&raw,&stored))
                 return error("Distinct bounded CL/1 projection required");
-            const bool matches=stored.length==canonical.size()&&
-                !memcmp(stored.bytes.get(),canonical.data(),canonical.size());
+            const bool matches=scalar?cd::network::history::verify_cl1_scalar(result,
+                cd::json::parse_report({reinterpret_cast<const char*>(stored.bytes.get()),stored.length},max_report)):
+                stored.length==canonical.size()&&!memcmp(stored.bytes.get(),canonical.data(),canonical.size());
             if(!matches)return error("Stored CL/1 projection differs from independent replay");
             if(!recheck_input(projection,max_report,stored)||!recheck_input(capture,CL1_MAX_CAPTURE,raw))
                 return error("CL/1 projection or capture changed during replay");
@@ -3367,7 +3377,8 @@ static int cl1_numeric_cli(int argc,char** argv,std::string_view operation){
             if(!atomic_create(output,proof.data(),proof.size()))return error("CL/1 proof destination unavailable");
             return 0;
         }
-        const auto data=csv?cd::network::history::native_live_csv(result):canonical;
+        const auto data=csv?(scalar?cd::network::history::cl1_scalar_csv(result):
+            cd::network::history::native_live_csv(result)):canonical;
         if(!recheck_input(capture,CL1_MAX_CAPTURE,raw))return error("CL/1 source changed during numeric replay");
         if(!atomic_create(output,data.data(),data.size()))return error("CL/1 numeric destination unavailable");
         return result.complete?0:2;
@@ -3605,7 +3616,9 @@ int main(int argc, char **argv) {
     if(argc>=2&&!strcmp(argv[1],"verify-network-journals"))return verify_network_journal_cli(argc,argv);
     if(argc>=2&&(!strcmp(argv[1],"inspect-socketcan-journal")||!strcmp(argv[1],"recover-socketcan-report")||!strcmp(argv[1],"verify-socketcan-journal")))return socket_campaign_cli(argc,argv,argv[1]);
     if(argc>=2&&(!strcmp(argv[1],"project-cl1-live")||!strcmp(argv[1],"export-cl1-live-csv")||
-        !strcmp(argv[1],"verify-cl1-live-projection")))return cl1_numeric_cli(argc,argv,argv[1]);
+        !strcmp(argv[1],"verify-cl1-live-projection")||!strcmp(argv[1],"project-cl1-scalar")||
+        !strcmp(argv[1],"export-cl1-scalar-csv")||!strcmp(argv[1],"verify-cl1-scalar")))
+        return cl1_numeric_cli(argc,argv,argv[1]);
     if(argc>=2&&!strcmp(argv[1],"project-native-live"))return project_native_live_cli(argc,argv,false);
     if(argc>=2&&!strcmp(argv[1],"export-native-live-csv"))return project_native_live_cli(argc,argv,true);
     if(argc>=2&&!strcmp(argv[1],"export-legacy-live-csv"))return legacy_live_csv_cli(argc,argv);

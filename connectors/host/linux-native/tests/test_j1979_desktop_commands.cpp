@@ -90,6 +90,12 @@ int main(){
     rejects([&]{(void)prepare(find("verify-cl1-projection"),usb_numeric);});
     usb_numeric["projection"]=report;
     assert(prepare(find("verify-cl1-projection"),usb_numeric).args.front()=="verify-cl1-live-projection");
+    usb_numeric.erase("projection");
+    assert(prepare(find("project-cl1-scalar"),usb_numeric).args.front()=="project-cl1-scalar");
+    assert(prepare(find("csv-cl1-scalar"),usb_numeric).args.front()=="export-cl1-scalar-csv");
+    rejects([&]{(void)prepare(find("verify-cl1-scalar"),usb_numeric);});
+    usb_numeric["projection"]=report;
+    assert(prepare(find("verify-cl1-scalar"),usb_numeric).args.front()=="verify-cl1-scalar");
     usb_numeric["rx"]="7E9";rejects([&]{(void)prepare(find("verify-cl1-projection"),usb_numeric);});
     auto invalid=verify;invalid["output"]=report;
     rejects([&]{(void)prepare(find("verify-native-live"),invalid);});
