@@ -21,12 +21,15 @@ Recipe recipe(MutationOperation operation){
     }else p.steps.emplace_back("SUPPORT","08000000000000");
     p.steps.insert(p.steps.end(),{{"SCOPE","0100"},{"STATIONARY","010D"},{"STATIONARY","010C"}});
     p.baseline=p.steps.size();
-    p.steps.insert(p.steps.end(),{{"PROTOCOL","ATDPN"},{"SCOPE","0100"},{"IDENTITY","0901"},{"IDENTITY","0902"},
-        {"STATIONARY","010D"},{"STATIONARY","010C"}});
+    p.steps.insert(p.steps.end(),{{"PROTOCOL","ATDPN"},{"SCOPE","0100"},{"IDENTITY","0901"},{"IDENTITY","0902"}});
+    if(operation==MutationOperation::evap)p.steps.emplace_back("SUPPORT","08000000000000");
+    p.steps.insert(p.steps.end(),{{"STATIONARY","010D"},{"STATIONARY","010C"}});
     p.intent=p.steps.size();
     p.steps.emplace_back("MUTATION",operation==MutationOperation::clear?"04":"08010000000000");
-    if(operation==MutationOperation::clear)
+    if(operation==MutationOperation::clear){
         for(auto q:{"03","07","0A","0101"})p.steps.emplace_back("AFTER",q);
+        p.steps.insert(p.steps.end(),{{"SCOPE","0100"},{"IDENTITY","0901"},{"IDENTITY","0902"}});
+    }
     return p;
 }
 using Grouped=std::map<unsigned,std::vector<Data>>;

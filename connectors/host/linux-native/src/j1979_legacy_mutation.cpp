@@ -222,7 +222,7 @@ public:
             }else if(!support())return finish("NOT_TESTED","EVAP_TARGET_UNVERIFIED");
             if(!scope()||!parked())return finish("NOT_TESTED","STATIONARY_OR_SCOPE_UNVERIFIED");
             journal_("BASELINE",r_);r_.baseline_saved=true;
-            if(!protocol()||!scope()||!identity()||!parked())return finish("NOT_TESTED","CONTEXT_CHANGED_BEFORE_INTENT");
+            if(!protocol()||!scope()||!identity()||(!clear&&!support())||!parked())return finish("NOT_TESTED","CONTEXT_CHANGED_BEFORE_INTENT");
             if(!freshness(elapsed()))return finish("NOT_TESTED","STALE_STATIONARY_OR_IDENTITY_EVIDENCE");
             (void)remaining();
             journal_("INTENT",r_);r_.intent_saved=true;
@@ -232,6 +232,8 @@ public:
             ack(rows);
             if(clear){
                 snapshot("AFTER",r_.after);
+                const bool final_identity=scope()&&identity();
+                if(r_.complete_ack&&!final_identity)return finish("ACKNOWLEDGED_PARTIAL","FINAL_IDENTITY_UNVERIFIED");
                 if(r_.complete_ack&&verified(r_.after,3)){
                     if(!verified(r_.after,7))return finish("ACKNOWLEDGED_PARTIAL","PENDING_READBACK_UNAVAILABLE");
                     if(residual())return finish("ACKNOWLEDGED_READBACK","DTCS_STILL_PRESENT");

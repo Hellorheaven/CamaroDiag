@@ -66,7 +66,12 @@ struct Fake:Link{
         else add("08000000000000",wire(p,0x10,{0x48,0,0,0x80,0,0,0})+wire(p,0x20,{0x48,0,0,0,0,0,0}));
         scope();parked();
     }
-    void recheck(){probe();scope();identity();parked();}
+    void recheck(MutationOperation op=MutationOperation::clear){
+        probe();scope();identity();
+        if(op==MutationOperation::evap)add("08000000000000",wire(p,0x10,{0x48,0,0,0x80,0,0,0})+wire(p,0x20,{0x48,0,0,0,0,0,0}));
+        parked();
+    }
+    void after(bool remaining=false,bool pending_missing=false,std::string_view final_vin=vin){snapshot(remaining,pending_missing);scope();identity(final_vin);}
 };
 MutationPlan plan(Protocol p,MutationOperation op){
     return {p,op,std::string(vin),0x10,60000,{0x10,0x20}};
@@ -104,7 +109,7 @@ void variants(){
     for(unsigned n=1;n<=5;++n){
         const auto p=static_cast<Protocol>(n);
         Fake clear(p);clear.admission(MutationOperation::clear);clear.recheck();
-        clear.add("04",clear.pair({0x44}));clear.snapshot();
+        clear.add("04",clear.pair({0x44}));clear.after();
         const auto result=run(clear,MutationOperation::clear);
         assert(result.attempted&&result.complete_ack&&result.baseline_saved&&result.intent_saved);
         assert(result.outcome=="ACKNOWLEDGED_READBACK"&&result.reason.empty()&&clear.mutation_count==1&&clear.script.empty());
@@ -124,7 +129,7 @@ void variants(){
         rejects([&]{inspect_mutation(mutation_report(forged),clear.baseline_json,clear.intent_json,vin);});
         forged=result;forged.observations.push_back(forged.observations.back());
         rejects([&]{inspect_mutation(mutation_report(forged),clear.baseline_json,clear.intent_json,vin);});
-        Fake evap(p);evap.admission(MutationOperation::evap);evap.recheck();
+        Fake evap(p);evap.admission(MutationOperation::evap);evap.recheck(MutationOperation::evap);
         evap.add("08010000000000",wire(p,0x10,{0x48,1,0,0,0,0,0}));
         auto e=run(evap,MutationOperation::evap);
         assert(e.outcome=="ACKNOWLEDGED"&&e.reason=="LEAK_TEST_NOT_PERFORMED"&&evap.mutation_count==1);
@@ -151,16 +156,20 @@ void failures(){
     auto u=run(unknown,MutationOperation::clear);
     assert(u.attempted&&u.outcome=="UNCERTAIN"&&u.unexpected_sources.contains(0x30));
     Fake refused(p);refused.admission(MutationOperation::clear);refused.recheck();
-    refused.add("04",wire(p,0x10,{0x44})+wire(p,0x20,{0x7f,4,0x22}));refused.snapshot();
+    refused.add("04",wire(p,0x10,{0x44})+wire(p,0x20,{0x7f,4,0x22}));refused.after();
     auto r=run(refused,MutationOperation::clear);
     assert(r.outcome=="UNCERTAIN"&&r.acknowledgments.at(0x20)=="REFUSED_22");
     Fake remaining(p);remaining.admission(MutationOperation::clear);remaining.recheck();
-    remaining.add("04",remaining.pair({0x44}));remaining.snapshot(true);
+    remaining.add("04",remaining.pair({0x44}));remaining.after(true);
     auto residual=run(remaining,MutationOperation::clear);
     assert(residual.reason=="DTCS_STILL_PRESENT"&&residual.outcome=="ACKNOWLEDGED_READBACK");
     Fake optional(p);optional.admission(MutationOperation::clear);optional.recheck();
-    optional.add("04",optional.pair({0x44}));optional.snapshot(false,true);
+    optional.add("04",optional.pair({0x44}));optional.after(false,true);
     assert(run(optional,MutationOperation::clear).reason=="PENDING_READBACK_UNAVAILABLE");
+    Fake changed(p);changed.admission(MutationOperation::clear);changed.recheck();
+    changed.add("04",changed.pair({0x44}));changed.after(false,false,"1G1YY22G965109877");
+    auto identity=run(changed,MutationOperation::clear);
+    assert(identity.complete_ack&&identity.outcome=="ACKNOWLEDGED_PARTIAL"&&identity.reason=="FINAL_IDENTITY_UNVERIFIED");
     auto bad=plan(p,MutationOperation::clear);bad.engine=0x30;assert(!bad.valid());
     bad=plan(p,MutationOperation::clear);bad.sources.insert(0xff);assert(!bad.valid());
     rejects([&]{mutation_response_frames(plan(p,MutationOperation::clear),Data{8,1,0,0,0,0,0},"NO DATA");});
