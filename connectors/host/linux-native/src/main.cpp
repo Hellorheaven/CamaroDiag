@@ -28,6 +28,7 @@
 #include "j1979_native_live_inspection.hpp"
 #include "j1979_historical_can_plan.hpp"
 #include "j1979_legacy_discovery_history.hpp"
+#include "j1979_legacy_scan_history.hpp"
 #include "j1979_legacy_discovery_binding.hpp"
 #include "j1979_legacy_freeze_wire.hpp"
 #include "j1979_legacy_live_wire.hpp"
@@ -2823,6 +2824,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
         "  camarodiag-native --inspect-j1979-native-live TX RX VIN REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-native-can-plan TX RX VIN REPORT.json PROOF.json\n"
+        "  camarodiag-native verify-legacy --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-network --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-can-network VIN|- REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-can-plan historical|android VIN|- REPORT.json PROOF.json\n"
@@ -2949,6 +2951,30 @@ static int native_can_plan_cli(const char* tx_text,const char* rx_text,const cha
         return 0;
     }catch(const std::exception& e){return error(e.what());}
 }
+static int verify_legacy_compat_cli(int argc,char** argv){
+    const char* path=nullptr;const char* output=nullptr;std::optional<std::string> vin;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing verify-legacy option value");
+        const char* value=argv[i++];
+        if(key=="--report"&&!path)path=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else return error("Unexpected or duplicate verify-legacy option");
+    }
+    if(!path||!output)return error("verify-legacy requires --report and --output");
+    try{
+        constexpr std::size_t maximum=64u*1024u*1024u;
+        input original{},again{};
+        if(!load_regular(path,maximum,&original))return error("Bounded selected-source legacy report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const auto checked=cd::legacy::history::inspect_historical_scan(cd::json::parse_report(raw,maximum),vin);
+        const auto proof=cd::legacy::history::historical_scan_report(checked,original.digest);
+        if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Legacy report changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Legacy proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
 static int verify_network_compat_cli(int argc,char** argv){
     const char* path=nullptr;const char* vin="-";const char* output=nullptr;
     bool vin_seen=false;
@@ -2968,6 +2994,7 @@ static int verify_network_compat_cli(int argc,char** argv){
 int main(int argc, char **argv) {
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-live"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-can-plan"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
+    if(argc>=2&&!strcmp(argv[1],"verify-legacy"))return verify_legacy_compat_cli(argc,argv);
     if(argc>=2&&!strcmp(argv[1],"verify-network"))return verify_network_compat_cli(argc,argv);
     if(argc==5&&!strcmp(argv[1],"--inspect-j1979-historical-can-network"))return historical_can_network_cli(argv[2],argv[3],argv[4]);
     if(argc==6&&!strcmp(argv[1],"--inspect-j1979-historical-can-plan"))return historical_can_plan_cli(argv[2],argv[3],argv[4],argv[5]);
