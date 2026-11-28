@@ -74,7 +74,7 @@ class Recording final:public Channel {
         ++event_count_;pending_.push_back(std::move(e));
     }
     void flush(){
-        for(const auto& e:pending_)writer_.append(e);
+        writer_.append_batch(pending_);
         pending_.clear();
     }
 public:

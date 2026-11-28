@@ -58,6 +58,7 @@ public:
     Writer(const Writer&)=delete;
     Writer& operator=(const Writer&)=delete;
     void append(const Event&);
+    void append_batch(std::span<const Event>);
     bool healthy()const noexcept{return !failed_&&!finished_;}
 };
 // All callback implementations are injected; replay never opens a transport.

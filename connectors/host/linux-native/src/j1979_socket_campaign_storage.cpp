@@ -50,8 +50,27 @@ void Writer::persist(Bytes b){
     bytes_+=b.size();
 }
 void Writer::append(const Event& event){
-    if(sequence_>=max_events){failed_=true;throw std::runtime_error("SCJ event limit");}
-    persist(encode_event(event,sequence_));
-    ++sequence_;finished_=event.kind==Kind::terminal;
+    append_batch(std::span<const Event>(&event,1));
+}
+void Writer::append_batch(std::span<const Event> events){
+    if(events.empty())return;
+    if(failed_||finished_||events.size()>max_events-sequence_){
+        failed_=true;throw std::runtime_error("SCJ event limit or terminal reached");
+    }
+    Data wire;
+    for(std::size_t i=0;i<events.size();++i){
+        if(events[i].kind==Kind::terminal&&i+1!=events.size()){
+            failed_=true;throw std::runtime_error("SCJ terminal must be last");
+        }
+        const auto frame=encode_event(events[i],sequence_+i);
+        if(frame.size()>max_journal-bytes_-wire.size()){
+            failed_=true;throw std::runtime_error("SCJ batch exceeds journal bound");
+        }
+        wire.insert(wire.end(),frame.begin(),frame.end());
+    }
+    // One fsync/readback per group: all callback observations and intent
+    // are durable before the vehicle request, without a sync per clock tick.
+    persist(wire);
+    sequence_+=events.size();finished_=events.back().kind==Kind::terminal;
 }
 }
