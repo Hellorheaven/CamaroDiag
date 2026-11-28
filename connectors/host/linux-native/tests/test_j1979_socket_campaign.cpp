@@ -108,6 +108,12 @@ void complete(bool live,Fake f={}){
         assert(projected.source_sha256==sha256(data)&&projected.raw_report_sha256==sha256(r.report));
         assert(projected.projection.report.at("transport_recipe_replayed").boolean());
         assert(projected.projection.report.at("evidence_kind").string()=="SCJ/1");
+        const auto report=cd::network::history::project_live_evidence(LiveEvidenceKind::report,
+            {reinterpret_cast<const std::uint8_t*>(r.report.data()),r.report.size()},{0x7e0,0x7e8},vin);
+        assert(!report.projection.report.at("original_capture_replayed").boolean());
+        const std::array duplicate{projected.projection,report.projection};
+        const std::array digests{projected.source_sha256,report.source_sha256};
+        rejects([&]{(void)cd::network::history::compare_native_live(duplicate,digests);});
         const auto proof=cd::network::history::verify_live_evidence(projected,projected.projection.report,std::string(64,'a'));
         assert(proof.at("consistent").boolean());
         auto tampered=projected.projection.report.object();

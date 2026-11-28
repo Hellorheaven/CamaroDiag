@@ -3109,7 +3109,8 @@ static void usage(FILE *stream) {
         "  camarodiag-native export-native-live-csv --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native export-legacy-live-csv --capture CAPTURE.llr --protocol 2 --source 10 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native compare-native-live --report A.json --report B.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
-        "    Use --cl1 CAPTURE.cl instead of --report for each original USB capture (2 to 16 sources).\n"
+        "    Sources: --cl1 CAPTURE.cl, --scj JOURNAL.scj, --ecp CAMPAIGN.ecp or --report RAW.json; 2 to 16 sources.\n"
+        "    Specify --profile 6/7/8/9 for all ECP sources. Identical replayed raw reports cannot count twice.\n"
         "  camarodiag-native compare-live --report A.json --report B.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-native-freeze --capture CAPTURE.cf --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-j1979-capture --capture CAPTURE.cj1 --report REPORT.json [--vin VIN] --output PROOF.json\n"
@@ -3547,21 +3548,31 @@ static int live_evidence_cli(int argc,char** argv,std::string_view command){
 }
 
 static int compare_native_live_cli(int argc,char** argv){
-    struct Source {const char* path;bool cl1;};
+    using namespace cd::network::history;
+    struct Source {const char* path;LiveEvidenceKind kind;};
     std::vector<Source> paths;
     const char* output=nullptr;const char* vin=nullptr;const char* tx=nullptr;const char* rx=nullptr;
+    const char* profile=nullptr;bool ecp=false;
     for(int i=2;i<argc;){
         const std::string_view key(argv[i++]);
         if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing native comparison option");
         const char* value=argv[i++];
-        if((key=="--report"||key=="--cl1")&&paths.size()<16)paths.push_back({value,key=="--cl1"});
+        if((key=="--report"||key=="--cl1"||key=="--scj"||key=="--ecp")&&paths.size()<16){
+            const auto kind=key=="--report"?LiveEvidenceKind::report:key=="--cl1"?LiveEvidenceKind::cl1:
+                key=="--scj"?LiveEvidenceKind::socket_journal:LiveEvidenceKind::elm_campaign;
+            paths.push_back({value,kind});ecp=ecp||kind==LiveEvidenceKind::elm_campaign;
+        }
+        else if(key=="--profile"&&!profile)profile=value;
         else if(key=="--output"&&!output)output=value;
         else if(key=="--vin"&&!vin)vin=value;
         else if(key=="--tx"&&!tx)tx=value;
         else if(key=="--rx"&&!rx)rx=value;
         else return error("Unexpected or duplicate native comparison option");
     }
-    if(paths.size()<2||!output||!vin||!tx||!rx)return error("Native comparison requires 2 to 16 raw reports or CL/1 captures, TX, RX, VIN and output");
+    uint32_t selected_profile=0;
+    if(paths.size()<2||!output||!vin||!tx||!rx||ecp!=bool(profile)||
+        (profile&&(!decimal_uint32(profile,&selected_profile)||selected_profile<6||selected_profile>9)))
+        return error("Comparison requires 2 to 16 original sources, independent TX/RX/VIN and ELM profile for ECP");
     try{
         auto id=[](std::string_view s){
             std::uint32_t n{};
@@ -3579,25 +3590,23 @@ static int compare_native_live_cli(int argc,char** argv){
         for(std::size_t i=0;i<paths.size();++i){
             auto& in=snapshots[i];
             const auto& source=paths[i];
-            const auto bound=source.cl1?static_cast<std::size_t>(CL1_MAX_CAPTURE):maximum;
+            const auto bound=source.kind==LiveEvidenceKind::cl1?static_cast<std::size_t>(CL1_MAX_CAPTURE):maximum;
             if(!load_regular(source.path,bound,&in)||in.length>total_limit-total)
                 return error("Bounded native comparison inputs required");
             for(std::size_t previous=0;previous<i;++previous)
                 if(!separate(&in,&snapshots[previous]))return error("Comparison inputs alias the same evidence");
             total+=in.length;
-            if(source.cl1){
-                projections.push_back(cd::network::history::project_cl1_live({in.bytes.get(),in.length},pair,vin));
-            }else{
-                const auto root=cd::json::parse_report({reinterpret_cast<const char*>(in.bytes.get()),in.length},maximum);
-                projections.push_back(cd::network::history::project_native_live(root,pair,vin));
-            }
-            digests.emplace_back(in.digest);
+            auto evidence=project_live_evidence(source.kind,{in.bytes.get(),in.length},pair,vin,
+                source.kind==LiveEvidenceKind::elm_campaign?selected_profile:0);
+            if(evidence.source_sha256!=in.digest)return error("Comparison source digest differs");
+            digests.push_back(evidence.source_sha256);
+            projections.push_back(std::move(evidence.projection));
         }
         const auto result=cd::network::history::compare_native_live(projections,digests);
         const auto proof=cd::json::serialize(result)+"\n";
         for(std::size_t i=0;i<paths.size();++i){
             input again{};
-            if(!load_regular(paths[i].path,paths[i].cl1?static_cast<std::size_t>(CL1_MAX_CAPTURE):maximum,&again)||!same_input(&snapshots[i],&again))
+            if(!load_regular(paths[i].path,paths[i].kind==LiveEvidenceKind::cl1?static_cast<std::size_t>(CL1_MAX_CAPTURE):maximum,&again)||!same_input(&snapshots[i],&again))
                 return error("Native comparison input changed");
         }
         if(!atomic_create(output,proof.data(),proof.size()))return error("Native comparison output unavailable");

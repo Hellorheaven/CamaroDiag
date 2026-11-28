@@ -139,7 +139,7 @@ const std::vector<Operation>& operations(){
         op("verify-live","Hors ligne — Live historique","Rejeu d’un rapport historique et de ses statistiques.","verify-live",{report(),vin(),output()}),
         op("verify-freeze","Hors ligne — Freeze historique CAN","Reconstruction de la recette et des déclencheurs.","verify-freeze",{report(),vin(),output()}),
         op("verify-legacy-freeze","Hors ligne — Freeze historique legacy","Reconstruction des échanges de la source sélectionnée.","verify-legacy-freeze",{report(),vin(),output()}),
-        op("compare-native-live","Hors ligne — Comparer les mesures CAN et USB","Compare les originaux natifs, sans comparer les projections éditées.","compare-native-live",{optional_report("report","Premier rapport CAN/ELM"),optional_report("second-report","Deuxième rapport CAN/ELM"),optional_cl1("cl1","Première capture CL/1"),optional_cl1("second-cl1","Deuxième capture CL/1"),tx(),rx(),vin(),output()}),
+        op("compare-native-live","Hors ligne — Comparer les mesures CAN et USB","Compare les preuves originales SCJ, ECP, CL/1 et les rapports bruts.","compare-native-live",{optional_report("report","Premier rapport CAN/ELM"),optional_report("second-report","Deuxième rapport CAN/ELM"),optional_cl1("cl1","Première capture CL/1"),optional_cl1("second-cl1","Deuxième capture CL/1"),optional_evidence("scj","Premier journal SCJ","--scj"),optional_evidence("second-scj","Deuxième journal SCJ","--scj"),optional_evidence("ecp","Première capture ECP","--ecp"),optional_evidence("second-ecp","Deuxième capture ECP","--ecp"),optional_profile(),tx(),rx(),vin(),output()}),
         op("compare-live","Hors ligne — Comparer les mesures historiques","Compare les rapports historiques sans interroger le véhicule.","compare-live",{report(),second_report(),vin(),output()}),
         op("verify-network-report","Hors ligne — Rapport réseau historique","Vérifie le rapport réseau indépendamment des journaux SCJ.","verify-network",{report(),vin(),output()}),
         op("verify-can-mutation","Hors ligne — Maintenance CAN historique","Vérifie la cohérence des preuves existantes ; aucune émission.","verify-can-mutation",{report(),baseline(),vin(),output()}),
@@ -286,11 +286,16 @@ Invocation prepare(const Operation& supplied,const Values& values){
     }
     if(op.id=="compare-native-live"){
         unsigned sources=0;
-        for(const auto* key:{"report","second-report","cl1","second-cl1"}){
+        bool ecp=false;
+        for(const auto* key:{"report","second-report","cl1","second-cl1","scj","second-scj","ecp","second-ecp"}){
             const auto it=values.find(key);
-            if(it!=values.end()&&!it->second.empty())++sources;
+            if(it!=values.end()&&!it->second.empty()){
+                ++sources;ecp=ecp||std::string_view(key).ends_with("ecp");
+            }
         }
-        require(sources>=2,"Au moins deux rapports bruts ou captures CL/1 sont nécessaires");
+        const auto p=values.find("profile");
+        require(sources>=2&&ecp==(p!=values.end()&&!p->second.empty()),
+            "Deux preuves au minimum ; profil ELM requis uniquement pour ECP");
     }
     if(op.id=="elm-live"){
         const auto given=[&](std::string_view key){

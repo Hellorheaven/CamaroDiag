@@ -132,6 +132,13 @@ int main(){
     compare.erase("second-cl1");compare.erase("report");compare["second-cl1"]=second;
     ready=prepare(find("compare-native-live"),compare);
     assert(std::count(ready.args.begin(),ready.args.end(),"--cl1")==2);
+    compare.erase("second-cl1");compare["scj"]=second;
+    ready=prepare(find("compare-native-live"),compare);
+    assert(std::count(ready.args.begin(),ready.args.end(),"--scj")==1);
+    compare.erase("scj");compare["ecp"]=second;
+    rejects([&]{(void)prepare(find("compare-native-live"),compare);});
+    compare["profile"]="6";ready=prepare(find("compare-native-live"),compare);
+    assert(std::count(ready.args.begin(),ready.args.end(),"--ecp")==1);
     Values legacy{{"protocol","2"},{"source","10"},{"vin",values["vin"]},{"capture",capture},{"report",report},{"output",proof}};
     ready=prepare(find("verify-legacy-live-capture"),legacy);
     assert((ready.args==std::vector<std::string>{"--verify-j1979-legacy-live","2","10",values["vin"],capture,report,proof}));

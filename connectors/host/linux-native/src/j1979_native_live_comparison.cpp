@@ -122,7 +122,7 @@ json::Value compare_native_live(std::span<const NativeLiveProjection> runs,std::
     const auto& tx=first.at("tx_can_id");
     const auto& rx=first.at("rx_can_id");
     const Pair expected{address(tx),address(rx)};
-    std::set<std::string> hashes;
+    std::set<std::string> hashes,raw_hashes;
     std::vector<Index> indices;
     std::set<Key> keys;
     std::set<unsigned> shared;
@@ -144,10 +144,19 @@ json::Value compare_native_live(std::span<const NativeLiveProjection> runs,std::
         }
         for(const auto& [k,c]:idx.channels){(void)c;keys.insert(k);}
         all_identity=all_identity&&idx.identity;all_complete=all_complete&&idx.complete;
-        sources.push_back(obj({{"source_sha256",str(digests[i])},{"transport",root.at("source_transport")},
+        Object source{{"source_sha256",str(digests[i])},{"transport",root.at("source_transport")},
             {"source_completed",root.at("source_completed")},{"identity_rechecked",flag(idx.identity)},
             {"numeric_projection_complete",flag(idx.complete)},{"completed_cycles",root.at("completed_cycles")},
-            {"requested_cycles",root.at("requested_cycles")}}));
+            {"requested_cycles",root.at("requested_cycles")}};
+        if(const auto* kind=root.find("evidence_kind")){
+            require(root.at("source_sha256").string()==digests[i],"Comparison evidence digest mismatch");
+            for(auto key:{"evidence_kind","raw_report_sha256","original_capture_replayed","transport_recipe_replayed"})
+                source.emplace(key,root.at(key));
+            const auto& raw=root.at("raw_report_sha256");
+            if(!raw.null())require(digest_ok(raw.string())&&raw_hashes.insert(raw.string()).second,
+                "Same replayed report cannot be counted as independent evidence");
+        }
+        sources.push_back(obj(std::move(source)));
         indices.push_back(std::move(idx));
     }
     Array shared_pids,coverage,comparisons;
