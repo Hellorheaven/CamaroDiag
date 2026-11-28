@@ -12,11 +12,13 @@ using namespace cd::network;
 namespace {
 constexpr char vin[]="1G1FA1RXXR0123456";
 constexpr Pair pair{0x7e0,0x7e8};
-struct Fake {unsigned count{};bool mismatch{},partial{},transport_fault{},inactive{};};
+struct Fake {unsigned count{};bool mismatch{},partial{},transport_fault{},inactive{},oversized{},bad_error_length{};};
 bool current(void* p){return !static_cast<Fake*>(p)->inactive;}
 std::uint64_t clock(void*){return 0;}
 int exchange(void* p,const std::uint8_t* q,std::size_t n,std::uint8_t* r,std::size_t* size,unsigned){
     auto& f=*static_cast<Fake*>(p);++f.count;
+    if(f.oversized&&f.count==2){*size=J1979_CAN_MAX_PAYLOAD+1;return 0;}
+    if(f.bad_error_length&&f.count==2){*size=SIZE_MAX;return -1;}
     if(f.transport_fault&&f.count==2)return -1;
     std::vector<std::uint8_t> out;
     if(n==2&&q[0]==9&&q[1]==2){
@@ -92,6 +94,15 @@ int main(){
     f={};f.transport_fault=true;
     const auto fault=history::inspect_native_plan(cd::json::parse_report(fixture(f)),pair,vin);
     assert(!fault.completed&&fault.stop_reason=="TRANSPORT_ERROR"&&fault.steps==2);
+    f={};f.oversized=true;
+    const auto too_large=fixture(f);
+    const auto rejected_length=history::inspect_native_plan(cd::json::parse_report(too_large),pair,vin);
+    assert(!rejected_length.completed&&rejected_length.stop_reason=="TRANSPORT_ERROR"&&rejected_length.steps==2);
+    assert(too_large.find("UNBOUNDED_TRANSPORT_REPLY")!=std::string::npos);
+    f={};f.bad_error_length=true;
+    const auto error_length=fixture(f);
+    assert(error_length.find("UNBOUNDED_TRANSPORT_REPLY")==std::string::npos);
+    assert(history::inspect_native_plan(cd::json::parse_report(error_length),pair,vin).stop_reason=="TRANSPORT_ERROR");
     f={};f.inactive=true;
     const auto inactive=history::inspect_native_plan(cd::json::parse_report(fixture(f)),pair,vin);
     assert(!inactive.completed&&inactive.stop_reason=="CONTEXT_CHANGED"&&inactive.steps==0);

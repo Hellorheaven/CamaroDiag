@@ -255,6 +255,13 @@ int main(void) {
     assert(j1979_can_scan(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"BUDGET_EXHAUSTED"));
     assert(s.count==1);j1979_can_result_free(&r);
-    puts("Native C J1979 physical CAN scan policy: synthetic checks passed");
+    s = stub{}; s.current=true; s.force_late=true;
+    p=plan(&s);
+    assert(j1979_can_scan(&p,&r)==0);
+    assert(!r.completed && !strcmp(r.stop_reason,"TRANSPORT_ERROR"));
+    assert(s.count==1 && !strcmp(r.steps[0].detail,"EXCHANGE_DEADLINE_EXCEEDED"));
+    assert(!r.vin_valid && r.steps[0].response_size==20);
+    j1979_can_result_free(&r);
+    puts("Native C++20 J1979 physical CAN scan policy: synthetic checks passed");
     return 0;
 }

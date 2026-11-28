@@ -87,6 +87,10 @@ class Replay {
         }else if(detail=="TRANSPORT_ERROR"||detail=="UNBOUNDED_TRANSPORT_REPLY"){
             require(!source.response,"Transport failure must not contain response payload");
             set(s.status,"FAILED");set(s.detail,detail);stop("TRANSPORT_ERROR");
+        }else if(detail=="EXCHANGE_DEADLINE_EXCEEDED"){
+            // A bounded reply can be retained as evidence, but must never
+            // become a positive observation after a transport deadline.
+            set(s.status,"FAILED");set(s.detail,detail);stop("TRANSPORT_ERROR");
         }else if(detail=="TIMEOUT"){
             require(!source.response,"Timed out native request must not contain response");
             set(s.detail,"TIMEOUT");

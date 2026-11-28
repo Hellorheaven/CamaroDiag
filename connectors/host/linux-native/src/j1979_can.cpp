@@ -187,7 +187,9 @@ static j1979_can_step *read_one(const j1979_can_plan *p, j1979_can_result *r,
     uint64_t end = now_ms(p);
     step->duration_ms = end >= begin && end - begin < UINT32_MAX
         ? (uint32_t)(end - begin) : UINT32_MAX;
-    if (capacity > answer.size()) {
+    /* The extra sentinel byte is not a legal ISO-TP payload. On a
+     * transport failure the output length is not part of the contract. */
+    if (rc == 0 && capacity > J1979_CAN_MAX_PAYLOAD) {
         snprintf(step->status, sizeof(step->status), "FAILED");
         snprintf(step->detail, sizeof(step->detail), "UNBOUNDED_TRANSPORT_REPLY");
         stop(r, "TRANSPORT_ERROR"); return step;
@@ -211,6 +213,11 @@ static j1979_can_step *read_one(const j1979_can_plan *p, j1979_can_result *r,
     if (p->current && !p->current(p->context)) {
         snprintf(step->detail, sizeof(step->detail), "CONTEXT_CHANGED");
         stop(r, "CONTEXT_CHANGED"); return step;
+    }
+    if (end < begin || (rc == 0 && end - begin > timeout)) {
+        snprintf(step->status, sizeof(step->status), "FAILED");
+        snprintf(step->detail, sizeof(step->detail), "EXCHANGE_DEADLINE_EXCEEDED");
+        stop(r, "TRANSPORT_ERROR"); return step;
     }
     if (rc == 1) {
         snprintf(step->detail, sizeof(step->detail), "TIMEOUT");
