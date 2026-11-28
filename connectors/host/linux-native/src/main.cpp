@@ -2373,6 +2373,103 @@ static int socket_freeze_cli(int argc,char** argv){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+static int elm_freeze_cli(int argc,char** argv){
+    capture_options o{};
+    unsigned profile=0,baud=38400;
+    bool profile_set=false,baud_set=false;
+    std::vector<char*> args{argv[0],argv[1]};
+    // Reuse the existing immutable freeze plan parser; adapter-specific
+    // options are consumed once, not interpreted as CAN diagnostic data.
+    char interface_option[]="--interface";
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--profile"||flag=="--baud"){
+            auto& seen=flag=="--profile"?profile_set:baud_set;
+            auto& dest=flag=="--profile"?profile:baud;
+            if(seen||i+1>=argc||!decimal_uint32(argv[++i],&dest))return error("Invalid fixed ELM profile or baud");
+            seen=true;continue;
+        }
+        if(flag=="--port"){
+            if(i+1>=argc||!argv[i+1][0])return error("Serial port required");
+            // The plan parser validates an interface string, so pass a
+            // fixed placeholder and preserve the actual port separately.
+            if(o.port)return error("Duplicate port");
+            o.port=argv[++i];
+            args.push_back(interface_option);
+            static char placeholder[]="can0";args.push_back(placeholder);continue;
+        }
+        if(flag=="--interface"||flag=="--key-file")return error("ELM serial port only");
+        args.push_back(argv[i]);
+    }
+    const char* port=o.port;
+    if(!port||!profile_set||!parse_capture_options(static_cast<int>(args.size()),args.data(),&o,true))
+        return error("Explicit fixed ELM profile, serial port, VIN, frames and output required");
+    const cd::elmcan::Scope target{profile,o.plan.tx,o.plan.rx};
+    if(!target.valid()||target.extended()!=o.plan.extended)return error("CAN profile and addressing disagree");
+    if(!isatty(STDIN_FILENO))return error("Interactive local consent required");
+    fputs("Confirm dedicated ELM CAN serial adapter and documented stationary vehicle. Read-only Mode 02. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}};
+    File capture{open(o.capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(capture.fd<0)return error("Capture destination unavailable");
+    File report{open(o.report,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(report.fd<0)return error("Report destination unavailable");
+    if(!sync_parent(o.capture)||!sync_parent(o.report))return error("Output reservation not durable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    try{
+        if(!signals.term)return error("Signal handlers unavailable");
+        const auto current=[](){return legacy_cancelled==0;};
+        auto serial=cd::legacy::serial_link(port,baud,current);
+        const auto acquired=cd::hostfreeze::run_elm(o.plan,target,*serial,current,capture.fd);
+        serial.reset();
+        const auto& result=acquired.capture;
+        const bool synced=fsync(capture.fd)==0;
+        const bool closed=close(capture.fd)==0;capture.fd=-1;
+        if(!synced||!closed||!result.capture_started)return error("CF/1 capture incomplete or unavailable");
+        input raw{},again{};
+        if(!load_regular(o.capture,CF1_MAX_BYTES,&raw))return error("No persisted CF/1 evidence");
+        struct Evidence{cf1_evidence value{};~Evidence(){cf1_evidence_free(&value);}} e;
+        char failure[256]{};
+        const int status=result.terminal_written?
+            cf1_inspect_complete(raw.bytes.get(),raw.length,o.plan.vin,&e.value,failure,sizeof(failure)):
+            cf1_inspect_prefix(raw.bytes.get(),raw.length,o.plan.vin,&e.value,failure,sizeof(failure));
+        if(status)return error(failure);
+        const auto& p=e.value.plan;
+        if(p.tx!=o.plan.tx||p.rx!=o.plan.rx||p.extended!=o.plan.extended||p.budget_ms!=o.plan.budget_ms||
+            p.frame_count!=o.plan.frame_count||p.pid_count!=o.plan.pid_count||
+            memcmp(p.frames,o.plan.frames,p.frame_count)||memcmp(p.pids,o.plan.pids,p.pid_count))
+            return error("Replayed CF/1 scope differs from approved plan");
+        if(!load_regular(o.capture,CF1_MAX_BYTES,&again)||!same_input(&raw,&again))
+            return error("Persisted CF/1 capture changed");
+        json_writer writer{65536};
+        writer.bytes.reset(new (std::nothrow) char[writer.capacity]{});
+        if(!writer.bytes)return error("Report allocation failed");
+        // Canonical offline report: never claim USB authentication for a
+        // local SocketCAN recording. Existing verification command applies.
+        if(result.terminal_written)write_complete(&writer,&e.value,raw.digest,false,false,false);
+        else write_prefix(&writer,&e.value,raw.digest);
+        if(writer.failed)return error("CF/1 report not serialized");
+        const bool completed=result.terminal_written&&e.value.execution_completed&&result.summary.allFramesStable&&!legacy_cancelled;
+        const auto reason=legacy_cancelled?std::string("CANCELLED"):acquired.error;
+        const auto json=cd::elmcan::report(target,o.plan.vin,"FREEZE",
+            {writer.bytes.get(),writer.used},acquired.observations,reason,completed);
+        if(!write_owned_file(report.fd,json.data(),json.size())||!sync_parent(o.report))
+            return error("ELM CAN CF/1 report not persisted");
+        return completed?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static int legacy_journal_cli(const char* protocol,const char* source,const char* vin,const char* path,const char* output,bool recover){
     uint32_t p=0,n=0;
     if(!decimal_uint32(protocol,&p)||!cd::legacy::valid_protocol(static_cast<cd::legacy::Protocol>(p))||
@@ -2408,6 +2505,7 @@ static void usage(FILE *stream) {
         "CamaroDiag Linux native C++20 — SAE J1979\n"
         "Usage:\n"
         "  camarodiag-native --j1979-can-discover --interface can0 --window-ms 1500 --output responders.json --confirm-functional-scope [--extended]\n"
+        "  camarodiag-native --j1979-elm-can-freeze --port /dev/ttyUSB0 --profile 6 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture freeze.cf --output freeze.json --confirm-physical-channel [--extended]\n"
         "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel\n"
         "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel\n"
         "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended]\n"
@@ -2496,6 +2594,7 @@ int main(int argc, char **argv) {
         return cm1_cli(argv[2],argv[3],argv[4],argv[5],true);
     if (argc >= 3 && !strcmp(argv[1], "--j1979-live-usb-native"))
         return capture_cl1_native(argc,argv);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-elm-can-freeze"))return elm_freeze_cli(argc,argv);
     if (argc>=3 && !strcmp(argv[1],"--j1979-elm-can"))return elm_can_cli(argc,argv,false);
     if (argc>=3 && !strcmp(argv[1],"--j1979-elm-live"))return elm_can_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--j1979-can-discover"))return network_cli(argc,argv,false);
