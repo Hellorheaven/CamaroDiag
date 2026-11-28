@@ -24,7 +24,7 @@ Decoded decode(std::string_view raw,const Scope&,Bytes request);
 struct Observation{
     std::string command,raw,error;
     Data request,response;
-    unsigned duration_ms{};
+    unsigned duration_ms{},timeout_ms{};
     int status{-1};
 };
 std::string report(const Scope&,std::string_view vin,std::string_view operation,std::string_view native_report,

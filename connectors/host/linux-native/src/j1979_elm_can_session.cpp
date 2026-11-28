@@ -45,7 +45,7 @@ void Session::record(Observation row){
 std::string Session::setup(std::string_view command,unsigned timeout){
     if(retired_||!current_()||evidence_.size()>=max_rows||max_raw-total_raw_<32768)
         throw legacy::TransportError("ELM CAN setup revoked or evidence limit");
-    Observation row{};row.command=command;
+    Observation row{};row.command=command;row.timeout_ms=timeout;
     const auto start=legacy::monotonic_ms();
     try{
         row.raw=link_.command(command,timeout);row.duration_ms=elapsed(start);
@@ -85,7 +85,7 @@ int Session::exchange_admitted(Bytes request,std::span<uint8_t> response,std::si
     const auto capacity=std::min(size,response.size());size=0;
     if(!current()||!allowed||request.empty()||request.size()>7||
         !capacity||timeout<1||timeout>2500||evidence_.size()>=max_rows||max_raw-total_raw_<32768)return -1;
-    Observation row{};row.request.assign(request.begin(),request.end());
+    Observation row{};row.timeout_ms=timeout;row.request.assign(request.begin(),request.end());
     Data frame{static_cast<uint8_t>(request.size())};frame.insert(frame.end(),request.begin(),request.end());
     row.command=legacy::hex(frame);
     const auto start=legacy::monotonic_ms();

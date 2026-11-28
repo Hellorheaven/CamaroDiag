@@ -38,7 +38,7 @@ std::string report(const Scope& scope,std::string_view vin,std::string_view oper
         o<<",\"request_hex\":";nullable(o,legacy::hex(row.request));
         o<<",\"response_hex\":";nullable(o,legacy::hex(row.response));
         o<<",\"raw_response\":";nullable(o,row.raw);
-        o<<",\"duration_ms\":"<<row.duration_ms<<",\"transport_status\":"<<row.status<<",\"error\":";nullable(o,row.error);
+        o<<",\"duration_ms\":"<<row.duration_ms<<",\"timeout_ms\":"<<row.timeout_ms<<",\"transport_status\":"<<row.status<<",\"error\":";nullable(o,row.error);
         o<<'}';
     }
     o<<"],\"native_report\":";
