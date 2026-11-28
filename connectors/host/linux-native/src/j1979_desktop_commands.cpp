@@ -45,6 +45,12 @@ Field csv_output(){return f("csv-output","Nouvel export CSV","--csv",K::output_f
 Field native_output(){return f("native-output","Nouveau rapport brut natif","--native-report-output",K::output_file,"",false);}
 Field positional(Field field){field.flag.clear();return field;}
 Field second_report(){return f("second-report","Deuxième rapport source","--report",K::input_file,"");}
+Field optional_report(std::string key,std::string label){
+    return f(std::move(key),std::move(label),"--report",K::input_file,"",false);
+}
+Field optional_cl1(std::string key,std::string label){
+    return f(std::move(key),std::move(label),"--cl1",K::input_file,"",false);
+}
 Field baseline(){return f("baseline","Rapport avant maintenance","--baseline",K::input_file,"",false);}
 Field trace(bool write=false){return f("trace",write?"Nouvelle trace":"Trace adaptateur","--trace",write?K::output_file:K::input_file,"");}
 Field offline_journal(){return f("journal","Journal source","--journal",K::input_file,"");}
@@ -116,7 +122,7 @@ const std::vector<Operation>& operations(){
         op("verify-live","Hors ligne — Live historique","Rejeu d’un rapport historique et de ses statistiques.","verify-live",{report(),vin(),output()}),
         op("verify-freeze","Hors ligne — Freeze historique CAN","Reconstruction de la recette et des déclencheurs.","verify-freeze",{report(),vin(),output()}),
         op("verify-legacy-freeze","Hors ligne — Freeze historique legacy","Reconstruction des échanges de la source sélectionnée.","verify-legacy-freeze",{report(),vin(),output()}),
-        op("compare-native-live","Hors ligne — Comparer les mesures CAN","Compare deux rapports CAN natifs sur le même périmètre.","compare-native-live",{report(),second_report(),tx(),rx(),vin(),output()}),
+        op("compare-native-live","Hors ligne — Comparer les mesures CAN et USB","Compare les originaux natifs, sans comparer les projections éditées.","compare-native-live",{optional_report("report","Premier rapport CAN/ELM"),optional_report("second-report","Deuxième rapport CAN/ELM"),optional_cl1("cl1","Première capture CL/1"),optional_cl1("second-cl1","Deuxième capture CL/1"),tx(),rx(),vin(),output()}),
         op("compare-live","Hors ligne — Comparer les mesures historiques","Compare les rapports historiques sans interroger le véhicule.","compare-live",{report(),second_report(),vin(),output()}),
         op("verify-network-report","Hors ligne — Rapport réseau historique","Vérifie le rapport réseau indépendamment des journaux SCJ.","verify-network",{report(),vin(),output()}),
         op("verify-can-mutation","Hors ligne — Maintenance CAN historique","Vérifie la cohérence des preuves existantes ; aucune émission.","verify-can-mutation",{report(),baseline(),vin(),output()}),
@@ -247,6 +253,14 @@ Invocation prepare(const Operation& supplied,const Values& values){
     if(ids.contains("tx")&&ids.contains("rx")&&std::any_of(op.fields.begin(),op.fields.end(),[](const Field& a){return a.key=="extended";})){
         const bool extended=values.contains("extended")&&values.at("extended")=="true";
         require(extended==(ids.at("tx")>0x7ff),"Adressage 11/29 bits incohérent");
+    }
+    if(op.id=="compare-native-live"){
+        unsigned sources=0;
+        for(const auto* key:{"report","second-report","cl1","second-cl1"}){
+            const auto it=values.find(key);
+            if(it!=values.end()&&!it->second.empty())++sources;
+        }
+        require(sources>=2,"Au moins deux rapports bruts ou captures CL/1 sont nécessaires");
     }
     if(op.id=="elm-live"){
         const auto given=[&](std::string_view key){

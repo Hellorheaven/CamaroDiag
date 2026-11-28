@@ -206,7 +206,7 @@ test-j1979-socket-campaign: build/j1979_live_export.o build/j1979_native_live_pr
 test-j1979-live: build/j1979_native_live_comparison.o build/j1979_native_live_projection.o build/test_j1979_live.o build/j1979_native_live_inspection.o build/native_json.o build/j1979_live.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-cl1: build/test_j1979_cl1.o build/cl1.o build/cf1.o build/j1979_cl1_projection.o build/j1979_native_live_projection.o build/j1979_native_live_inspection.o build/native_json.o build/j1979_live.o build/j1979_can.o build/j1979_policy.o $(DECODER_OBJECTS)
+test-j1979-cl1: build/j1979_native_live_comparison.o build/test_j1979_cl1.o build/cl1.o build/cf1.o build/j1979_cl1_projection.o build/j1979_native_live_projection.o build/j1979_native_live_inspection.o build/native_json.o build/j1979_live.o build/j1979_can.o build/j1979_policy.o $(DECODER_OBJECTS)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 clean:

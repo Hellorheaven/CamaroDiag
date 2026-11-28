@@ -3071,6 +3071,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native export-native-live-csv --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native export-legacy-live-csv --capture CAPTURE.llr --protocol 2 --source 10 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native compare-native-live --report A.json --report B.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "    Use --cl1 CAPTURE.cl instead of --report for each original USB capture (2 to 16 sources).\n"
         "  camarodiag-native compare-live --report A.json --report B.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-native-freeze --capture CAPTURE.cf --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-j1979-capture --capture CAPTURE.cj1 --report REPORT.json [--vin VIN] --output PROOF.json\n"
@@ -3397,20 +3398,21 @@ static int project_native_live_cli(int argc,char** argv,bool csv,bool verify=fal
     }catch(const std::exception& e){return error(e.what());}
 }
 static int compare_native_live_cli(int argc,char** argv){
-    std::vector<const char*> paths;
+    struct Source {const char* path;bool cl1;};
+    std::vector<Source> paths;
     const char* output=nullptr;const char* vin=nullptr;const char* tx=nullptr;const char* rx=nullptr;
     for(int i=2;i<argc;){
         const std::string_view key(argv[i++]);
         if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing native comparison option");
         const char* value=argv[i++];
-        if(key=="--report"&&paths.size()<16)paths.push_back(value);
+        if((key=="--report"||key=="--cl1")&&paths.size()<16)paths.push_back({value,key=="--cl1"});
         else if(key=="--output"&&!output)output=value;
         else if(key=="--vin"&&!vin)vin=value;
         else if(key=="--tx"&&!tx)tx=value;
         else if(key=="--rx"&&!rx)rx=value;
         else return error("Unexpected or duplicate native comparison option");
     }
-    if(paths.size()<2||!output||!vin||!tx||!rx)return error("Native comparison requires 2 to 16 reports, TX, RX, VIN and output");
+    if(paths.size()<2||!output||!vin||!tx||!rx)return error("Native comparison requires 2 to 16 raw reports or CL/1 captures, TX, RX, VIN and output");
     try{
         auto id=[](std::string_view s){
             std::uint32_t n{};
@@ -3427,18 +3429,26 @@ static int compare_native_live_cli(int argc,char** argv){
         std::vector<std::string> digests;
         for(std::size_t i=0;i<paths.size();++i){
             auto& in=snapshots[i];
-            if(!load_regular(paths[i],maximum,&in)||in.length>total_limit-total)
+            const auto& source=paths[i];
+            const auto bound=source.cl1?static_cast<std::size_t>(CL1_MAX_CAPTURE):maximum;
+            if(!load_regular(source.path,bound,&in)||in.length>total_limit-total)
                 return error("Bounded native comparison inputs required");
+            for(std::size_t previous=0;previous<i;++previous)
+                if(!separate(&in,&snapshots[previous]))return error("Comparison inputs alias the same evidence");
             total+=in.length;
-            const auto root=cd::json::parse_report({reinterpret_cast<const char*>(in.bytes.get()),in.length},maximum);
-            projections.push_back(cd::network::history::project_native_live(root,pair,vin));
+            if(source.cl1){
+                projections.push_back(cd::network::history::project_cl1_live({in.bytes.get(),in.length},pair,vin));
+            }else{
+                const auto root=cd::json::parse_report({reinterpret_cast<const char*>(in.bytes.get()),in.length},maximum);
+                projections.push_back(cd::network::history::project_native_live(root,pair,vin));
+            }
             digests.emplace_back(in.digest);
         }
         const auto result=cd::network::history::compare_native_live(projections,digests);
         const auto proof=cd::json::serialize(result)+"\n";
         for(std::size_t i=0;i<paths.size();++i){
             input again{};
-            if(!load_regular(paths[i],maximum,&again)||!same_input(&snapshots[i],&again))
+            if(!load_regular(paths[i].path,paths[i].cl1?static_cast<std::size_t>(CL1_MAX_CAPTURE):maximum,&again)||!same_input(&snapshots[i],&again))
                 return error("Native comparison input changed");
         }
         if(!atomic_create(output,proof.data(),proof.size()))return error("Native comparison output unavailable");

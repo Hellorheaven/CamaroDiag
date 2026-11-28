@@ -1,6 +1,7 @@
 #include "cl1.h"
 #include "j1979_native_live_inspection.hpp"
 #include <stdexcept>
+#include <array>
 #include "cf1.h"
 #include <assert.h>
 #include <stdint.h>
@@ -99,6 +100,14 @@ int main(void) {
     assert(samples[0].at("signals").array()[0].at("number").finite_number()==1726);
     assert(projected.report.at("channel_summary").array()[0].at("mean").finite_number()==1726);
     assert(native_live_csv(projected).find("engine-rpm")!=std::string::npos);
+    // Compare two independently replayed recordings, never user-edited
+    // engineering data. Different evidence digests are required.
+    const std::array runs{projected,projected};
+    const std::array hashes{std::string(64,'a'),std::string(64,'b')};
+    const auto comparison=compare_native_live(runs,hashes);
+    assert(comparison.at("all_recordings_complete").boolean());
+    const auto& channel=comparison.at("channel_comparison").array()[0];
+    assert(channel.at("comparable").boolean()&&channel.at("mean_range").finite_number()==0);
     bool refused=false;
     try{(void)project_cl1_live({f.bytes,f.used},{0x7e1,0x7e9},vin);}
     catch(const std::invalid_argument&){refused=true;}assert(refused);

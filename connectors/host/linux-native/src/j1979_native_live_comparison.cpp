@@ -121,6 +121,7 @@ json::Value compare_native_live(std::span<const NativeLiveProjection> runs,std::
     const auto& vin=first.at("vin");
     const auto& tx=first.at("tx_can_id");
     const auto& rx=first.at("rx_can_id");
+    const Pair expected{address(tx),address(rx)};
     std::set<std::string> hashes;
     std::vector<Index> indices;
     std::set<Key> keys;
@@ -129,7 +130,7 @@ json::Value compare_native_live(std::span<const NativeLiveProjection> runs,std::
     bool all_identity=true,all_complete=true;
     for(std::size_t i=0;i<runs.size();++i){
         const auto& root=runs[i].report;
-        require(compare(root.at("vin"),vin)&&compare(root.at("tx_can_id"),tx)&&compare(root.at("rx_can_id"),rx),
+        require(compare(root.at("vin"),vin)&&address(root.at("tx_can_id"))==expected.tx&&address(root.at("rx_can_id"))==expected.rx,
             "Native live recordings differ in VIN or physical CAN pair");
         require(digest_ok(digests[i])&&hashes.insert(digests[i]).second,"Invalid or duplicate source SHA-256");
         auto idx=index(runs[i]);
