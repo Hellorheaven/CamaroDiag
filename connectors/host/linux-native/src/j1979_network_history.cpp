@@ -174,10 +174,25 @@ void compare(const Value& row,const Responder& expected,bool extended,bool andro
     }
 }
 bool addressing(const Value& v){
-    const auto& s=v.string();require(s=="11BIT"||s=="29BIT","Invalid classic CAN addressing");return s=="29BIT";
+    const auto& s=v.string();require(s=="11BIT"||s=="29BIT"||s=="11bit"||s=="29bit","Invalid classic CAN addressing");return s=="29BIT"||s=="29bit";
 }
 bool contains_schema(const Value& v,std::string_view s){
     const auto* p=v.find("schema");return p&&p->string()==s;
+}
+}
+namespace {
+bool supported_schema(const Value& v){
+    return contains_schema(v,"camarodiag-j1979-network-v1")||
+        contains_schema(v,"camarodiag-functional-j1979-can-discovery-v1")||
+        contains_schema(v,"camarodiag-functional-j1979-can-network-v1")||
+        contains_schema(v,"camarodiag-j1979-can-discovery-linux-v1");
+}
+const Value& unwrap(const Value& v){
+    no_claims(v);
+    if(supported_schema(v))return v;
+    const auto* nested=v.find("network");
+    require(nested&&!nested->null()&&supported_schema(*nested),"Unsupported CAN network report wrapper");
+    no_claims(*nested);return *nested;
 }
 }
 static Inspection inspect_admission(const Value& root,bool campaign){
@@ -236,7 +251,7 @@ static Inspection inspect_admission(const Value& root,bool campaign){
     const auto* raw=property(*d,"raw_frames");
     if(!raw)raw=d->find("frames");
     require(raw,"Missing CAN discovery bytes");
-    const bool native=contains_schema(root,"camarodiag-j1979-can-discovery-linux-v1");
+    const bool native=contains_schema(*d,"camarodiag-j1979-can-discovery-linux-v1");
     for(const auto& v:array(*raw,max_frames))out.frames.push_back(frame(v,extended,android,false,native));
     require(out.sent||out.frames.empty(),"Response recorded without discovery transmission");
     if(native){
@@ -265,7 +280,7 @@ static Inspection inspect_admission(const Value& root,bool campaign){
     }
     return result;
 }
-Inspection inspect_discovery(const Value& root){return inspect_admission(root,false);}
+Inspection inspect_discovery(const Value& root){return inspect_admission(unwrap(root),false);}
 namespace {
 bool equal_value(const Value& a,const Value& b){
     if(a.data.index()!=b.data.index())return false;
@@ -302,12 +317,28 @@ bool terminal_error(std::string_view error){
         error=="BrokenPipeError"||error=="ConnectionResetError";
 }
 }
-NetworkInspection inspect_network(const Value& root,std::optional<std::string> expected_vin){
+NetworkInspection inspect_network(const Value& source,std::optional<std::string> expected_vin){
+    const auto& root=unwrap(source);
     NetworkInspection out{};
-    out.admission=inspect_admission(root,true);
+    bool discovery_only=contains_schema(root,"camarodiag-functional-j1979-can-discovery-v1")||
+        contains_schema(root,"camarodiag-j1979-can-discovery-linux-v1");
+    if(contains_schema(root,"camarodiag-j1979-network-v1"))
+        discovery_only=array(required(root,"selected_response_ids"),max_targets).empty();
+    out.discovery_only=discovery_only;
+    out.admission=inspect_admission(root,!discovery_only);
     const bool android=out.admission.platform=="ANDROID",windows=out.admission.platform=="J2534";
     const auto& d=out.admission.discovery;
     const Value* body=&root;
+    if(discovery_only){
+        out.vin=vin_value(optional(root,"declared_vin"));
+        if(expected_vin)require(out.vin==expected_vin,"Discovery VIN differs from independent target");
+        out.completed=d.completed;out.stop=d.stop;
+        if(const auto* ids=property(root,"selected_response_ids"))
+            require(array(*ids,max_targets).empty(),"Discovery-only report selects physical targets");
+        if(const auto* rows=property(root,"ecu_reports"))
+            require(array(*rows,max_targets).empty(),"Discovery-only report includes physical evidence");
+        return out;
+    }
     if(windows){
         body=&required(root,"network");
         require(!body->null(),"Missing Windows physical network body");
@@ -320,7 +351,11 @@ NetworkInspection inspect_network(const Value& root,std::optional<std::string> e
     out.completed=required(root,"completed").boolean();
     require(required(*body,"completed").boolean()==out.completed,"Outer network completion differs");
     out.stop=optional_text(*body,"stop_reason");
-    require(!out.completed||out.stop.empty(),"Completed network has stop reason");
+    require(out.completed==out.stop.empty(),"Inconsistent network completion");
+    if(windows){
+        const auto outer_error=optional_text(root,"error");
+        require(!out.completed||outer_error.empty(),"Completed J2534 network reports outer error");
+    }
     const auto& ids=array(required(*body,"selected_response_ids"),max_targets);
     std::set<std::uint32_t> seen;
     for(const auto& id:ids){
@@ -348,6 +383,9 @@ NetworkInspection inspect_network(const Value& root,std::optional<std::string> e
         row.error=optional_text(v,android?"stop_reason":"error");
         const auto& evidence=android?v:optional(v,"report");
         if(!evidence.null()){
+            no_claims(evidence);
+            if(const auto* tx=property(evidence,"tx_can_id"))require(address(*tx)==row.pair.tx,"Inner physical TX differs");
+            if(const auto* rx=property(evidence,"rx_can_id"))require(address(*rx)==row.pair.rx,"Inner physical RX differs");
             row.plan=inspect_plan(evidence,android?PlanOrder::android:PlanOrder::historical,out.vin);
             if(!row.plan->steps.empty())require(all_eligible&&!terminal,"Read attempted after unverified or terminal target");
             require(row.status!="PASSED"||row.plan->completed,"Successful ECU lacks complete physical plan");
@@ -364,8 +402,8 @@ NetworkInspection inspect_network(const Value& root,std::optional<std::string> e
 std::string report(const NetworkInspection& r,std::string_view digest){
     std::ostringstream o;
     o<<"{\"schema\":\"camarodiag-j1979-historical-can-network-inspection-linux-v1\","
-        "\"verification_scope\":\"DISCOVERY_SELECTION_READ_PLAN_BASIC_SUMMARY\","
-        "\"consistent\":true,\"completed\":"<<(r.completed?"true":"false")
+        "\"verification_scope\":"<<json::quote(r.discovery_only?"DISCOVERY_ONLY":"DISCOVERY_SELECTION_READ_PLAN_HISTORICAL_PROJECTIONS")
+        <<",\"consistent\":true,\"discovery_only\":"<<(r.discovery_only?"true":"false")<<",\"completed\":"<<(r.completed?"true":"false")
         <<",\"declared_vin\":"<<(r.vin?json::quote(*r.vin):"null")
         <<",\"stop_reason\":"<<(r.stop.empty()?"null":json::quote(r.stop))
         <<",\"admission\":"<<report(r.admission)<<",\"selected_response_ids\":[";

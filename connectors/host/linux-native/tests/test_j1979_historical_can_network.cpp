@@ -43,6 +43,14 @@ void rejects(const std::string& s){
 int main(){
     auto data=root();
     auto r=history::inspect_network(cd::json::parse_report(data),std::string(vin));
+    auto lower=history::inspect_network(cd::json::parse_report(replace(data,"\"addressing\":\"11BIT\"","\"addressing\":\"11bit\"")),std::string(vin));
+    assert(lower.completed);
+    auto wrapped=history::inspect_network(cd::json::parse_report("{\"network\":"+data+"}"),std::string(vin));
+    assert(wrapped.completed&&wrapped.rows.size()==2);
+    rejects("{\"physical_vehicle_verified\":true,\"network\":"+data+"}");
+    auto only=history::inspect_network(cd::json::parse_report(discovery()),{});
+    assert(only.discovery_only&&only.completed&&only.rows.empty());
+    rejects(replace(data,"\"report\":{\"completed\":true","\"report\":{\"tx_can_id\":\"7E1\",\"completed\":true"));
     assert(r.completed&&r.rows.size()==2&&r.rows[1].plan->measurements[0].number==60);
     rejects(replace(data,"\"selected_response_ids\":[\"7E8\",\"7E9\"]","\"selected_response_ids\":[\"7E9\",\"7E8\"]"));
     rejects(replace(data,"\"selected_response_ids\":[\"7E8\",\"7E9\"]","\"selected_response_ids\":[\"7E8\",\"7E8\"]"));

@@ -2819,6 +2819,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-legacy-maintenance VIN FINAL.json BASELINE.json INTENT.json PROOF.json\n"
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
+        "  camarodiag-native verify-network --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-can-network VIN|- REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-can-plan historical|android VIN|- REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-can-discovery-report REPORT.json PROOF.json\n"
@@ -2920,7 +2921,24 @@ static int historical_can_network_cli(const char* vin,const char* path,const cha
         return 0;
     }catch(const std::exception& e){return error(e.what());}
 }
+static int verify_network_compat_cli(int argc,char** argv){
+    const char* path=nullptr;const char* vin="-";const char* output=nullptr;
+    bool vin_seen=false;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing verify-network option value");
+        const char* value=argv[i++];
+        if(key=="--report"&&!path)path=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin_seen){vin=value;vin_seen=true;}
+        else return error("Unexpected or duplicate verify-network option");
+    }
+    if(!path||!output)return error("verify-network requires --report and --output");
+    if(vin_seen&&std::string_view(vin)=="-")return error("Explicit VIN must be a VIN");
+    return historical_can_network_cli(vin,path,output);
+}
 int main(int argc, char **argv) {
+    if(argc>=2&&!strcmp(argv[1],"verify-network"))return verify_network_compat_cli(argc,argv);
     if(argc==5&&!strcmp(argv[1],"--inspect-j1979-historical-can-network"))return historical_can_network_cli(argv[2],argv[3],argv[4]);
     if(argc==6&&!strcmp(argv[1],"--inspect-j1979-historical-can-plan"))return historical_can_plan_cli(argv[2],argv[3],argv[4],argv[5]);
     if(argc==4&&!strcmp(argv[1],"--inspect-j1979-can-discovery-report"))return historical_can_discovery_cli(argv[2],argv[3]);

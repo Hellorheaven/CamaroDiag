@@ -19,7 +19,7 @@ struct PhysicalRow {
 struct NetworkInspection {
     Inspection admission;
     std::optional<std::string> vin;
-    bool completed{};
+    bool completed{},discovery_only{};
     std::string stop;
     std::vector<std::uint32_t> selected;
     std::vector<PhysicalRow> rows;
